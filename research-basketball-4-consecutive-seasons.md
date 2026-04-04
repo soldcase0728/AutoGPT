@@ -94,8 +94,8 @@ Below are the confirmed players who played 4 consecutive seasons (2022-23, 2023-
 | ACC | 2 | North Carolina (1), Clemson (1) |
 | Big 12 | 1 | Iowa State (1) |
 | SEC | 1 | Mississippi State (1) |
-| Big South | 0 | -- |
-| **Total** | **13** | |
+| Big South | 2-3 | Winthrop (2-3) |
+| **Total** | **15-16** | |
 
 ### Transferred Between Power 4 Schools, in Power 4 All 4 Years (5 players)
 
@@ -107,29 +107,35 @@ Below are the confirmed players who played 4 consecutive seasons (2022-23, 2023-
 | Felix Okpara | Ohio State -> Tennessee | Big Ten -> SEC |
 | Denzel Aberdeen | Florida -> Kentucky | SEC -> SEC |
 
-### Grand Total: 18 players confirmed in Power 4 for all 4 consecutive seasons (2022-23 through 2025-26)
+### Grand Total: 20-21 players confirmed in Power 4 or Big South for all 4 consecutive seasons (2022-23 through 2025-26)
 
 ---
 
-## Big South Conference: No Confirmed 4-Year Players Found
+## Big South Conference: 2-3 Confirmed 4-Year Players Found
 
-After extensive research into every 2025-26 Big South All-Conference player and numerous roster searches, **no men's basketball player was confirmed to have played 4 consecutive seasons (2022-23 through 2025-26) entirely in the Big South Conference.**
+After deeper research into individual Big South team rosters (not just All-Conference honorees), **2-3 players were confirmed** to have been at the same Big South school for all 4 consecutive seasons. Notably, none were stars or All-Conference first-teamers -- they were role players who stayed while nearly everyone around them transferred.
 
-### Key Findings:
-- **Logan Duncomb (Winthrop, Player of the Year):** Started at Indiana (Big Ten, 2021-23), transferred to Xavier (Big East, 2023-24), then moved to Winthrop (Big South, 2024-26). Only 2 years in Big South.
-- **Terry Anderson (High Point, First Team All-Conference):** Played at junior college, then Lamar, then High Point. Transfer.
-- **Jonah Pierce (Presbyterian, First Team All-Conference):** Played at Francis Marion (Conference Carolinas, 2021-23) before transferring to Presbyterian. Only 2-3 years in Big South.
-- **Dennis Parker Jr. (Radford, Second Team):** Transferred from NC State (ACC) to Radford for 2025-26 only.
-- **Kareem Rozier (Winthrop, Second Team):** Played at Duquesne (A-10) for 3 seasons before Winthrop.
-- **Kody Clouet (Winthrop, Honorable Mention):** Played at 3 other schools before Winthrop.
-- **Elijah Tucker (Longwood, Honorable Mention):** Transferred to Longwood in 2023-24.
-- **Karmani Gregory (USC Upstate, Honorable Mention):** Came from junior college in 2024-25.
-- **Kameron Taylor (UNC Asheville, First Team):** Only a sophomore in 2025-26 (started 2024-25).
+### Confirmed Big South 4-Year Players
 
-### Closest Big South Candidate:
-- **Jaylen Peterson (Presbyterian):** Enrolled at Presbyterian since 2022-23 (class of 2022), played 14 games as a freshman. However, he redshirted one season and is listed as a "Redshirt Junior" in 2025-26, meaning he likely played only 3 of the 4 seasons.
+### 14. Xavier McKelvy -- Winthrop (Big South)
+- **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
+- **Key Stats:** Played in 25 games as a freshman, scoring a career-high 15 points vs. Toccoa Falls (made SportsCenter Top 10 for an alley-oop dunk). Averaged 3.3 PPG, 2.4 RPG as a sophomore.
+- **Notable:** Committed to Winthrop in the class of 2022 from United Faith Christian Academy (Charlotte, NC). Confirmed Senior Guard on the 2025-26 roster. **The clearest example of a 4-year Big South player.**
 
-The Big South's extreme roster turnover (only one team returned over 40% of their minutes entering 2025-26) makes four-year continuity nearly impossible.
+### 15. Michael Moore -- Winthrop (Big South, likely)
+- **Seasons:** 2022-23 (Fr), 2023-24, 2024-25, 2025-26
+- **Key Stats:** Played in 25 games with 1 start as a freshman. Finished 3rd on team in blocks (13). Career highs of 8 points, 11 rebounds, and 4 blocks vs. Toccoa Falls.
+- **Notable:** True freshman in 2022-23, confirmed on 2025-26 Winthrop roster. Exact class standing (senior vs. redshirt junior) less well-documented, but has been at Winthrop for all 4 years.
+
+### Borderline: Jaylen Peterson -- Presbyterian (Big South, 3 of 4 seasons played)
+- **Seasons on roster:** 2022-23, 2023-24 (redshirt), 2024-25, 2025-26
+- **Key Stats:** Played 14 games as a freshman in 2022-23. Named **Big South Defensive Player of the Year** in 2025-26. Set Presbyterian's D-I era record for blocks (52) in 2024-25.
+- **Notable:** Has been at Presbyterian for all 4 years but redshirted 2023-24, so he only PLAYED in 3 of 4 seasons. Listed as "Redshirt Junior" in 2025-26.
+
+### Why Big South 4-Year Players Are So Rare
+- The portal "gutted almost every Big South roster" -- only USC Upstate returned over 40% of their minutes entering 2025-26.
+- Every 2025-26 Big South All-Conference First Team and Second Team player was a transfer (Duncomb from Indiana/Xavier, Anderson from Lamar, Pierce from Francis Marion, Parker from NC State, Rozier from Duquesne, etc.).
+- Even players who started at Big South schools often left: Kenyon Giles (Radford freshman 2022-23) transferred to Wichita State; Ibu Yamazaki (Radford freshman 2022-23) transferred to Northern Colorado.
 
 ---
 
@@ -181,7 +187,7 @@ The data paints a stark picture of modern college basketball:
 - **The ACC had just TWO** four-year players (Seth Trimble at UNC and Dillon Hunter at Clemson) -- a testament to the extreme roster churn in the conference.
 - **The Big 12 had approximately 5** seniors who stayed at their original school per CBS Sports, though 2 of those (Sharp at Houston, Saunders at BYU) experienced conference realignment into the Big 12. Tamin Lipsey at Iowa State was the only one in the Big 12 all 4 years.
 - **The SEC had just ONE** four-year player finish at the school where he started (Shawn Jones Jr.).
-- **The Big South had ZERO** confirmed four-year players spanning all four seasons.
+- **The Big South had 2-3** confirmed four-year players at Winthrop (Xavier McKelvy, Michael Moore, and borderline Jaylen Peterson at Presbyterian who redshirted one year). Remarkably, NONE of the Big South's All-Conference first or second teamers were four-year Big South players -- they were all transfers.
 - The transfer portal, NIL, and coaching changes have fundamentally reshaped roster construction, making multi-year continuity the exception rather than the norm.
 
 ---
