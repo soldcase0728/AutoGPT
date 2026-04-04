@@ -86,6 +86,8 @@ Below are the confirmed players who played 4 consecutive seasons (2022-23, 2023-
 
 ## Summary by Conference
 
+### Same School, Same Power 4 Conference All 4 Years (13 players)
+
 | Conference | Confirmed 4-Year Players | Schools |
 |-----------|-------------------------|---------|
 | Big Ten | 9 (including 1 walk-on) | Purdue (3), Ohio State (1), Northwestern (1), Michigan State (2), Michigan (1), Illinois (1) |
@@ -94,6 +96,18 @@ Below are the confirmed players who played 4 consecutive seasons (2022-23, 2023-
 | SEC | 1 | Mississippi State (1) |
 | Big South | 0 | -- |
 | **Total** | **13** | |
+
+### Transferred Between Power 4 Schools, in Power 4 All 4 Years (5 players)
+
+| Player | Path | Conferences |
+|--------|------|-------------|
+| Otega Oweh | Oklahoma -> Kentucky | Big 12 -> SEC |
+| Isaac McKneely | Virginia -> Louisville | ACC -> ACC |
+| Milos Uzan | Oklahoma -> Houston | Big 12 -> Big 12 |
+| Felix Okpara | Ohio State -> Tennessee | Big Ten -> SEC |
+| Denzel Aberdeen | Florida -> Kentucky | SEC -> SEC |
+
+### Grand Total: 18 players confirmed in Power 4 for all 4 consecutive seasons (2022-23 through 2025-26)
 
 ---
 
@@ -119,22 +133,50 @@ The Big South's extreme roster turnover (only one team returned over 40% of thei
 
 ---
 
+## Players Who Transferred BETWEEN Power 4 Schools (In Power 4 All 4 Years)
+
+These players changed schools but remained in a Power 4 conference every season from 2022-23 through 2025-26:
+
+### 14. Otega Oweh -- Oklahoma (Big 12, 2022-24) then Kentucky (SEC, 2024-26)
+- Two years at Oklahoma in the Big 12, two years at Kentucky in the SEC. All four years in Power 4.
+- Senior year at Kentucky: 18.2 PPG, 4.5 RPG, 2.7 APG, 1.8 SPG. 2x Second Team All-SEC.
+
+### 15. Isaac McKneely -- Virginia (ACC, 2022-25) then Louisville (ACC, 2025-26)
+- Three years at Virginia, transferred to Louisville for his senior year. Remained in the ACC all four seasons.
+- Led ACC in three-point percentage (42.1%) as a junior at Virginia.
+
+### 16. Milos Uzan -- Oklahoma (Big 12, 2022-24) then Houston (Big 12, 2024-26)
+- Stayed in the Big 12 all four years. Two years at Oklahoma, two at Houston. 141 career games, 9.9 PPG, 3.9 APG.
+- Big 12 All-Freshman Team (2022-23). All-Big 12 Second Team at Houston (2024-25).
+
+### 17. Felix Okpara -- Ohio State (Big Ten, 2022-24) then Tennessee (SEC, 2024-26)
+- Two years at Ohio State in the Big Ten, two at Tennessee in the SEC. 142 career games. SEC All-Defense (2025-26).
+
+### 18. Denzel Aberdeen -- Florida (SEC, 2022-25) then Kentucky (SEC, 2025-26)
+- Three years at Florida, one at Kentucky. All four years in the SEC. Was sixth man on Florida's 2025 National Championship team.
+
+---
+
 ## Notable Near-Misses (Power 4 Adjacent)
 
 ### Richie Saunders -- BYU (WCC then Big 12)
 - **Seasons at BYU:** 2022-23 (WCC), 2023-24 (Big 12), 2024-25 (Big 12), 2025-26 (Big 12)
 - Played all 4 years at the same school, but BYU was in the WCC (not Power 4) in 2022-23 before joining the Big 12 in 2023-24. Only 3 of 4 seasons in a Power 4 conference.
-- Steadily improved from 5.5 PPG as a freshman to 18.0 PPG as a senior before a season-ending injury.
+- Steadily improved from 5.5 PPG as a freshman to 18.0 PPG as a senior before a season-ending injury. All-Big 12 First Team.
+
+### Emanuel Sharp -- Houston (AAC then Big 12)
+- **Seasons at Houston:** 2022-23 (AAC), 2023-24 (Big 12), 2024-25 (Big 12), 2025-26 (Big 12)
+- Played all 4 years at Houston, but Houston was in the AAC (not Power 4) in 2022-23 before joining the Big 12 in 2023-24. Only 3 of 4 seasons in Power 4. Senior year: 15.5 PPG. Over 100 career victories.
 
 ### Alex Karaban -- UConn (Big East)
-- Played all 4 seasons at UConn (2022-23 through 2025-26), winning 2 national championships. However, UConn plays in the **Big East**, which is NOT a Power 4 conference. UConn's winningest men's player in program history.
+- Played all 4 seasons at UConn (2022-23 through 2025-26), winning 2 national championships. However, UConn plays in the **Big East**, which is NOT a Power 4 conference. UConn's winningest men's player in program history. 149 games, 125 wins.
 
 ---
 
 ## The Bigger Picture
 
 The data paints a stark picture of modern college basketball:
-- **Only 22 scholarship players from high-major schools** graduating in 2026 spent their entire career at one school (per CBS Sports' Isaac Trotter). We identified 12 of those 22 (plus 1 walk-on).
+- **Only 22 scholarship players from high-major schools** graduating in 2026 spent their entire career at one school (per CBS Sports' Isaac Trotter). We identified 12 of those 22 (plus 1 walk-on). An additional 5 players transferred between Power 4 schools while remaining in Power 4 conferences all 4 years.
 - **The Big Ten dominates** with 8-9 four-year players, led by Purdue's historic trio of Smith, Loyer, and Kaufman-Renn who won a program-record 117 games together.
 - **The ACC had just TWO** four-year players (Seth Trimble at UNC and Dillon Hunter at Clemson) -- a testament to the extreme roster churn in the conference.
 - **The Big 12 had at least ONE** (Tamin Lipsey at Iowa State).
@@ -167,6 +209,14 @@ The data paints a stark picture of modern college basketball:
 - [Seth Trimble - UNC Athletics](https://goheels.com/sports/mens-basketball/roster/seth-trimble/27315)
 - [Dillon Hunter - Clemson / SI](https://www.si.com/college/clemson/basketball/dillon-hunter-leadership-fuels-clemson-basketball-perfect-acc-start)
 - [AJ Redd - Daily Illini](https://dailyillini.com/sports-stories/mens-sports/men-basketball/2026/03/03/aj-redd-reflects/)
+- [Otega Oweh - Wikipedia](https://en.wikipedia.org/wiki/Otega_Oweh)
+- [Milos Uzan - Wikipedia](https://en.wikipedia.org/wiki/Milos_Uzan)
+- [Felix Okpara - Sports Reference](https://www.sports-reference.com/cbb/players/felix-okpara-1.html)
+- [Denzel Aberdeen - Wikipedia](https://en.wikipedia.org/wiki/Denzel_Aberdeen)
+- [Emanuel Sharp - Wikipedia](https://en.wikipedia.org/wiki/Emanuel_Sharp)
+- [Only one SEC player at original school (Louisiana Sports)](https://www.louisianasports.net/2026/03/04/31666/latest-stories/)
+- [247Sports: Bruce Thornton Ohio State](https://247sports.com/article/bruce-thornton-ohio-state-college-basketball-star-278180526/)
+- [NCAA.com: Tamin Lipsey hometown hero](https://www.ncaa.com/news/basketball-men/article/2026-03-26/hometown-hero-iowa-states-tamin-lipseys-fairytale-road-sweet-16)
 
 ---
 
