@@ -34,11 +34,66 @@ Below are the confirmed players who played 4 consecutive seasons (2022-23, 2023-
 - **Accolades:** Big 12 All-Freshman (2022-23), First Team All-Big 12 (2023-24), All-Big 12 Second Team (2025-26), 3x All-Big 12 Defensive Team. Made Iowa State basketball history in the NCAA Tournament.
 - **Notable:** Described as a "hometown hero" and four-year starter, defying the odds of the modern college basketball landscape by staying in Ames all four years.
 
-### 5. Shawn Jones Jr. -- Mississippi State (SEC)
+### 5. Bruce Thornton -- Ohio State (Big Ten)
+- **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
+- **Key Stats:** 2,164 career points (Ohio State's all-time leading scorer), 541 assists (3rd in program history), 507 rebounds. 136 career games. Only the second Big Ten player ever with 2,000+ points, 500+ rebounds, and 500+ assists.
+- **Accolades:** AP Honorable Mention All-American, Second Team All-Big Ten (2025-26). Only four-time captain in Ohio State history.
+- **Notable:** Scoring progression: 10.6 -> 15.7 -> 17.7 -> 19.9 ppg. Started all four years.
+
+### 6. Nick Martinelli -- Northwestern (Big Ten)
+- **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
+- **Key Stats:** Grew from 2.6 ppg as a freshman to 23.7 ppg as a senior. Led the Big Ten in scoring as a junior (first Northwestern player to do so since John Shurna in 2011-12). Set Northwestern single-season scoring record (676 pts).
+- **Accolades:** Second Team All-Big Ten (2025-26).
+- **Notable:** One of the most dramatic development arcs -- from 20 games off the bench as a freshman to the conference's leading scorer.
+
+### 7. Jaxon Kohler -- Michigan State (Big Ten)
+- **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
+- **Key Stats:** Career: 6.9 ppg, 5.7 rpg across 127 games, 50.2% FG, 37.6% 3PT. Former 4-star, No. 59 overall recruit (class of 2022).
+- **Notable:** Played all 34 games as a freshman under Tom Izzo and grew into a consistent contributor.
+
+### 8. Carson Cooper -- Michigan State (Big Ten)
+- **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
+- **Key Stats:** Career: 5.4 ppg, 4.5 rpg across 137 games, 58.8% FG. Led team with 23 blocked shots as a freshman.
+- **Notable:** Was a zero-star recruit from IMG Academy's B team, recruited by Tom Izzo. Developed into a reliable role player.
+
+### 9. Will Tschetter -- Michigan (Big Ten)
+- **Seasons:** 2022-23 (RS Fr), 2023-24 (RS So), 2024-25 (RS Jr), 2025-26 (RS Sr) -- redshirted 2021-22
+- **Key Stats:** Career: 4.9 ppg, 2.0 rpg, 49.0% FG, 38.2% 3PT across 132 games. Helped Michigan win an outright Big Ten regular-season title and Big Ten Tournament title in 2025-26.
+- **Notable:** Completed undergraduate degree in three years (Earth and Environmental Science).
+
+### 10. Seth Trimble -- North Carolina (ACC)
+- **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
+- **Key Stats:** Grew from 1.8 ppg as a freshman to 14.5 ppg, 3.7 rpg, 2.5 apg as a senior. The only returning rotation player from the previous season.
+- **Notable:** Limited early but became a key starter for the Tar Heels by his senior year.
+
+### 11. Dillon Hunter -- Clemson (ACC)
+- **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
+- **Key Stats:** Career progression from 1.4 ppg as a freshman to 5.4 ppg, 2.5 rpg, 1.9 apg as a senior. Led Tigers in assist/turnover ratio (4.14/1) in 2025-26.
+- **Notable:** Was the only returning player who had logged minutes the prior season. Career-high 17 pts vs Florida State.
+
+### 12. Shawn Jones Jr. -- Mississippi State (SEC)
 - **Seasons:** 2022-23 (Fr), 2023-24 (So), 2024-25 (Jr), 2025-26 (Sr)
 - **Key Stats:** Career averages across 122 games: 4.6 points, 2.6 rebounds, 1.0 assists. Senior year: 5.3 points and 4.0 rebounds per game.
 - **Background:** Originally committed to Texas State, but joined Mississippi State as a "glorified walk-on" under coach Chris Jans. Steadily developed over four seasons.
 - **Notable:** The **only SEC senior** in the 2025-26 class to finish where he started. Per CBS Sports, this makes him a unicorn in the SEC's transfer-portal-driven landscape.
+
+### 13. AJ Redd -- Illinois (Big Ten, Walk-on)
+- **Seasons:** 2022-23, 2023-24, 2024-25, 2025-26
+- **Key Stats:** Walk-on who arrived as a student manager in fall 2022, added to roster December 21, 2022. Senior year: 11 games, 1.4 ppg. Played in first NCAA Tournament game vs. Morehead State.
+- **Notable:** Walk-on (not scholarship), but a genuine four-year Illinois player. Described as the only senior at the 2026 Final Four (besides Alex Karaban) who spent every game in the same uniform.
+
+---
+
+## Summary by Conference
+
+| Conference | Confirmed 4-Year Players | Schools |
+|-----------|-------------------------|---------|
+| Big Ten | 9 (including 1 walk-on) | Purdue (3), Ohio State (1), Northwestern (1), Michigan State (2), Michigan (1), Illinois (1) |
+| ACC | 2 | North Carolina (1), Clemson (1) |
+| Big 12 | 1 | Iowa State (1) |
+| SEC | 1 | Mississippi State (1) |
+| Big South | 0 | -- |
+| **Total** | **13** | |
 
 ---
 
@@ -79,8 +134,10 @@ The Big South's extreme roster turnover (only one team returned over 40% of thei
 ## The Bigger Picture
 
 The data paints a stark picture of modern college basketball:
-- **Only 22 players from high-major schools** graduating in 2026 spent their entire career at one school (per CBS Sports).
-- **Purdue stands alone** as having three four-year starters in the same class -- a remarkable feat that head coach Matt Painter has cited as a "blueprint for future success" in the portal era.
+- **Only 22 scholarship players from high-major schools** graduating in 2026 spent their entire career at one school (per CBS Sports' Isaac Trotter). We identified 12 of those 22 (plus 1 walk-on).
+- **The Big Ten dominates** with 8-9 four-year players, led by Purdue's historic trio of Smith, Loyer, and Kaufman-Renn who won a program-record 117 games together.
+- **The ACC had just TWO** four-year players (Seth Trimble at UNC and Dillon Hunter at Clemson) -- a testament to the extreme roster churn in the conference.
+- **The Big 12 had at least ONE** (Tamin Lipsey at Iowa State).
 - **The SEC had just ONE** four-year player finish at the school where he started (Shawn Jones Jr.).
 - **The Big South had ZERO** confirmed four-year players spanning all four seasons.
 - The transfer portal, NIL, and coaching changes have fundamentally reshaped roster construction, making multi-year continuity the exception rather than the norm.
@@ -102,6 +159,14 @@ The data paints a stark picture of modern college basketball:
 - [2025-26 Big South Season Summary - Sports Reference](https://www.sports-reference.com/cbb/conferences/big-south/men/2026.html)
 - [ESPN Top 100 Players 2025-26](https://www.espn.com/mens-college-basketball/story/_/id/46661719/ranking-top-100-mens-college-basketball-players-2025-2026)
 - [2026 Final Four Roster Analysis (Yahoo Sports)](https://sports.yahoo.com/articles/inside-2026-final-four-rosters-090001208.html)
+- [Bruce Thornton - Ohio State All-Time Leading Scorer (Eleven Warriors)](https://www.elevenwarriors.com/ohio-state-basketball/2026/03/161924/bruce-thornton-can-stamp-legacy-as-one-of-ohio-state-s-all-time-greats-in-long-awaited-chance-to-play-in-ncaa-tournament)
+- [Nick Martinelli - Northwestern Athletics](https://nusports.com/sports/mens-basketball/roster/nick-martinelli/12688)
+- [Jaxon Kohler - Sports Reference](https://www.sports-reference.com/cbb/players/jaxon-kohler-1.html)
+- [Carson Cooper - Sports Reference](https://www.sports-reference.com/cbb/players/carson-cooper-1.html)
+- [Will Tschetter - Michigan Athletics](https://mgoblue.com/sports/mens-basketball/roster/will-tschetter/27053)
+- [Seth Trimble - UNC Athletics](https://goheels.com/sports/mens-basketball/roster/seth-trimble/27315)
+- [Dillon Hunter - Clemson / SI](https://www.si.com/college/clemson/basketball/dillon-hunter-leadership-fuels-clemson-basketball-perfect-acc-start)
+- [AJ Redd - Daily Illini](https://dailyillini.com/sports-stories/mens-sports/men-basketball/2026/03/03/aj-redd-reflects/)
 
 ---
 
