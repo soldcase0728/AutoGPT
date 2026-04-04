@@ -179,7 +179,7 @@ The data paints a stark picture of modern college basketball:
 - **Only 22 scholarship players from high-major schools** graduating in 2026 spent their entire career at one school (per CBS Sports' Isaac Trotter). We identified 12 of those 22 (plus 1 walk-on). An additional 5 players transferred between Power 4 schools while remaining in Power 4 conferences all 4 years.
 - **The Big Ten dominates** with 8-9 four-year players, led by Purdue's historic trio of Smith, Loyer, and Kaufman-Renn who won a program-record 117 games together.
 - **The ACC had just TWO** four-year players (Seth Trimble at UNC and Dillon Hunter at Clemson) -- a testament to the extreme roster churn in the conference.
-- **The Big 12 had at least ONE** (Tamin Lipsey at Iowa State).
+- **The Big 12 had approximately 5** seniors who stayed at their original school per CBS Sports, though 2 of those (Sharp at Houston, Saunders at BYU) experienced conference realignment into the Big 12. Tamin Lipsey at Iowa State was the only one in the Big 12 all 4 years.
 - **The SEC had just ONE** four-year player finish at the school where he started (Shawn Jones Jr.).
 - **The Big South had ZERO** confirmed four-year players spanning all four seasons.
 - The transfer portal, NIL, and coaching changes have fundamentally reshaped roster construction, making multi-year continuity the exception rather than the norm.
