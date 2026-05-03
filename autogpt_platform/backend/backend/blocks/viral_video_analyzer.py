@@ -13,12 +13,20 @@ recommendations - using one of two engines:
 `ViralVideoReportPDFBlock` renders a report dict (typically the `report`
 output of the analyzer) to a PDF file. Inspired by the `pdf_report.py` layer
 of the TRIBE Review MVP.
+
+`VideoToBriefBlock` turns a video file (URL, data URI, or local path) into
+the textual brief the analyzer expects: transcript (on-screen text) and
+scene-by-scene description with timestamps. Uses moviepy for frame sampling
+and Anthropic Claude vision in a single multimodal call.
 """
 
+import base64
+import io
 import logging
 from enum import Enum
 from typing import Any
 
+import anthropic
 from fpdf import FPDF
 from pydantic import BaseModel, SecretStr, model_validator
 
@@ -34,7 +42,7 @@ from backend.blocks.llm import (
 from backend.data.block import Block, BlockCategory, BlockOutput, BlockSchema
 from backend.data.model import APIKeyCredentials, SchemaField
 from backend.util import json
-from backend.util.file import store_media_file
+from backend.util.file import get_exec_file_path, store_media_file
 from backend.util.request import Requests
 from backend.util.type import MediaFileType
 
@@ -682,3 +690,279 @@ class ViralVideoReportPDFBlock(Block):
             return_content=input_data.return_content,
         )
         yield "pdf_path", pdf_path
+
+
+# ---------------------------------------------------------------------------
+# Video -> brief block
+# ---------------------------------------------------------------------------
+
+
+_BRIEF_PROMPT = (
+    "You are preparing a brief for a short-form video performance analyst who "
+    "cannot see the video. {n} frames sampled at the timestamps below are "
+    "attached, in order. The video is {duration:.2f}s long.\n\n"
+    "Timestamps (seconds): {timestamps}\n\n"
+    "Return strictly JSON with these exact keys:\n"
+    '  "transcript": every piece of on-screen text, captions, lower-thirds, '
+    "and CTA copy you can read across the frames, concatenated in time order. "
+    'If unreadable, write "(unreadable)".\n'
+    '  "video_description": a scene-by-scene description with explicit '
+    "timestamps in seconds. One short paragraph per frame, covering subjects, "
+    "actions, framing, on-screen graphics, color/mood, and pacing cues.\n\n"
+    "Output JSON only - no prose, no markdown fences."
+)
+
+
+class VideoToBriefBlock(Block):
+    """Sample frames from a video and use Claude vision to produce a brief."""
+
+    class Input(BlockSchema):
+        video: MediaFileType = SchemaField(
+            description=(
+                "Video to analyze. Accepts a URL, a data URI, or a relative "
+                "path inside the execution media folder."
+            ),
+        )
+        credentials: AICredentials = AICredentialsField()
+        model: LlmModel = SchemaField(
+            title="Vision Model",
+            default=LlmModel.CLAUDE_4_SONNET,
+            description=(
+                "Anthropic vision model used to caption frames. "
+                "Must support image input (Claude 3.5+ / 4 Sonnet/Opus)."
+            ),
+            advanced=False,
+        )
+        frame_count: int = SchemaField(
+            title="Frames",
+            default=8,
+            description=(
+                "Number of evenly-spaced frames to sample. "
+                "More frames = richer brief and higher cost."
+            ),
+            ge=2,
+            le=20,
+        )
+        frame_max_dim: int = SchemaField(
+            title="Max frame dimension (px)",
+            default=720,
+            description=(
+                "Frames are resized so neither dimension exceeds this value, "
+                "to keep the request payload small."
+            ),
+            advanced=True,
+            ge=128,
+            le=2048,
+        )
+        max_output_tokens: int = SchemaField(
+            title="Max output tokens",
+            default=2000,
+            description="Upper bound on the model's response length.",
+            advanced=True,
+            ge=200,
+        )
+        extra_context: str = SchemaField(
+            default="",
+            description=(
+                "Optional extra hints (e.g. brand, language, what to look for) "
+                "appended to the prompt."
+            ),
+            advanced=True,
+        )
+
+    class Output(BlockSchema):
+        transcript: str = SchemaField(
+            description="On-screen text / captions / dialog, concatenated."
+        )
+        video_description: str = SchemaField(
+            description="Scene-by-scene description with timestamps."
+        )
+        duration_seconds: float = SchemaField(
+            description="Video duration in seconds (from the file)."
+        )
+        frames_sampled: int = SchemaField(
+            description="How many frames were actually sent to the model."
+        )
+        error: str = SchemaField(description="Error message if extraction failed.")
+
+    def __init__(self):
+        super().__init__(
+            id="4adb5d67-d53d-4af2-ba87-70df261093c5",
+            description=(
+                "Turns a video file into the transcript + scene description "
+                "that ViralVideoAnalyzerBlock expects, by sampling frames and "
+                "captioning them with a Claude vision model."
+            ),
+            categories={BlockCategory.AI, BlockCategory.MULTIMEDIA},
+            input_schema=VideoToBriefBlock.Input,
+            output_schema=VideoToBriefBlock.Output,
+            test_input={
+                "credentials": TEST_CREDENTIALS_INPUT,
+                "video": "test_clip.mp4",
+                "model": LlmModel.CLAUDE_4_SONNET,
+                "frame_count": 4,
+            },
+            test_credentials=TEST_CREDENTIALS,
+            test_output=[
+                ("transcript", "Order today - 20% off"),
+                (
+                    "video_description",
+                    "0.0s: yawning person. 5.0s: product reveal. 10.0s: CTA.",
+                ),
+                ("duration_seconds", 15.0),
+                ("frames_sampled", 4),
+            ],
+            test_mock={
+                "_localize_video": lambda *args, **kwargs: "/tmp/test_clip.mp4",
+                "_extract_frames": lambda *args, **kwargs: (
+                    [
+                        (0.0, b"\xff\xd8\xff"),
+                        (5.0, b"\xff\xd8\xff"),
+                        (10.0, b"\xff\xd8\xff"),
+                        (14.9, b"\xff\xd8\xff"),
+                    ],
+                    15.0,
+                ),
+                "_caption_frames": lambda *args, **kwargs: {
+                    "transcript": "Order today - 20% off",
+                    "video_description": (
+                        "0.0s: yawning person. 5.0s: product reveal. 10.0s: CTA."
+                    ),
+                },
+            },
+        )
+
+    def _extract_frames(
+        self, local_video_path: str, frame_count: int, max_dim: int
+    ) -> tuple[list[tuple[float, bytes]], float]:
+        """Sync helper. Returns ([(timestamp_s, jpeg_bytes), ...], duration)."""
+        from moviepy.video.io.VideoFileClip import VideoFileClip
+        from PIL import Image
+
+        with VideoFileClip(local_video_path) as clip:
+            duration = float(clip.duration or 0.0)
+            if duration <= 0:
+                raise ValueError("Video has no readable duration.")
+
+            n = min(frame_count, max(2, int(duration * 4)))
+            timestamps = [duration * i / (n - 1) for i in range(n)]
+            timestamps[-1] = max(0.0, min(duration - 0.05, timestamps[-1]))
+
+            frames: list[tuple[float, bytes]] = []
+            for t in timestamps:
+                frame = clip.get_frame(t)
+                img = Image.fromarray(frame)
+                img.thumbnail((max_dim, max_dim))
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=82)
+                frames.append((float(t), buf.getvalue()))
+
+        return frames, duration
+
+    async def _caption_frames(
+        self,
+        credentials: APIKeyCredentials,
+        model: LlmModel,
+        frames: list[tuple[float, bytes]],
+        duration: float,
+        extra_context: str,
+        max_output_tokens: int,
+    ) -> dict[str, str]:
+        client = anthropic.AsyncAnthropic(
+            api_key=credentials.api_key.get_secret_value()
+        )
+
+        timestamps = [round(t, 2) for t, _ in frames]
+        prompt_text = _BRIEF_PROMPT.format(
+            n=len(frames),
+            duration=duration,
+            timestamps=", ".join(f"{t}" for t in timestamps),
+        )
+        if extra_context:
+            prompt_text += "\n\nAdditional context: " + extra_context
+
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt_text}]
+        for ts, jpeg in frames:
+            content.append(
+                {
+                    "type": "text",
+                    "text": f"Frame at t={ts:.2f}s:",
+                }
+            )
+            content.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": base64.b64encode(jpeg).decode("ascii"),
+                    },
+                }
+            )
+
+        response = await client.messages.create(
+            model=model.value,
+            max_tokens=max_output_tokens,
+            messages=[{"role": "user", "content": content}],
+        )
+
+        raw = "".join(
+            block.text for block in response.content if getattr(block, "text", None)
+        ).strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+            if raw.lower().startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        try:
+            parsed = json.loads(raw)
+        except Exception as e:
+            raise ValueError(f"Vision model returned non-JSON brief: {e}: {raw[:300]}")
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Expected dict, got {type(parsed).__name__}")
+        return {
+            "transcript": str(parsed.get("transcript", "") or ""),
+            "video_description": str(parsed.get("video_description", "") or ""),
+        }
+
+    async def _localize_video(
+        self, file: MediaFileType, graph_exec_id: str, user_id: str
+    ) -> str:
+        local_path_rel = await store_media_file(
+            graph_exec_id=graph_exec_id,
+            file=file,
+            user_id=user_id,
+        )
+        return get_exec_file_path(graph_exec_id, local_path_rel)
+
+    async def run(
+        self,
+        input_data: Input,
+        *,
+        credentials: APIKeyCredentials,
+        graph_exec_id: str,
+        user_id: str,
+        **kwargs,
+    ) -> BlockOutput:
+        absolute_path = await self._localize_video(
+            input_data.video, graph_exec_id=graph_exec_id, user_id=user_id
+        )
+
+        frames, duration = self._extract_frames(
+            absolute_path, input_data.frame_count, input_data.frame_max_dim
+        )
+
+        brief = await self._caption_frames(
+            credentials=credentials,
+            model=input_data.model,
+            frames=frames,
+            duration=duration,
+            extra_context=input_data.extra_context,
+            max_output_tokens=input_data.max_output_tokens,
+        )
+
+        yield "transcript", brief["transcript"]
+        yield "video_description", brief["video_description"]
+        yield "duration_seconds", duration
+        yield "frames_sampled", len(frames)
