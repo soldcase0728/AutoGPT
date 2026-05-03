@@ -140,6 +140,7 @@ class LlmModel(str, Enum, metaclass=LlmModelMeta):
     PERPLEXITY_SONAR_DEEP_RESEARCH = "perplexity/sonar-deep-research"
     NOUSRESEARCH_HERMES_3_LLAMA_3_1_405B = "nousresearch/hermes-3-llama-3.1-405b"
     NOUSRESEARCH_HERMES_3_LLAMA_3_1_70B = "nousresearch/hermes-3-llama-3.1-70b"
+    NOUSRESEARCH_HERMES_4_405B = "nousresearch/hermes-4-405b"
     AMAZON_NOVA_LITE_V1 = "amazon/nova-lite-v1"
     AMAZON_NOVA_MICRO_V1 = "amazon/nova-micro-v1"
     AMAZON_NOVA_PRO_V1 = "amazon/nova-pro-v1"
@@ -267,6 +268,7 @@ MODEL_METADATA = {
     LlmModel.NOUSRESEARCH_HERMES_3_LLAMA_3_1_70B: ModelMetadata(
         "open_router", 12288, 12288
     ),
+    LlmModel.NOUSRESEARCH_HERMES_4_405B: ModelMetadata("open_router", 131000, 4096),
     LlmModel.OPENAI_GPT_OSS_120B: ModelMetadata("open_router", 131072, 131072),
     LlmModel.OPENAI_GPT_OSS_20B: ModelMetadata("open_router", 131072, 32768),
     LlmModel.AMAZON_NOVA_LITE_V1: ModelMetadata("open_router", 300000, 5120),
