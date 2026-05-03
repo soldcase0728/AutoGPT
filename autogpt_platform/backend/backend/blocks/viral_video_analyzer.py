@@ -1,21 +1,26 @@
 """
-Viral video analyzer block.
+Viral video analyzer + PDF report blocks.
 
-Analyzes short-form video ads (TikTok / Reels / Shorts style) and produces a
-structured report with hook/retention scores, weak-moment timestamps, and
-concrete editing recommendations. Optionally compares 2-4 cuts side by side
-and picks a winner.
+`ViralVideoAnalyzerBlock` produces a structured short-form-video performance
+report - hook/retention scores, weak-moment timestamps, and concrete editing
+recommendations - using one of two engines:
 
-Inspired by the TRIBE Review MVP (which uses Meta's TRIBE v2 neural model).
-This block uses a multimodal LLM to do the analysis from textual context
-(transcript, scene description, metadata). A `TRIBE` engine value is reserved
-for a future external endpoint and currently raises NotImplementedError.
+  - `llm`:    sends textual context (transcript, scene description, brief) to
+              a multimodal LLM via `AIStructuredResponseGeneratorBlock`.
+  - `tribe`:  POSTs the same context to an external TRIBE v2 inference service
+              and expects a JSON response with the same fields.
+
+`ViralVideoReportPDFBlock` renders a report dict (typically the `report`
+output of the analyzer) to a PDF file. Inspired by the `pdf_report.py` layer
+of the TRIBE Review MVP.
 """
 
+import logging
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, model_validator
+from fpdf import FPDF
+from pydantic import BaseModel, SecretStr, model_validator
 
 from backend.blocks.llm import (
     TEST_CREDENTIALS,
@@ -26,9 +31,14 @@ from backend.blocks.llm import (
     AIStructuredResponseGeneratorBlock,
     LlmModel,
 )
-from backend.data.block import BlockCategory, BlockOutput, BlockSchema
+from backend.data.block import Block, BlockCategory, BlockOutput, BlockSchema
 from backend.data.model import APIKeyCredentials, SchemaField
 from backend.util import json
+from backend.util.file import store_media_file
+from backend.util.request import Requests
+from backend.util.type import MediaFileType
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisEngine(str, Enum):
@@ -76,6 +86,15 @@ _REPORT_FORMAT: dict[str, str] = {
 }
 
 
+def _cut_payload(cut: VideoCut) -> dict[str, str]:
+    return {
+        "label": cut.label,
+        "video_url": cut.video_url,
+        "transcript": cut.transcript,
+        "description": cut.description,
+    }
+
+
 class ViralVideoAnalyzerBlock(AIBlockBase):
     """Analyze a short-form video ad and return a structured performance report."""
 
@@ -86,7 +105,8 @@ class ViralVideoAnalyzerBlock(AIBlockBase):
             default=LlmModel.GPT4O,
             description=(
                 "Multimodal LLM used to analyze the video context. "
-                "Gemini 2.5 Pro / Flash work well for long transcripts."
+                "Gemini 2.5 Pro / Flash work well for long transcripts. "
+                "Ignored when analysis_engine = tribe."
             ),
             advanced=False,
         )
@@ -95,23 +115,40 @@ class ViralVideoAnalyzerBlock(AIBlockBase):
             default=AnalysisEngine.LLM,
             description=(
                 "`llm` runs the analysis through the selected LLM. "
-                "`tribe` is reserved for an external TRIBE v2 inference endpoint "
-                "and is not yet implemented."
+                "`tribe` POSTs the context to an external TRIBE v2 inference "
+                "service at `tribe_endpoint_url`."
             ),
         )
         tribe_endpoint_url: str = SchemaField(
             title="TRIBE Endpoint URL",
             default="",
             description=(
-                "URL of an external TRIBE v2 inference service. "
-                "Only used when analysis_engine = tribe."
+                "Base URL of an external TRIBE v2 inference service. "
+                "The block POSTs to `{url}/analyze`. "
+                "Required when analysis_engine = tribe."
             ),
             advanced=True,
+        )
+        tribe_api_key: SecretStr = SchemaField(
+            title="TRIBE API Key",
+            default=SecretStr(""),
+            description=(
+                "Optional bearer token sent as `Authorization: Bearer ...` "
+                "to the TRIBE endpoint."
+            ),
+            advanced=True,
+        )
+        tribe_timeout_seconds: int = SchemaField(
+            title="TRIBE Timeout (s)",
+            default=600,
+            description="Request timeout for the TRIBE endpoint.",
+            advanced=True,
+            ge=1,
         )
 
         video_url: str = SchemaField(
             default="",
-            description="URL of the primary video to analyze (informational).",
+            description="URL of the primary video to analyze.",
         )
         transcript: str = SchemaField(
             default="",
@@ -193,7 +230,8 @@ class ViralVideoAnalyzerBlock(AIBlockBase):
             description=(
                 "Analyzes a short-form video ad and returns hook/retention "
                 "scores, weak-moment timestamps, and concrete editing "
-                "recommendations. Optionally compares 2-4 cuts."
+                "recommendations. Optionally compares 2-4 cuts. "
+                "Supports an LLM engine and an external TRIBE v2 endpoint."
             ),
             categories={BlockCategory.AI, BlockCategory.MARKETING},
             input_schema=ViralVideoAnalyzerBlock.Input,
@@ -327,10 +365,53 @@ class ViralVideoAnalyzerBlock(AIBlockBase):
     async def _analyze_with_tribe(
         self, input_data: "ViralVideoAnalyzerBlock.Input"
     ) -> dict[str, Any]:
-        raise NotImplementedError(
-            "TRIBE inference engine is not implemented in this block. "
-            "Wire `tribe_endpoint_url` to a hosted TRIBE v2 service first."
+        endpoint = input_data.tribe_endpoint_url.rstrip("/") + "/analyze"
+        headers = {"Content-Type": "application/json"}
+        api_key = input_data.tribe_api_key.get_secret_value()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        primary = VideoCut(
+            label="primary",
+            video_url=input_data.video_url,
+            transcript=input_data.transcript,
+            description=input_data.video_description,
         )
+        payload = {
+            "platform": input_data.platform.value,
+            "duration_seconds": input_data.duration_seconds,
+            "goal": input_data.goal,
+            "target_audience": input_data.target_audience,
+            "primary_cut": _cut_payload(primary),
+            "comparison_cuts": [_cut_payload(c) for c in input_data.comparison_cuts],
+            "expected_format": _REPORT_FORMAT,
+        }
+
+        response = await Requests().post(
+            endpoint,
+            headers=headers,
+            json=payload,
+            timeout=input_data.tribe_timeout_seconds,
+        )
+        if response.status >= 400:
+            raise RuntimeError(
+                f"TRIBE endpoint returned {response.status}: {response.text[:500]}"
+            )
+
+        try:
+            body = response.json()
+        except Exception as e:
+            raise ValueError(f"TRIBE endpoint returned non-JSON: {e}")
+
+        if (
+            isinstance(body, dict)
+            and "report" in body
+            and isinstance(body["report"], dict)
+        ):
+            return body["report"]
+        if isinstance(body, dict):
+            return body
+        raise ValueError(f"Unexpected TRIBE response shape: {type(body).__name__}")
 
     async def run(
         self,
@@ -361,3 +442,243 @@ class ViralVideoAnalyzerBlock(AIBlockBase):
         yield "recommendations", list(report.get("recommendations", []) or [])
         yield "comparison_winner", winner
         yield "prompt", self.prompt
+
+
+# ---------------------------------------------------------------------------
+# PDF report block
+# ---------------------------------------------------------------------------
+
+
+def _ascii_safe(text: str) -> str:
+    """fpdf2's default Helvetica fonts are Latin-1 only; strip anything else."""
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
+def _render_report_pdf(report: dict[str, Any], title: str, subtitle: str) -> bytes:
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    def line(h: float, text: str) -> None:
+        pdf.multi_cell(0, h, _ascii_safe(text), new_x="LMARGIN", new_y="NEXT")
+
+    pdf.set_font("Helvetica", "B", 20)
+    line(10, title)
+    if subtitle:
+        pdf.set_font("Helvetica", "I", 12)
+        line(7, subtitle)
+    pdf.ln(2)
+
+    summary = str(report.get("summary", "") or "")
+    if summary:
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Summary", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+        line(6, summary)
+        pdf.ln(2)
+
+    score_keys = [
+        ("Overall", "overall_score"),
+        ("Hook", "hook_score"),
+        ("Retention", "retention_score"),
+        ("Clarity", "clarity_score"),
+    ]
+    scores = [(label, report.get(key)) for label, key in score_keys]
+    scores = [(label, val) for label, val in scores if val is not None]
+    if scores:
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Scores", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+        for label, value in scores:
+            pdf.cell(
+                0,
+                6,
+                _ascii_safe(f"  {label}: {value}/100"),
+                new_x="LMARGIN",
+                new_y="NEXT",
+            )
+        pdf.ln(2)
+
+    weak_moments = report.get("weak_moments") or []
+    if isinstance(weak_moments, list) and weak_moments:
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Weak moments", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+        for moment in weak_moments:
+            if not isinstance(moment, dict):
+                continue
+            ts = moment.get("timestamp_seconds", "?")
+            issue = moment.get("issue", "")
+            fix = moment.get("suggested_fix", "")
+            pdf.set_font("Helvetica", "B", 11)
+            line(6, f"  t={ts}s  {issue}")
+            pdf.set_font("Helvetica", "", 11)
+            if fix:
+                line(6, f"    Fix: {fix}")
+        pdf.ln(2)
+
+    strong_moments = report.get("strong_moments") or []
+    if isinstance(strong_moments, list) and strong_moments:
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Strong moments", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+        for moment in strong_moments:
+            if not isinstance(moment, dict):
+                continue
+            ts = moment.get("timestamp_seconds", "?")
+            why = moment.get("why", "")
+            line(6, f"  t={ts}s  {why}")
+        pdf.ln(2)
+
+    recommendations = report.get("recommendations") or []
+    if isinstance(recommendations, list) and recommendations:
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Recommendations", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+        for idx, rec in enumerate(recommendations, start=1):
+            line(6, f"  {idx}. {rec}")
+        pdf.ln(2)
+
+    comparison = report.get("comparison")
+    if isinstance(comparison, dict) and comparison:
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Comparison", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+        winner = comparison.get("winner", "")
+        if winner:
+            line(6, f"  Winner: {winner}")
+        reasoning = comparison.get("reasoning", "")
+        if reasoning:
+            line(6, f"  Reasoning: {reasoning}")
+        per_cut = comparison.get("per_cut_notes") or {}
+        if isinstance(per_cut, dict):
+            for label, notes in per_cut.items():
+                pdf.set_font("Helvetica", "B", 11)
+                line(6, f"  {label}")
+                pdf.set_font("Helvetica", "", 11)
+                line(6, f"    {notes}")
+
+    output = pdf.output()
+    return bytes(output)
+
+
+class ViralVideoReportPDFBlock(Block):
+    """Render a viral-video analysis report (dict) to a PDF file."""
+
+    class Input(BlockSchema):
+        report: dict[str, Any] = SchemaField(
+            description=(
+                "Structured report dict, typically the `report` output of "
+                "ViralVideoAnalyzerBlock."
+            ),
+        )
+        title: str = SchemaField(
+            default="Viral Video Analysis Report",
+            description="Title shown at the top of the PDF.",
+        )
+        subtitle: str = SchemaField(
+            default="",
+            description="Optional subtitle (e.g. campaign name, date).",
+        )
+        return_content: bool = SchemaField(
+            default=False,
+            description=(
+                "If true, return the PDF as a base64 data URI. "
+                "Otherwise return a relative path inside the execution's "
+                "media folder."
+            ),
+            advanced=True,
+        )
+
+    class Output(BlockSchema):
+        pdf_path: MediaFileType = SchemaField(
+            description=(
+                "PDF file path (relative to execution media folder) or "
+                "data URI when return_content = true."
+            ),
+        )
+        error: str = SchemaField(description="Error message if rendering failed.")
+
+    def __init__(self):
+        super().__init__(
+            id="b9f0c4d1-3e2a-4f8b-9c6e-7a1d5b8e9f02",
+            description=(
+                "Renders a viral-video analysis report (the `report` output "
+                "of ViralVideoAnalyzerBlock) to a PDF file."
+            ),
+            categories={BlockCategory.MARKETING, BlockCategory.MULTIMEDIA},
+            input_schema=ViralVideoReportPDFBlock.Input,
+            output_schema=ViralVideoReportPDFBlock.Output,
+            test_input={
+                "report": {
+                    "summary": "Solid demo with a weak hook.",
+                    "overall_score": 72,
+                    "hook_score": 60,
+                    "retention_score": 75,
+                    "clarity_score": 80,
+                    "weak_moments": [
+                        {
+                            "timestamp_seconds": 0.5,
+                            "issue": "Yawn opener fails to stop the scroll.",
+                            "suggested_fix": "Lead with the product reveal.",
+                        }
+                    ],
+                    "strong_moments": [
+                        {"timestamp_seconds": 3.0, "why": "Clear product reveal."}
+                    ],
+                    "recommendations": [
+                        "Move the BrewBot reveal to 0s.",
+                        "Add a punchier CTA caption.",
+                    ],
+                    "comparison": None,
+                },
+                "title": "BrewBot ad - cut A",
+                "subtitle": "TikTok 9x16 - 15s",
+            },
+            test_output=[
+                (
+                    "pdf_path",
+                    lambda v: isinstance(v, str) and v.lower().endswith(".pdf"),
+                ),
+            ],
+            test_mock={
+                "_persist_pdf": lambda *args, **kwargs: "viral_report.pdf",
+            },
+        )
+
+    async def _persist_pdf(
+        self,
+        pdf_bytes: bytes,
+        graph_exec_id: str,
+        user_id: str,
+        return_content: bool,
+    ) -> MediaFileType:
+        import base64
+
+        b64 = base64.b64encode(pdf_bytes).decode("ascii")
+        data_uri = MediaFileType(f"data:application/pdf;base64,{b64}")
+        return await store_media_file(
+            graph_exec_id=graph_exec_id,
+            file=data_uri,
+            user_id=user_id,
+            return_content=return_content,
+        )
+
+    async def run(
+        self,
+        input_data: Input,
+        *,
+        graph_exec_id: str,
+        user_id: str,
+        **kwargs,
+    ) -> BlockOutput:
+        pdf_bytes = _render_report_pdf(
+            input_data.report, input_data.title, input_data.subtitle
+        )
+        pdf_path = await self._persist_pdf(
+            pdf_bytes,
+            graph_exec_id=graph_exec_id,
+            user_id=user_id,
+            return_content=input_data.return_content,
+        )
+        yield "pdf_path", pdf_path
