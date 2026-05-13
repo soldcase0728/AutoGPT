@@ -14,4 +14,5 @@ capacity_report.csv
 summary_dashboard.csv
 orphan_catalog.csv
 grid_v10.csv
+student_offer_v10.csv
 *.local.csv
