@@ -332,6 +332,19 @@ for k, sec in enumerate(sections):
     if in_section:
         model.Add(sum(in_section) <= sec["cap"])
 
+# H6: each student in each COURSE at most once
+# (prevents the solver from filling an empty slot with a duplicate section
+# of a course the student already has -- the "double PE" bug.)
+# We group eligible vars by (student, course) and AddAtMostOne over them.
+from collections import defaultdict as _dd
+by_student_course = _dd(list)
+for (s, r_idx, k), var in x.items():
+    course = sections[k]["course"]
+    by_student_course[(s, course)].append(var)
+for (s, course), vlist in by_student_course.items():
+    if len(vlist) > 1:
+        model.AddAtMostOne(vlist)
+
 # Objective
 model.Maximize(sum(x.values()))
 
