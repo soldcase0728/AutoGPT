@@ -15,6 +15,11 @@ summary_dashboard.csv
 orphan_catalog.csv
 grid_v10.csv
 grid_v11.csv
+grid_v12.csv
+grid_v12_rebuilt.csv
+grid_snapshot.xlsx
+grid_snapshot_v12.xlsx
+student_offer.xlsx
 student_offer_v10.csv
 student_offer_v11.csv
 student_offer_v9_check.csv
