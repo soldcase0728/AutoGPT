@@ -1,3 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Raw student data (PII) — do not commit
+student_requests.csv
+*.local.csv
