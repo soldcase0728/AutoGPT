@@ -6,4 +6,5 @@ __pycache__/
 student_requests.csv
 grid_v9.csv
 grid_v9.tsv
+grid_snapshot.xlsx
 *.local.csv
