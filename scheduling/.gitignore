@@ -4,4 +4,6 @@ __pycache__/
 
 # Raw student data (PII) — do not commit
 student_requests.csv
+grid_v9.csv
+grid_v9.tsv
 *.local.csv
