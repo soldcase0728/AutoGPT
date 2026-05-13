@@ -7,4 +7,10 @@ student_requests.csv
 grid_v9.csv
 grid_v9.tsv
 grid_snapshot.xlsx
+student_offer.xlsx
+student_offer.csv
+waitlist.csv
+capacity_report.csv
+summary_dashboard.csv
+orphan_catalog.csv
 *.local.csv
