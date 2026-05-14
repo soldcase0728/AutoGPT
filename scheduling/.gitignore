@@ -31,4 +31,11 @@ student_requests_clean.csv
 student_offer_FINAL_10.xlsx
 summary_v12_fresh.csv
 waitlist_v12.csv
+catalog.xlsx
+grid_latest.xlsx
+grid_v15.csv
+schedule_v9_final2.xlsx
+student_offer_FINAL.xlsx
+student_offer_v15.csv
+waitlist_v15.csv
 *.local.csv
