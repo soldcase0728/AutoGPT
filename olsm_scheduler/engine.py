@@ -33,6 +33,20 @@ class BuildEngine:
         exclude = exclude or set()
         candidates = []
 
+        tcm = getattr(self.data, "_teacher_course_map", {})
+        course_name_map = getattr(self.data, "_student_to_roster_course", {})
+        roster_name = course_name_map.get(course.code, course.code)
+        exact_teachers = tcm.get(roster_name, [])
+
+        for tname in exact_teachers:
+            if tname in exclude or tname not in self.data.teachers:
+                continue
+            t = self.data.teachers[tname]
+            load = t.teaching_period_count()
+            has_capacity = load < t.max_teaching_periods or t.overload_approved
+            if has_capacity:
+                return t
+
         course_lower = course.code.lower()
         course_name_lower = course.name.lower()
         stripped = course_lower.replace("g ", "").replace(" b", "").replace("hon ", "").replace("ap ", "").strip()
@@ -219,23 +233,28 @@ class BuildEngine:
         print(f"  Girls rotation course: {girls_rot_code}")
         print(f"  Boys rotation course: {boys_rot_code}")
 
-        rotation_teachers = [t for t in self.data.teachers.values() if t.is_rotation_teacher]
-
         girls_pool: list[Teacher] = []
         boys_pool: list[Teacher] = []
 
-        for t in rotation_teachers:
-            notes_lower = t.notes.lower()
-            if "both" in notes_lower:
-                girls_pool.append(t)
-                boys_pool.append(t)
-            elif "girl" in notes_lower:
-                girls_pool.append(t)
-            elif "boy" in notes_lower:
-                boys_pool.append(t)
-            else:
-                girls_pool.append(t)
-                boys_pool.append(t)
+        if self.data.girls_rotation_teachers:
+            for tname in self.data.girls_rotation_teachers:
+                if tname in self.data.teachers:
+                    girls_pool.append(self.data.teachers[tname])
+        if self.data.boys_rotation_teachers:
+            for tname in self.data.boys_rotation_teachers:
+                if tname in self.data.teachers:
+                    boys_pool.append(self.data.teachers[tname])
+
+        if not girls_pool or not boys_pool:
+            rotation_teachers = [t for t in self.data.teachers.values() if t.is_rotation_teacher]
+            for t in rotation_teachers:
+                pools = [p.lower() for p in t.rotation_pools]
+                if "girls" in pools or not pools:
+                    if t not in girls_pool:
+                        girls_pool.append(t)
+                if "boys" in pools or not pools:
+                    if t not in boys_pool:
+                        boys_pool.append(t)
 
         if girls_rot_code:
             g_course = self.data.courses[girls_rot_code]
@@ -332,10 +351,16 @@ class BuildEngine:
             print(f"  Seminar: {sem_course.code} — {needed} sections at P4")
 
         for t in self.data.teachers.values():
-            if t.lunch_period:
-                continue
             has_lunch = any(s == SlotType.LUNCH for s in t.schedule.values())
             if has_lunch:
+                continue
+
+            if t.lunch_period and t.lunch_period not in t.schedule:
+                t.schedule[t.lunch_period] = SlotType.LUNCH
+                t.assigned_classes[t.lunch_period] = "LUNCH"
+                continue
+
+            if t.lunch_period:
                 continue
 
             if t.name in self.data.boys_rotation_teachers:

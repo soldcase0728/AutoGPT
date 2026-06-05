@@ -6,7 +6,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from .parser import load_input_file, load_student_requests_csv
+from .parser import (
+    load_input_file, load_student_requests_csv,
+    parse_teacher_roster_v16, _is_teacher_roster_v16,
+    build_fuzzy_course_mapping,
+)
 from .engine import BuildEngine
 from .output import generate_all_outputs
 
@@ -93,13 +97,22 @@ Examples:
                 rotation_boys=args.rotation_boys,
             )
             if args.teachers:
-                import openpyxl
-                from .parser import parse_teachers_xlsx, _find_header_row
-                wb = openpyxl.load_workbook(args.teachers, data_only=True)
-                for name in wb.sheetnames:
-                    if "teacher" in name.lower() or "roster" in name.lower():
-                        data.teachers = parse_teachers_xlsx(wb[name])
-                        break
+                auto_teachers = {k for k, v in data.teachers.items()
+                                 if "Auto-generated" in v.notes}
+                for k in auto_teachers:
+                    del data.teachers[k]
+                teacher_path = Path(args.teachers)
+                if _is_teacher_roster_v16(teacher_path):
+                    parse_teacher_roster_v16(teacher_path, data)
+                    build_fuzzy_course_mapping(data)
+                else:
+                    import openpyxl
+                    from .parser import parse_teachers_xlsx, _find_header_row
+                    wb = openpyxl.load_workbook(args.teachers, data_only=True)
+                    for name in wb.sheetnames:
+                        if "teacher" in name.lower() or "roster" in name.lower():
+                            data.teachers = parse_teachers_xlsx(wb[name])
+                            break
         else:
             data = load_input_file(input_path)
     except Exception as e:

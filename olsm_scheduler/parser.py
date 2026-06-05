@@ -502,6 +502,12 @@ def load_input_file(filepath: str | Path) -> ScheduleData:
     if filepath.suffix.lower() == ".csv":
         return load_student_requests_csv(filepath)
 
+    # Check if this is a Teacher Roster v16 file
+    if _is_teacher_roster_v16(filepath):
+        data = ScheduleData()
+        parse_teacher_roster_v16(filepath, data)
+        return data
+
     wb = openpyxl.load_workbook(filepath, data_only=True)
     data = ScheduleData()
 
@@ -564,3 +570,428 @@ def _compute_enrollment_counts(data: ScheduleData):
         for req in student.course_requests:
             if req in data.courses:
                 data.courses[req].enrollment_count += 1
+
+
+# ── TEACHER ROSTER v16 PARSER ─────────────────────────────────────────
+
+def _parse_period(val: str) -> Optional[Period]:
+    """Parse a single period string like 'P5A' into a Period enum."""
+    val = val.strip().upper()
+    try:
+        return Period(val)
+    except ValueError:
+        return None
+
+
+def _parse_prep_list(val: str) -> list[Period]:
+    """Parse a comma-separated list of PREP periods."""
+    if not val or val.strip() == "—" or val.strip() == "-":
+        return []
+    result = []
+    for part in val.replace(",", " ").split():
+        p = _parse_period(part)
+        if p:
+            result.append(p)
+    return result
+
+
+def _resolve_teacher_name(name: str, teachers: dict[str, Teacher]) -> str:
+    """Resolve a teacher name to its canonical form in the teachers dict.
+
+    Handles mismatches like 'Carly (PT Hire)' vs 'Carly (NEW PT HIRE)' by
+    matching on last-name prefix when exact match fails.
+    """
+    if name in teachers:
+        return name
+    # Try matching by first token (last name or unique identifier)
+    name_lower = name.lower()
+    first_token = name.split(",")[0].split("(")[0].strip().lower()
+    for known in teachers:
+        known_first = known.split(",")[0].split("(")[0].strip().lower()
+        if first_token and known_first and first_token == known_first:
+            # Ambiguity check: only match if there's exactly one candidate
+            candidates = [k for k in teachers
+                          if k.split(",")[0].split("(")[0].strip().lower() == first_token]
+            if len(candidates) == 1:
+                return candidates[0]
+    return name  # Return original if no match found
+
+
+def _split_qualified_teachers(raw: str, known_names: set[str]) -> list[str]:
+    """Split a comma-separated string of qualified teachers into individual names.
+
+    Teacher names use "Last, First" format (e.g. "Abel, Mike") and multiple
+    teachers are also comma-separated. So "Graham, Ethan, Lengel, Mark"
+    must parse as ["Graham, Ethan", "Lengel, Mark"].
+
+    Strategy: use the known teacher names from the master roster to greedily
+    match names from the raw string. Fall back to pairing tokens for unknown names.
+    """
+    if not raw:
+        return []
+
+    # Try to greedily match known names
+    remaining = raw.strip()
+    result: list[str] = []
+
+    # Sort known names longest-first so we match the most specific name first
+    sorted_names = sorted(known_names, key=len, reverse=True)
+
+    while remaining:
+        remaining = remaining.strip().lstrip(",").strip()
+        if not remaining:
+            break
+
+        matched = False
+        for name in sorted_names:
+            if remaining.startswith(name):
+                rest = remaining[len(name):]
+                # Must be followed by end-of-string, comma, or whitespace
+                if not rest or rest[0] in (",", " "):
+                    result.append(name)
+                    remaining = rest.lstrip(",").strip()
+                    matched = True
+                    break
+
+        if not matched:
+            # Unknown name — take up to the next comma-separated pair
+            # Assume "Last, First" format: take two comma-separated tokens
+            parts = remaining.split(",", 2)
+            if len(parts) >= 2:
+                candidate = (parts[0].strip() + ", " + parts[1].strip())
+                result.append(candidate)
+                remaining = ",".join(parts[2:]) if len(parts) > 2 else ""
+            else:
+                # Single token remaining
+                if parts[0].strip():
+                    result.append(parts[0].strip())
+                remaining = ""
+
+    return result
+
+
+def _build_fuzzy_course_map(roster_courses: list[str],
+                            student_courses: list[str]) -> dict[str, str]:
+    """Build a mapping from student CSV course names to roster short names.
+
+    The roster uses abbreviated names like "G Hon Bio", "AP Amer Lit B"
+    while the student CSV uses full names like "G Honors Biology",
+    "AP American Literature".  We build a bidirectional fuzzy lookup.
+
+    Returns dict mapping roster_course -> student_course (best match).
+    """
+    import re
+
+    def _normalize(name: str) -> str:
+        """Normalize a course name for comparison."""
+        s = name.lower().strip()
+        return re.sub(r'\s+', ' ', s)
+
+    def _tokenize(name: str) -> set[str]:
+        """Get meaningful tokens from a course name."""
+        s = _normalize(name)
+        return {w for w in s.split() if len(w) > 1}
+
+    # Common abbreviation expansions for matching
+    abbrev_map = {
+        "amer": "american",
+        "lit": "literature",
+        "bio": "biology",
+        "chem": "chemistry",
+        "phys": "physics",
+        "conc": "conceptual",
+        "scrip": "scriptures",
+        "calc": "calculus",
+        "alg": "algebra",
+        "geo": "geometry",
+        "hon": "honors",
+        "eng": "english",
+        "hist": "history",
+        "relig": "religions",
+        "psyc": "psychology",
+        "comp": "composition",
+        "env": "environmental",
+        "sci": "science",
+        "wrld": "world",
+        "econ": "economics",
+        "acct": "accounting",
+        "stats": "statistics",
+        "prep": "preparation",
+        "mm": "multimedia",
+        "rot": "rotation",
+    }
+
+    def _expand(tokens: set[str]) -> set[str]:
+        expanded = set(tokens)
+        for tok in tokens:
+            if tok in abbrev_map:
+                expanded.add(abbrev_map[tok])
+        return expanded
+
+    mapping: dict[str, str] = {}
+    used_student: set[str] = set()
+
+    # First pass: exact matches
+    student_lower_map = {s.lower(): s for s in student_courses}
+    for rc in roster_courses:
+        if rc.lower() in student_lower_map:
+            mapping[rc] = student_lower_map[rc.lower()]
+            used_student.add(rc.lower())
+
+    # Second pass: fuzzy matching for unmatched roster courses
+    remaining_roster = [rc for rc in roster_courses if rc not in mapping]
+    remaining_student = [s for s in student_courses if s.lower() not in used_student]
+
+    for rc in remaining_roster:
+        rc_tokens = _tokenize(rc)
+        rc_expanded = _expand(rc_tokens)
+
+        best_score = 0
+        best_match = None
+
+        for sc in remaining_student:
+            sc_tokens = _tokenize(sc)
+            sc_expanded = _expand(sc_tokens)
+
+            # Check gender prefix match
+            rc_has_g = rc.startswith("G ")
+            sc_has_g = sc.startswith("G ")
+            if rc_has_g != sc_has_g:
+                continue
+
+            # Check boys suffix match
+            rc_has_b = rc.endswith(" B") and not rc.endswith("AB")
+            sc_has_b = sc.endswith(" B") and not sc.endswith("AB")
+
+            # Token overlap with expansion
+            overlap = len(rc_expanded & sc_expanded)
+            union = len(rc_expanded | sc_expanded)
+            if union == 0:
+                continue
+
+            score = overlap / union
+
+            # Bonus for matching gender suffix
+            if rc_has_b == sc_has_b:
+                score += 0.1
+
+            # Bonus for AP match
+            rc_is_ap = "ap" in rc_tokens
+            sc_is_ap = "ap" in sc_tokens
+            if rc_is_ap == sc_is_ap:
+                score += 0.1
+            elif rc_is_ap != sc_is_ap:
+                score -= 0.5
+
+            if score > best_score:
+                best_score = score
+                best_match = sc
+
+        if best_match and best_score > 0.25:
+            mapping[rc] = best_match
+
+    return mapping
+
+
+def parse_teacher_roster_v16(filepath: str | Path, data: ScheduleData) -> None:
+    """Parse the OLSM Teacher Roster v16 Excel file.
+
+    Reads four sheets:
+    1. "1. Master Roster" -> data.teachers
+    2. "3. Rotation Pools" -> data.girls_rotation_teachers, data.boys_rotation_teachers
+    3. "5. Constraints" -> overload/lunch shift adjustments on teachers
+    4. "6. Subject Specialties" -> data._teacher_course_map
+    """
+    filepath = Path(filepath)
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+
+    # ── Sheet 1: Master Roster ──────────────────────────────────────
+    ws1 = wb["1. Master Roster"]
+    # Header is at row 4, data starts at row 5
+    header_row = 4
+    cmap1 = _col_map(ws1, header_row)
+
+    for row in range(5, ws1.max_row + 1):
+        name = _get(ws1, row, cmap1, "last name", "first")
+        if not name:
+            continue
+
+        dept = _get(ws1, row, cmap1, "department", "dept")
+        max_tp = _int(_get(ws1, row, cmap1, "total teaching"), 6)
+
+        # Subject specialties from "Subjects Taught (Unique)" column
+        subjects_raw = _get(ws1, row, cmap1, "subjects taught")
+        specialties = [s.strip() for s in subjects_raw.replace(";", ",").split(",")
+                       if s.strip() and s.strip() != "—" and s.strip() != "— CUT —"]
+
+        # Rotation pool
+        rotation_raw = _get(ws1, row, cmap1, "rotation")
+        is_rotation = bool(rotation_raw
+                           and rotation_raw.strip() != "—"
+                           and rotation_raw.strip() != "-"
+                           and rotation_raw.strip())
+        rotation_pools = []
+        if is_rotation:
+            if "girls" in rotation_raw.lower():
+                rotation_pools.append("Girls")
+            if "boys" in rotation_raw.lower():
+                rotation_pools.append("Boys")
+
+        # PREP periods
+        prep_raw = _get(ws1, row, cmap1, "prep period")
+        prep_periods = _parse_prep_list(prep_raw)
+        required_prep = len(prep_periods) if prep_periods else 1
+
+        # Lunch
+        lunch_raw = _get(ws1, row, cmap1, "lunch")
+        lunch_period = None
+        if lunch_raw and lunch_raw.strip() != "—" and lunch_raw.strip() != "-":
+            lunch_period = _parse_period(lunch_raw.split("(")[0].strip())
+
+        # Overload
+        overload_raw = _get(ws1, row, cmap1, "overload")
+        overload = overload_raw.strip().upper() == "YES" if overload_raw else False
+
+        # Notes
+        notes = _get(ws1, row, cmap1, "notes", "constraint")
+
+        data.teachers[name] = Teacher(
+            name=name,
+            department=dept or "",
+            subject_specialties=specialties,
+            certifications=[],
+            max_teaching_periods=max_tp,
+            required_prep_periods=required_prep,
+            special_constraints="",
+            notes=notes,
+            is_rotation_teacher=is_rotation,
+            rotation_pools=rotation_pools,
+            lunch_period=lunch_period,
+            overload_approved=overload,
+        )
+
+    # ── Sheet 3: Rotation Pools ─────────────────────────────────────
+    ws3 = wb["3. Rotation Pools"]
+    for row in range(5, ws3.max_row + 1):
+        pool_val = _str(ws3.cell(row=row, column=1).value)
+        teacher_name = _str(ws3.cell(row=row, column=3).value)
+        if not teacher_name:
+            continue
+
+        # Resolve name to master roster key (handles mismatches like
+        # "Carly (PT Hire)" in rotation pool vs "Carly (NEW PT HIRE)" in roster)
+        resolved_name = _resolve_teacher_name(teacher_name, data.teachers)
+
+        if "girls" in pool_val.lower() or "p1" in pool_val.lower():
+            if resolved_name not in data.girls_rotation_teachers:
+                data.girls_rotation_teachers.append(resolved_name)
+        if "boys" in pool_val.lower() or "p3" in pool_val.lower():
+            if resolved_name not in data.boys_rotation_teachers:
+                data.boys_rotation_teachers.append(resolved_name)
+
+        # Also update the teacher record if it exists
+        if resolved_name in data.teachers:
+            t = data.teachers[resolved_name]
+            t.is_rotation_teacher = True
+
+    # ── Sheet 5: Constraints ────────────────────────────────────────
+    ws5 = wb["5. Constraints"]
+    for row in range(4, ws5.max_row + 1):
+        teacher_name = _str(ws5.cell(row=row, column=1).value)
+        constraint_type = _str(ws5.cell(row=row, column=2).value).upper()
+        detail = _str(ws5.cell(row=row, column=3).value)
+
+        if not teacher_name or not constraint_type:
+            continue
+
+        if teacher_name not in data.teachers:
+            continue
+
+        t = data.teachers[teacher_name]
+
+        if constraint_type == "OVERLOAD":
+            t.overload_approved = True
+            # Parse the max periods from detail like "8 teaching periods (standard is 6)"
+            import re
+            m = re.match(r'(\d+)\s+teaching', detail)
+            if m:
+                t.max_teaching_periods = int(m.group(1))
+
+        elif constraint_type == "LUNCH SHIFT":
+            # Parse the shifted lunch period from detail
+            # "Lunch at P5A instead of standard P5B"
+            import re
+            m = re.search(r'Lunch at (P\w+)', detail)
+            if m:
+                p = _parse_period(m.group(1))
+                if p:
+                    t.lunch_period = p
+
+    # ── Sheet 6: Subject Specialties ────────────────────────────────
+    ws6 = wb["6. Subject Specialties"]
+    teacher_course_map: dict[str, list[str]] = {}
+
+    # Build set of known teacher names from master roster for smart splitting
+    known_names = set(data.teachers.keys())
+
+    for row in range(5, ws6.max_row + 1):
+        course_name = _str(ws6.cell(row=row, column=1).value)
+        qualified_raw = _str(ws6.cell(row=row, column=4).value)
+
+        if not course_name or course_name == "— CUT —":
+            continue
+
+        teachers_list = _split_qualified_teachers(qualified_raw, known_names)
+        teacher_course_map[course_name] = teachers_list
+
+    # Store on the data object
+    data._teacher_course_map = teacher_course_map  # type: ignore[attr-defined]
+
+    # Build the fuzzy mapping from roster course names to student CSV course names
+    # This will be populated later when student data is available
+    data._roster_course_names = list(teacher_course_map.keys())  # type: ignore[attr-defined]
+
+    # Pre-build a reverse map: teacher_name -> list of roster course names
+    teacher_to_courses: dict[str, list[str]] = defaultdict(list)
+    for course, teachers in teacher_course_map.items():
+        for t_name in teachers:
+            teacher_to_courses[t_name].append(course)
+    data._teacher_to_roster_courses = dict(teacher_to_courses)  # type: ignore[attr-defined]
+
+    print(f"  Parsed {len(data.teachers)} teachers from Teacher Roster v16")
+    print(f"  Girls rotation pool: {data.girls_rotation_teachers}")
+    print(f"  Boys rotation pool: {data.boys_rotation_teachers}")
+    print(f"  Subject specialties: {len(teacher_course_map)} courses mapped")
+
+
+def _is_teacher_roster_v16(filepath: str | Path) -> bool:
+    """Check if a file is a Teacher Roster v16 file."""
+    try:
+        wb = openpyxl.load_workbook(filepath, read_only=True)
+        result = "1. Master Roster" in wb.sheetnames
+        wb.close()
+        return result
+    except Exception:
+        return False
+
+
+def build_fuzzy_course_mapping(data: ScheduleData) -> dict[str, str]:
+    """Build fuzzy mapping between roster course names and student course names.
+
+    Call this AFTER both teacher roster and student data are loaded.
+    Returns dict mapping roster_course_name -> student_course_name.
+    Also stores the mapping as data._course_name_map.
+    """
+    roster_courses = getattr(data, "_roster_course_names", [])
+    if not roster_courses:
+        return {}
+
+    student_courses = list(data.courses.keys())
+    mapping = _build_fuzzy_course_map(roster_courses, student_courses)
+    data._course_name_map = mapping  # type: ignore[attr-defined]
+
+    # Also build reverse: student_course -> roster_course
+    reverse = {v: k for k, v in mapping.items()}
+    data._student_to_roster_course = reverse  # type: ignore[attr-defined]
+
+    return mapping
