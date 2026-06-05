@@ -259,7 +259,7 @@ class BuildEngine:
         if girls_rot_code:
             g_course = self.data.courses[girls_rot_code]
             needed = g_course.required_sections()
-            teachers_needed = max(needed, 1)
+            teachers_needed = max(needed, len(girls_pool), 1)
 
             if not girls_pool:
                 for t in self.data.teachers.values():
@@ -289,7 +289,7 @@ class BuildEngine:
         if boys_rot_code:
             b_course = self.data.courses[boys_rot_code]
             needed = b_course.required_sections()
-            teachers_needed = max(needed, 1)
+            teachers_needed = max(needed, len(boys_pool), 1)
 
             if not boys_pool:
                 for t in self.data.teachers.values():

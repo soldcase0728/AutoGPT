@@ -682,17 +682,24 @@ def _build_fuzzy_course_map(roster_courses: list[str],
     """
     import re
 
+    roman_map = {"i": "1", "ii": "2", "iii": "3", "iv": "4"}
+
     def _normalize(name: str) -> str:
         """Normalize a course name for comparison."""
         s = name.lower().strip()
-        return re.sub(r'\s+', ' ', s)
+        s = s.replace("(combined)", "").replace("(r)", "")
+        s = s.replace("/", " ").replace("-", " ").replace("&", "and")
+        s = s.replace("u.s.", "us")
+        for roman, digit in roman_map.items():
+            s = re.sub(rf'\b{roman}\b', digit, s)
+        return re.sub(r'\s+', ' ', s).strip()
 
     def _tokenize(name: str) -> set[str]:
         """Get meaningful tokens from a course name."""
         s = _normalize(name)
-        return {w for w in s.split() if len(w) > 1}
+        noise = {"and", "the", "of", "in", "to", "for"}
+        return {w for w in s.split() if (len(w) > 1 or w.isdigit()) and w not in noise}
 
-    # Common abbreviation expansions for matching
     abbrev_map = {
         "amer": "american",
         "lit": "literature",
@@ -715,10 +722,16 @@ def _build_fuzzy_course_map(roster_courses: list[str],
         "wrld": "world",
         "econ": "economics",
         "acct": "accounting",
+        "account": "accounting",
         "stats": "statistics",
         "prep": "preparation",
         "mm": "multimedia",
         "rot": "rotation",
+        "redeem": "redeemer",
+        "gov": "government",
+        "pe": "physical education",
+        "adv": "advanced",
+        "pre": "pre",
     }
 
     def _expand(tokens: set[str]) -> set[str]:
@@ -753,27 +766,38 @@ def _build_fuzzy_course_map(roster_courses: list[str],
             sc_tokens = _tokenize(sc)
             sc_expanded = _expand(sc_tokens)
 
-            # Check gender prefix match
-            rc_has_g = rc.startswith("G ")
-            sc_has_g = sc.startswith("G ")
+            # Check gender prefix/suffix match
+            rc_has_g = rc.startswith("G ") or (rc.endswith(" G") and not rc.endswith("OG"))
+            sc_has_g = sc.startswith("G ") or (sc.endswith(" G") and not sc.endswith("OG"))
             if rc_has_g != sc_has_g:
                 continue
 
-            # Check boys suffix match
+            # B suffix in roster = boys; no G prefix in student = boys/coed
             rc_has_b = rc.endswith(" B") and not rc.endswith("AB")
             sc_has_b = sc.endswith(" B") and not sc.endswith("AB")
+            # Roster "B" suffix should match non-G student courses
+            if rc_has_b and sc_has_g:
+                continue
+            if sc_has_b and rc_has_g:
+                continue
 
-            # Token overlap with expansion
-            overlap = len(rc_expanded & sc_expanded)
-            union = len(rc_expanded | sc_expanded)
+            # Token overlap with expansion (exclude gender/boys suffix tokens)
+            rc_match_tokens = rc_expanded - {"b"} if rc_has_b else rc_expanded
+            sc_match_tokens = sc_expanded - {"b"} if sc_has_b else sc_expanded
+            if rc.endswith(" G"):
+                rc_match_tokens = rc_match_tokens - {"g"}
+            if sc.endswith(" G"):
+                sc_match_tokens = sc_match_tokens - {"g"}
+            overlap = len(rc_match_tokens & sc_match_tokens)
+            union = len(rc_match_tokens | sc_match_tokens)
             if union == 0:
                 continue
 
             score = overlap / union
 
-            # Bonus for matching gender suffix
+            # Bonus for matching B suffix
             if rc_has_b == sc_has_b:
-                score += 0.1
+                score += 0.05
 
             # Bonus for AP match
             rc_is_ap = "ap" in rc_tokens
