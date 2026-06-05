@@ -178,3 +178,7 @@ autogpt_platform/backend/settings.py
 *.ign.*
 .test-contents
 .claude/settings.local.json
+
+# OLSM scheduler output
+olsm_output/
+olsm_sample_data.xlsx
