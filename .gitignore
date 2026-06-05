@@ -182,3 +182,5 @@ autogpt_platform/backend/settings.py
 # OLSM scheduler output
 olsm_output/
 olsm_sample_data.xlsx
+Student_Requests.csv
+OLSM_Teacher_Roster_v16.xlsx
