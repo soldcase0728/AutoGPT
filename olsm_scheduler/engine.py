@@ -193,107 +193,113 @@ class BuildEngine:
     # ── STEP 1: ROTATION POOLS ──────────────────────────────────────────
 
     def step_1_rotation(self):
-        girls_subjects = ["Music Tech", "Engineering", "Build Wealth", "Art"]
-        boys_subjects = ["Music Tech", "Multimedia", "Business Rotational", "ACT Prep"]
+        girls_rot_code = None
+        boys_rot_code = None
+        for code, course in self.data.courses.items():
+            if course.is_rotation:
+                if course.gender_restriction == Gender.GIRLS:
+                    girls_rot_code = code
+                else:
+                    boys_rot_code = code
+
+        if not girls_rot_code and not boys_rot_code:
+            for code in self.data.courses:
+                lower = code.lower()
+                if "grammar" in lower and "genre" in lower:
+                    if code.startswith("G "):
+                        girls_rot_code = code
+                    else:
+                        boys_rot_code = code
+
+        if girls_rot_code:
+            self.data.courses[girls_rot_code].flag = CourseFlag.ROTATION
+        if boys_rot_code:
+            self.data.courses[boys_rot_code].flag = CourseFlag.ROTATION
+
+        print(f"  Girls rotation course: {girls_rot_code}")
+        print(f"  Boys rotation course: {boys_rot_code}")
 
         rotation_teachers = [t for t in self.data.teachers.values() if t.is_rotation_teacher]
-        print(f"  Found {len(rotation_teachers)} rotation teachers: {[t.name for t in rotation_teachers]}")
 
         girls_pool: list[Teacher] = []
         boys_pool: list[Teacher] = []
 
         for t in rotation_teachers:
-            specs_lower = [s.lower() for s in t.subject_specialties]
             notes_lower = t.notes.lower()
-
-            can_girls = any(any(gs.lower() in sp for sp in specs_lower) for gs in girls_subjects)
-            can_boys = any(any(bs.lower() in sp for sp in specs_lower) for bs in boys_subjects)
-
             if "both" in notes_lower:
-                if len(girls_pool) < 4:
-                    girls_pool.append(t)
-                if len(boys_pool) < 4:
-                    boys_pool.append(t)
-            elif can_girls and len(girls_pool) < 4:
                 girls_pool.append(t)
-            elif can_boys and len(boys_pool) < 4:
+                boys_pool.append(t)
+            elif "girl" in notes_lower:
+                girls_pool.append(t)
+            elif "boy" in notes_lower:
                 boys_pool.append(t)
             else:
-                if len(girls_pool) < 4:
-                    girls_pool.append(t)
-                elif len(boys_pool) < 4:
-                    boys_pool.append(t)
+                girls_pool.append(t)
+                boys_pool.append(t)
 
-        while len(girls_pool) < 4:
-            for t in self.data.teachers.values():
-                if t not in girls_pool and t not in boys_pool:
-                    dept_lower = t.department.lower()
-                    if any(d in dept_lower for d in ["art", "music", "tech", "engineer"]):
+        if girls_rot_code:
+            g_course = self.data.courses[girls_rot_code]
+            needed = g_course.required_sections()
+            teachers_needed = max(needed, 1)
+
+            if not girls_pool:
+                for t in self.data.teachers.values():
+                    if t.department.lower() in ("english", "language arts"):
                         girls_pool.append(t)
-                        if len(girls_pool) >= 4:
+                        if len(girls_pool) >= teachers_needed:
                             break
 
-        while len(boys_pool) < 4:
-            for t in self.data.teachers.values():
-                if t not in boys_pool:
-                    dept_lower = t.department.lower()
-                    if any(d in dept_lower for d in ["test", "business", "media", "music", "tech"]):
-                        boys_pool.append(t)
-                        if len(boys_pool) >= 4:
-                            break
+            self.data.girls_rotation_teachers = [t.name for t in girls_pool[:teachers_needed]]
 
-        self.data.girls_rotation_teachers = [t.name for t in girls_pool[:4]]
-        self.data.boys_rotation_teachers = [t.name for t in boys_pool[:4]]
+            for t in girls_pool[:teachers_needed]:
+                for p in [Period.P1, Period.P2]:
+                    if p not in t.schedule:
+                        t.schedule[p] = SlotType.ROTATION
+                        t.assigned_classes[p] = girls_rot_code
+                print(f"  Girls rotation: {t.name} → P1+P2")
 
-        for t in girls_pool[:4]:
-            for p in [Period.P1, Period.P2]:
-                t.schedule[p] = SlotType.ROTATION
-                t.assigned_classes[p] = "Girls Rotation"
-            print(f"  Girls pool: {t.name} → P1+P2")
-
-        for t in boys_pool[:4]:
-            for p in [Period.P3, Period.P5B]:
-                t.schedule[p] = SlotType.ROTATION
-                t.assigned_classes[p] = "Boys Rotation"
-            if t.lunch_period == Period.P5B:
-                t.schedule[Period.P5A] = SlotType.LUNCH
-                t.lunch_period = Period.P5A
-                print(f"  Lunch shift: {t.name} P5B → P5A")
-            print(f"  Boys pool: {t.name} → P3+P5B")
-
-        for i, (subj, tname) in enumerate(zip(girls_subjects, self.data.girls_rotation_teachers[:4])):
             for label, period in [("A", Period.P1), ("B", Period.P2)]:
-                rot_code = f"Girls_ROT_{subj.replace(' ', '_')}"
-                if rot_code not in self.data.courses:
-                    self.data.courses[rot_code] = Course(
-                        code=rot_code, name=f"Girls Rotation: {subj}",
-                        department="Rotation", grade_level=9,
-                        gender_restriction=Gender.GIRLS, min_sections=2,
-                        standard_capacity=55, flag=CourseFlag.ROTATION,
+                for i, tname in enumerate(self.data.girls_rotation_teachers):
+                    sec_id = self._next_section_id(girls_rot_code, f"{label}-T{i+1}")
+                    self.data.sections[sec_id] = Section(
+                        section_id=sec_id, course_code=girls_rot_code,
+                        section_label=label, teacher_name=tname,
+                        period=period, capacity=g_course.standard_capacity,
                     )
-                sec_id = self._next_section_id(rot_code, label)
-                self.data.sections[sec_id] = Section(
-                    section_id=sec_id, course_code=rot_code,
-                    section_label=label, teacher_name=tname,
-                    period=period, capacity=55,
-                )
 
-        for i, (subj, tname) in enumerate(zip(boys_subjects, self.data.boys_rotation_teachers[:4])):
+        if boys_rot_code:
+            b_course = self.data.courses[boys_rot_code]
+            needed = b_course.required_sections()
+            teachers_needed = max(needed, 1)
+
+            if not boys_pool:
+                for t in self.data.teachers.values():
+                    if t.department.lower() in ("english", "language arts"):
+                        boys_pool.append(t)
+                        if len(boys_pool) >= teachers_needed:
+                            break
+
+            self.data.boys_rotation_teachers = [t.name for t in boys_pool[:teachers_needed]]
+
+            for t in boys_pool[:teachers_needed]:
+                for p in [Period.P3, Period.P5B]:
+                    if p not in t.schedule:
+                        t.schedule[p] = SlotType.ROTATION
+                        t.assigned_classes[p] = boys_rot_code
+                if t.lunch_period == Period.P5B:
+                    t.schedule[Period.P5A] = SlotType.LUNCH
+                    t.lunch_period = Period.P5A
+                    print(f"  Lunch shift: {t.name} P5B → P5A")
+                print(f"  Boys rotation: {t.name} → P3+P5B")
+
             for label, period in [("A", Period.P3), ("B", Period.P5B)]:
-                rot_code = f"Boys_ROT_{subj.replace(' ', '_')}"
-                if rot_code not in self.data.courses:
-                    self.data.courses[rot_code] = Course(
-                        code=rot_code, name=f"Boys Rotation: {subj}",
-                        department="Rotation", grade_level=10,
-                        gender_restriction=Gender.BOYS, min_sections=2,
-                        standard_capacity=55, flag=CourseFlag.ROTATION,
+                for i, tname in enumerate(self.data.boys_rotation_teachers):
+                    sec_id = self._next_section_id(boys_rot_code, f"{label}-T{i+1}")
+                    self.data.sections[sec_id] = Section(
+                        section_id=sec_id, course_code=boys_rot_code,
+                        section_label=label, teacher_name=tname,
+                        period=period, capacity=b_course.standard_capacity,
                     )
-                sec_id = self._next_section_id(rot_code, label)
-                self.data.sections[sec_id] = Section(
-                    section_id=sec_id, course_code=rot_code,
-                    section_label=label, teacher_name=tname,
-                    period=period, capacity=55,
-                )
 
     # ── STEP 2: CONSTRAINTS ─────────────────────────────────────────────
 
@@ -301,7 +307,29 @@ class BuildEngine:
         for t in self.data.teachers.values():
             if SEM_PERIOD not in t.schedule:
                 t.schedule[SEM_PERIOD] = SlotType.SEM
-                t.assigned_classes[SEM_PERIOD] = "SEM"
+                t.assigned_classes[SEM_PERIOD] = "Seminar"
+
+        seminar_courses = [c for c in self.data.courses.values()
+                          if "seminar" in c.code.lower()]
+        for sem_course in seminar_courses:
+            needed = sem_course.required_sections()
+            used_teachers: set[str] = set()
+            for i in range(needed):
+                teacher = self._find_teacher_for_course(sem_course, exclude=used_teachers)
+                if not teacher:
+                    for t in self.data.teachers.values():
+                        if t.name not in used_teachers and SEM_PERIOD in t.schedule:
+                            teacher = t
+                            break
+                if teacher:
+                    sec_id = self._next_section_id(sem_course.code, str(i + 1))
+                    self.data.sections[sec_id] = Section(
+                        section_id=sec_id, course_code=sem_course.code,
+                        section_label=str(i + 1), teacher_name=teacher.name,
+                        period=SEM_PERIOD, capacity=sem_course.standard_capacity,
+                    )
+                    used_teachers.add(teacher.name)
+            print(f"  Seminar: {sem_course.code} — {needed} sections at P4")
 
         for t in self.data.teachers.values():
             if t.lunch_period:
@@ -341,7 +369,7 @@ class BuildEngine:
     def step_3_single_section(self):
         single_courses = [c for c in self.data.courses.values()
                           if c.min_sections == 1 and c.enrollment_count > 0
-                          and not c.is_rotation]
+                          and not c.is_rotation and "seminar" not in c.code.lower()]
         single_courses.sort(key=lambda c: len(c.valid_periods()))
 
         placed = 0
@@ -540,14 +568,45 @@ class BuildEngine:
 
     def step_8_student_assignment(self):
         for s in self.data.students.values():
-            s.schedule[SEM_PERIOD] = "SEM"
             s.schedule[s.lunch_period] = "LUNCH"
+
+        seminar_courses = {c.code: c for c in self.data.courses.values()
+                          if "seminar" in c.code.lower()}
+        if seminar_courses:
+            print(f"  Placing Seminar courses at P4 for all students...")
+            for s in self.data.students.values():
+                for req in s.course_requests:
+                    if "seminar" in req.lower() and req in self.data.courses:
+                        s.schedule[SEM_PERIOD] = req
+                        secs = self.data.sections_for_course(req)
+                        for sec in secs:
+                            if sec.period == SEM_PERIOD and not sec.is_full:
+                                sec.enrolled_students.append(s.student_id)
+                                break
+                        else:
+                            if secs:
+                                secs[0].enrolled_students.append(s.student_id)
+                        break
+                else:
+                    s.schedule[SEM_PERIOD] = "SEM"
+        else:
+            for s in self.data.students.values():
+                s.schedule[SEM_PERIOD] = "SEM"
+
+        girls_rot_code = None
+        boys_rot_code = None
+        for code, course in self.data.courses.items():
+            if course.is_rotation:
+                if course.gender_restriction == Gender.GIRLS:
+                    girls_rot_code = code
+                else:
+                    boys_rot_code = code
 
         g9_girls = self.data.students_by_grade_gender(9, Gender.GIRLS)
         b10_boys = self.data.students_by_grade_gender(10, Gender.BOYS)
 
-        self._assign_rotation(g9_girls, "Girls", GIRLS_ROTATION_PERIODS)
-        self._assign_rotation(b10_boys, "Boys", BOYS_ROTATION_PERIODS)
+        self._assign_rotation(g9_girls, "Girls", GIRLS_ROTATION_PERIODS, girls_rot_code)
+        self._assign_rotation(b10_boys, "Boys", BOYS_ROTATION_PERIODS, boys_rot_code)
 
         assignment_order = [
             (9, Gender.GIRLS, "9th-grade girls"),
@@ -573,8 +632,9 @@ class BuildEngine:
         print(f"  Total conflicts: {total_conflicts}")
 
     def _assign_rotation(self, students: list[Student], pool_name: str,
-                         periods: set[Period]):
-        if not students:
+                         periods: set[Period], rot_code: str | None = None):
+        if not students or not rot_code:
+            print(f"  {pool_name} rotation: skipped (no rotation course found)")
             return
 
         random.shuffle(students)
@@ -586,25 +646,27 @@ class BuildEngine:
         p_a, p_b = period_list[0], period_list[1]
 
         rot_sections_a = [s for s in self.data.sections.values()
-                          if pool_name in s.course_code and s.section_label == "A"]
+                          if s.course_code == rot_code and s.section_label == "A"]
         rot_sections_b = [s for s in self.data.sections.values()
-                          if pool_name in s.course_code and s.section_label == "B"]
+                          if s.course_code == rot_code and s.section_label == "B"]
 
         for i, student in enumerate(section_a):
             student.rotation_section = "A"
             student.rotation_subcohort = (i % 4) + 1
-            student.schedule[p_a] = f"{pool_name}_Rotation_A"
+            student.schedule[p_a] = rot_code
             for sec in rot_sections_a:
                 if student.student_id not in sec.enrolled_students:
                     sec.enrolled_students.append(student.student_id)
+                    break
 
         for i, student in enumerate(section_b):
             student.rotation_section = "B"
             student.rotation_subcohort = (i % 4) + 1
-            student.schedule[p_b] = f"{pool_name}_Rotation_B"
+            student.schedule[p_b] = rot_code
             for sec in rot_sections_b:
                 if student.student_id not in sec.enrolled_students:
                     sec.enrolled_students.append(student.student_id)
+                    break
 
         print(f"  {pool_name} rotation: Section A={len(section_a)}, Section B={len(section_b)}")
 

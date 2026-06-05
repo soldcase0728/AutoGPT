@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .parser import load_input_file
+from .parser import load_input_file, load_student_requests_csv
 from .engine import BuildEngine
 from .output import generate_all_outputs
 
@@ -18,19 +18,28 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m olsm_scheduler input_data.xlsx
+  python -m olsm_scheduler Student_Requests.csv
+  python -m olsm_scheduler Student_Requests.csv --teachers teachers.xlsx
   python -m olsm_scheduler input_data.xlsx -o ./schedule_output
   python -m olsm_scheduler input_data.xlsx --validate-only
         """,
     )
     parser.add_argument(
         "input_file",
-        help="Path to the populated INPUT_TEMPLATES.xlsx file",
+        help="Path to input file (.csv Student Requests or .xlsx INPUT_TEMPLATES)",
     )
     parser.add_argument(
         "-o", "--output-dir",
         default="./olsm_output",
         help="Output directory for generated files (default: ./olsm_output)",
+    )
+    parser.add_argument(
+        "--teachers",
+        help="Path to teacher roster .xlsx file (when using CSV student input)",
+    )
+    parser.add_argument(
+        "--rooms",
+        help="Path to room inventory .xlsx file (when using CSV student input)",
     )
     parser.add_argument(
         "--validate-only",
@@ -48,6 +57,16 @@ Examples:
         type=int,
         default=42,
         help="Random seed for reproducible student assignments (default: 42)",
+    )
+    parser.add_argument(
+        "--rotation-girls",
+        default="G Grammar and Genre Studies 9",
+        help="Girls rotation course name (default: 'G Grammar and Genre Studies 9')",
+    )
+    parser.add_argument(
+        "--rotation-boys",
+        default="Grammar and Genre Studies",
+        help="Boys rotation course name (default: 'Grammar and Genre Studies')",
     )
 
     args = parser.parse_args()
@@ -67,9 +86,26 @@ Examples:
 
     print(f"\nLoading input file: {input_path}")
     try:
-        data = load_input_file(input_path)
+        if input_path.suffix.lower() == ".csv":
+            data = load_student_requests_csv(
+                input_path,
+                rotation_girls=args.rotation_girls,
+                rotation_boys=args.rotation_boys,
+            )
+            if args.teachers:
+                import openpyxl
+                from .parser import parse_teachers_xlsx, _find_header_row
+                wb = openpyxl.load_workbook(args.teachers, data_only=True)
+                for name in wb.sheetnames:
+                    if "teacher" in name.lower() or "roster" in name.lower():
+                        data.teachers = parse_teachers_xlsx(wb[name])
+                        break
+        else:
+            data = load_input_file(input_path)
     except Exception as e:
         print(f"ERROR: Failed to parse input file: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
     print(f"  Students: {len(data.students)}")

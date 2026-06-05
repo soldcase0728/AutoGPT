@@ -135,7 +135,7 @@ def generate_class_rosters(data: ScheduleData, output_dir: Path):
     for sec in sorted(data.sections.values(), key=lambda s: s.section_id):
         if not sec.enrolled_students:
             continue
-        title = sec.section_id[:31]
+        title = sec.section_id.replace("/", "-").replace("\\", "-")[:31]
         ws = wb.create_sheet(title=title)
 
         ws.cell(row=1, column=1, value="Section:")
@@ -181,7 +181,7 @@ def generate_teacher_schedules(data: ScheduleData, output_dir: Path):
     wb.remove(wb.active)
 
     for t in sorted(data.teachers.values(), key=lambda t: t.name):
-        title = t.name[:31]
+        title = t.name.replace("/", "-").replace("\\", "-")[:31]
         ws = wb.create_sheet(title=title)
 
         ws.cell(row=1, column=1, value="Teacher:")

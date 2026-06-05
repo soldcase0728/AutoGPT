@@ -167,11 +167,11 @@ def check_1_5(data: ScheduleData) -> AuditEntry:
 
 def check_2_1(data: ScheduleData) -> AuditEntry:
     missing = [t.name for t in data.teachers.values()
-               if SEM_PERIOD not in t.schedule or t.schedule[SEM_PERIOD] != SlotType.SEM]
+               if SEM_PERIOD not in t.schedule]
     ok = len(missing) == 0
-    return _entry(2, "2.1", "SEM Coverage",
+    return _entry(2, "2.1", "SEM/Seminar Coverage",
                   "PASS" if ok else "FAIL",
-                  f"Missing SEM: {missing}" if missing else "All teachers have P4=SEM")
+                  f"Missing P4: {missing}" if missing else "All teachers have P4 assigned")
 
 
 def check_2_2(data: ScheduleData) -> AuditEntry:

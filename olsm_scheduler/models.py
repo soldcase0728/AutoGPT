@@ -102,6 +102,10 @@ class Course:
         return max(self.min_sections, math.ceil(self.enrollment_count / self.standard_capacity))
 
     def forbidden_periods(self) -> set[Period]:
+        if self.is_rotation:
+            return set()
+        if "seminar" in self.code.lower():
+            return set()
         forbidden = {Period.P4}
         if self.grade_level == 9 and self.gender_restriction == Gender.GIRLS:
             forbidden |= GIRLS_ROTATION_PERIODS
