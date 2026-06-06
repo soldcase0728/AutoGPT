@@ -30,6 +30,11 @@ class BuildEngine:
 
     def _find_teacher_for_course(self, course: Course,
                                  exclude: set[str] | None = None) -> Optional[Teacher]:
+        """Find a qualified teacher for a course using ONLY roster assignments.
+
+        Never assigns a teacher outside their rostered courses/department.
+        Enforces max_teaching_periods hard cap (no overloads without approval).
+        """
         exclude = exclude or set()
         candidates = []
 
@@ -45,96 +50,41 @@ class BuildEngine:
             load = t.teaching_period_count()
             has_capacity = load < t.max_teaching_periods or t.overload_approved
             if has_capacity:
-                return t
-
-        course_lower = course.code.lower()
-        course_name_lower = course.name.lower()
-        stripped = course_lower.replace("g ", "").replace(" b", "").replace("hon ", "").replace("ap ", "").strip()
-        course_keywords = {w for w in stripped.split() if len(w) > 2}
-        course_keywords |= {w for w in course_name_lower.split() if len(w) > 2}
-
-        for t in self.data.teachers.values():
-            if t.name in exclude:
-                continue
-            if t.is_rotation_teacher and not course.is_rotation:
-                if t.teaching_period_count() >= t.max_teaching_periods:
-                    continue
-
-            spec_text = " ".join(t.subject_specialties).lower()
-            cert_text = " ".join(t.certifications).lower()
-            dept_lower = t.department.lower().split("/")[0].strip()
-
-            spec_match = any(
-                kw in spec_text for kw in course_keywords
-            ) if course_keywords else False
-
-            dept_match = False
-            course_dept = course.department.lower().split("/")[0].strip()
-            if course_dept and dept_lower:
-                dept_match = course_dept == dept_lower or course_dept in dept_lower or dept_lower in course_dept
-
-            cert_match = False
-            if course.is_ap:
-                cert_match = any("ap" in c.lower() for c in t.certifications)
-            if course.is_honors:
-                cert_match = any("honor" in c.lower() for c in t.certifications) or dept_match
-
-            if spec_match or dept_match or cert_match:
                 avail = len(t.available_periods())
-                load = t.teaching_period_count()
-                has_capacity = load < t.max_teaching_periods or t.overload_approved
-                priority = 10 if spec_match else (5 if cert_match else 1)
-                score = priority * 100 + avail * 10 - load + (1000 if has_capacity else 0)
+                score = avail * 10 - load + (1000 if has_capacity else 0)
                 candidates.append((score, t))
 
         candidates.sort(key=lambda x: -x[0])
-        for _, t in candidates:
-            if t.teaching_period_count() < t.max_teaching_periods or t.overload_approved:
-                return t
         return candidates[0][1] if candidates else None
 
     def _find_teacher_and_period(self, course: Course,
                                   exclude: set[str] | None = None
                                   ) -> tuple[Optional[Teacher], Optional[Period]]:
-        """Try all candidate teachers until one with an available period is found."""
+        """Find a qualified teacher AND available period for a course.
+
+        Only uses roster-assigned teachers. Spreads sections across periods
+        by penalizing periods already used by other sections of this course.
+        """
         exclude = exclude or set()
-        course_keywords = course.code.lower().split()
+
+        tcm = getattr(self.data, "_teacher_course_map", {})
+        course_name_map = getattr(self.data, "_student_to_roster_course", {})
+        roster_name = course_name_map.get(course.code, course.code)
+        exact_teachers = tcm.get(roster_name, [])
 
         candidates: list[tuple[int, Teacher]] = []
 
-        for t in self.data.teachers.values():
-            if t.name in exclude:
+        for tname in exact_teachers:
+            if tname in exclude or tname not in self.data.teachers:
                 continue
-            if t.is_rotation_teacher and not course.is_rotation:
-                if t.teaching_period_count() >= t.max_teaching_periods:
-                    continue
-
-            spec_text = " ".join(t.subject_specialties).lower()
-            cert_text = " ".join(t.certifications).lower()
-            dept_lower = t.department.lower().split("/")[0].strip()
-
-            spec_match = any(
-                kw in spec_text for kw in course_keywords
-            ) if course_keywords else False
-
-            dept_match = False
-            course_dept = course.department.lower().split("/")[0].strip()
-            if course_dept and dept_lower:
-                dept_match = course_dept == dept_lower or course_dept in dept_lower or dept_lower in course_dept
-
-            cert_match = False
-            if course.is_ap:
-                cert_match = any("ap" in c.lower() for c in t.certifications)
-            if course.is_honors:
-                cert_match = any("honor" in c.lower() for c in t.certifications) or dept_match
-
-            if spec_match or dept_match or cert_match:
-                avail = len(t.available_periods())
-                load = t.teaching_period_count()
-                has_capacity = load < t.max_teaching_periods or t.overload_approved
-                priority = 10 if spec_match else (5 if cert_match else 1)
-                score = priority * 100 + avail * 10 - load + (1000 if has_capacity else 0)
-                candidates.append((score, t))
+            t = self.data.teachers[tname]
+            load = t.teaching_period_count()
+            has_capacity = load < t.max_teaching_periods or t.overload_approved
+            if not has_capacity:
+                continue
+            avail = len(t.available_periods())
+            score = avail * 10 - load + (1000 if has_capacity else 0)
+            candidates.append((score, t))
 
         candidates.sort(key=lambda x: -x[0])
         for _, t in candidates:
@@ -158,12 +108,19 @@ class BuildEngine:
                 if p in candidates:
                     return p
 
+        existing_sections = [s for s in self.data.sections_for_course(course.code)
+                             if s.period is not None]
+        used_periods = {s.period for s in existing_sections}
+
+        fresh = candidates - used_periods
+        pool = fresh if fresh else candidates
+
         period_load = defaultdict(int)
         for sec in self.data.sections.values():
             if sec.period:
                 period_load[sec.period] += 1
 
-        best = min(candidates, key=lambda p: period_load.get(p, 0))
+        best = min(pool, key=lambda p: period_load.get(p, 0))
         return best
 
     def _place_section(self, course: Course, teacher: Teacher,
@@ -586,13 +543,7 @@ class BuildEngine:
             for i in range(needed):
                 teacher, period = self._find_teacher_and_period(course)
                 if not teacher or not period:
-                    for t in self.data.teachers.values():
-                        p = self._find_best_period(t, course)
-                        if p and t.teaching_period_count() < t.max_teaching_periods:
-                            teacher, period = t, p
-                            break
-                if not teacher or not period:
-                    print(f"  WARNING: No teacher/period for {course.code}")
+                    print(f"  WARNING: No qualified teacher/period for {course.code}")
                     break
 
                 cap = 30 if ("pe" in course.name.lower() or "gym" in course.name.lower()) else course.standard_capacity
@@ -688,25 +639,28 @@ class BuildEngine:
         rot_sections_b = [s for s in self.data.sections.values()
                           if s.course_code == rot_code and s.section_label == "B"]
 
+        num_teachers_a = len(rot_sections_a) or 1
+        num_teachers_b = len(rot_sections_b) or 1
+
         for i, student in enumerate(section_a):
             student.rotation_section = "A"
-            student.rotation_subcohort = (i % 4) + 1
+            student.rotation_subcohort = (i % num_teachers_a) + 1
             student.schedule[p_a] = rot_code
-            for sec in rot_sections_a:
-                if student.student_id not in sec.enrolled_students:
-                    sec.enrolled_students.append(student.student_id)
-                    break
+            sec_idx = i % num_teachers_a
+            if sec_idx < len(rot_sections_a):
+                rot_sections_a[sec_idx].enrolled_students.append(student.student_id)
 
         for i, student in enumerate(section_b):
             student.rotation_section = "B"
-            student.rotation_subcohort = (i % 4) + 1
+            student.rotation_subcohort = (i % num_teachers_b) + 1
             student.schedule[p_b] = rot_code
-            for sec in rot_sections_b:
-                if student.student_id not in sec.enrolled_students:
-                    sec.enrolled_students.append(student.student_id)
-                    break
+            sec_idx = i % num_teachers_b
+            if sec_idx < len(rot_sections_b):
+                rot_sections_b[sec_idx].enrolled_students.append(student.student_id)
 
         print(f"  {pool_name} rotation: Section A={len(section_a)}, Section B={len(section_b)}")
+        for sec in rot_sections_a + rot_sections_b:
+            print(f"    {sec.teacher_name} @ {sec.period.value}: {len(sec.enrolled_students)} students")
 
     def _assign_courses(self, students: list[Student], label: str) -> tuple[int, int]:
         assigned = 0

@@ -755,7 +755,8 @@ def _build_fuzzy_course_map(roster_courses: list[str],
     remaining_roster = [rc for rc in roster_courses if rc not in mapping]
     remaining_student = [s for s in student_courses if s.lower() not in used_student]
 
-    for rc in remaining_roster:
+    for rc_orig in remaining_roster:
+        rc = rc_orig
         rc_tokens = _tokenize(rc)
         rc_expanded = _expand(rc_tokens)
 
@@ -769,16 +770,17 @@ def _build_fuzzy_course_map(roster_courses: list[str],
             # Check gender prefix/suffix match
             rc_has_g = rc.startswith("G ") or (rc.endswith(" G") and not rc.endswith("OG"))
             sc_has_g = sc.startswith("G ") or (sc.endswith(" G") and not sc.endswith("OG"))
-            if rc_has_g != sc_has_g:
-                continue
-
-            # B suffix in roster = boys; no G prefix in student = boys/coed
+            rc_combined = "(combined)" in rc_orig.lower() or "(Combined)" in rc_orig
             rc_has_b = rc.endswith(" B") and not rc.endswith("AB")
             sc_has_b = sc.endswith(" B") and not sc.endswith("AB")
-            # Roster "B" suffix should match non-G student courses
-            if rc_has_b and sc_has_g:
+
+            if rc_combined:
+                pass
+            elif rc_has_g != sc_has_g:
                 continue
-            if sc_has_b and rc_has_g:
+            elif rc_has_b and sc_has_g:
+                continue
+            elif sc_has_b and rc_has_g:
                 continue
 
             # Token overlap with expansion (exclude gender/boys suffix tokens)
@@ -812,7 +814,9 @@ def _build_fuzzy_course_map(roster_courses: list[str],
                 best_match = sc
 
         if best_match and best_score > 0.25:
-            mapping[rc] = best_match
+            mapping[rc_orig] = best_match
+            if not rc_combined:
+                used_student.add(best_match.lower())
 
     return mapping
 
@@ -1010,12 +1014,101 @@ def build_fuzzy_course_mapping(data: ScheduleData) -> dict[str, str]:
     if not roster_courses:
         return {}
 
+    import re
+
     student_courses = list(data.courses.keys())
     mapping = _build_fuzzy_course_map(roster_courses, student_courses)
     data._course_name_map = mapping  # type: ignore[attr-defined]
 
     # Also build reverse: student_course -> roster_course
     reverse = {v: k for k, v in mapping.items()}
+
+    tcm = getattr(data, "_teacher_course_map", {})
+
+    # For "(combined)" roster courses, also map the G-prefix student equivalent
+    for rc in roster_courses:
+        if "(combined)" not in rc.lower() and "(Combined)" not in rc:
+            continue
+        if rc not in mapping:
+            continue
+        sc = mapping[rc]
+        teachers = tcm.get(rc, [])
+        if not teachers:
+            continue
+        # If we mapped "French 3 (Combined)" -> "French III", also map "G French III"
+        g_variant = f"G {sc}" if not sc.startswith("G ") else None
+        non_g_variant = sc[2:] if sc.startswith("G ") else None
+        for variant in [g_variant, non_g_variant]:
+            if variant and variant in data.courses and variant not in reverse:
+                reverse[variant] = rc
+
+    # Handle range roster entries like "Band 1-4"
+    roman_rev = {"1": "I", "2": "II", "3": "III", "4": "IV"}
+    for rc in roster_courses:
+        m = re.match(r'^(.+?)\s*(\d)\s*-\s*(\d)\s*$', rc)
+        if not m:
+            continue
+        base, start, end = m.group(1).strip(), int(m.group(2)), int(m.group(3))
+        teachers = tcm.get(rc, [])
+        if not teachers:
+            continue
+        for num in range(start, end + 1):
+            for sc in student_courses:
+                if sc in reverse:
+                    continue
+                sc_lower = sc.lower()
+                base_lower = base.lower()
+                numeral = roman_rev.get(str(num), str(num))
+                if base_lower in sc_lower and (numeral in sc or str(num) in sc):
+                    reverse[sc] = rc
+                    break
+
+    # Department synonym groups
+    dept_synonyms = {
+        "language": {"language", "french", "spanish", "world lang"},
+        "french": {"language", "french"},
+        "spanish": {"language", "spanish"},
+        "science": {"science", "biology", "chemistry", "physics", "engineering"},
+        "history": {"history", "social studies", "government", "economics"},
+        "pe": {"pe", "health", "physical education"},
+        "arts": {"arts", "art", "music", "fine arts"},
+        "computer science": {"computer", "computer science", "cs", "technology"},
+        "math": {"math", "mathematics"},
+        "english": {"english", "language arts", "writing"},
+        "business": {"business", "accounting"},
+        "music": {"music", "arts", "fine arts"},
+    }
+
+    def _depts_match(d1: str, d2: str) -> bool:
+        if d1 == d2 or d1 in d2 or d2 in d1:
+            return True
+        syns1 = dept_synonyms.get(d1, {d1})
+        syns2 = dept_synonyms.get(d2, {d2})
+        return bool(syns1 & syns2)
+
+    # Department-based fallback for unmapped courses with >0 enrollment
+    for sc in student_courses:
+        if sc in reverse:
+            continue
+        course = data.courses.get(sc)
+        if not course or course.enrollment_count == 0:
+            continue
+        if "seminar" in sc.lower() or course.is_rotation:
+            continue
+        course_dept = course.department.lower().strip()
+        if not course_dept:
+            continue
+        for t in data.teachers.values():
+            t_dept = t.department.lower().split("/")[0].strip()
+            if not t_dept:
+                continue
+            if _depts_match(course_dept, t_dept):
+                if sc not in reverse:
+                    reverse[sc] = f"__dept__{sc}"
+                    tcm[f"__dept__{sc}"] = []
+                if t.name not in tcm[f"__dept__{sc}"]:
+                    tcm[f"__dept__{sc}"].append(t.name)
+
     data._student_to_roster_course = reverse  # type: ignore[attr-defined]
 
     return mapping
