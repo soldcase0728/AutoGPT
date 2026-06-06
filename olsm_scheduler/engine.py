@@ -93,6 +93,56 @@ class BuildEngine:
                 return t
         return candidates[0][1] if candidates else None
 
+    def _find_teacher_and_period(self, course: Course,
+                                  exclude: set[str] | None = None
+                                  ) -> tuple[Optional[Teacher], Optional[Period]]:
+        """Try all candidate teachers until one with an available period is found."""
+        exclude = exclude or set()
+        course_keywords = course.code.lower().split()
+
+        candidates: list[tuple[int, Teacher]] = []
+
+        for t in self.data.teachers.values():
+            if t.name in exclude:
+                continue
+            if t.is_rotation_teacher and not course.is_rotation:
+                if t.teaching_period_count() >= t.max_teaching_periods:
+                    continue
+
+            spec_text = " ".join(t.subject_specialties).lower()
+            cert_text = " ".join(t.certifications).lower()
+            dept_lower = t.department.lower().split("/")[0].strip()
+
+            spec_match = any(
+                kw in spec_text for kw in course_keywords
+            ) if course_keywords else False
+
+            dept_match = False
+            course_dept = course.department.lower().split("/")[0].strip()
+            if course_dept and dept_lower:
+                dept_match = course_dept == dept_lower or course_dept in dept_lower or dept_lower in course_dept
+
+            cert_match = False
+            if course.is_ap:
+                cert_match = any("ap" in c.lower() for c in t.certifications)
+            if course.is_honors:
+                cert_match = any("honor" in c.lower() for c in t.certifications) or dept_match
+
+            if spec_match or dept_match or cert_match:
+                avail = len(t.available_periods())
+                load = t.teaching_period_count()
+                has_capacity = load < t.max_teaching_periods or t.overload_approved
+                priority = 10 if spec_match else (5 if cert_match else 1)
+                score = priority * 100 + avail * 10 - load + (1000 if has_capacity else 0)
+                candidates.append((score, t))
+
+        candidates.sort(key=lambda x: -x[0])
+        for _, t in candidates:
+            period = self._find_best_period(t, course)
+            if period:
+                return t, period
+        return None, None
+
     def _find_best_period(self, teacher: Teacher, course: Course,
                           preferred: list[Period] | None = None) -> Optional[Period]:
         valid = course.valid_periods()
@@ -404,14 +454,9 @@ class BuildEngine:
                 placed += 1
                 continue
 
-            teacher = self._find_teacher_for_course(course)
-            if not teacher:
+            teacher, period = self._find_teacher_and_period(course)
+            if not teacher or not period:
                 print(f"  WARNING: No teacher found for {course.code}")
-                continue
-
-            period = self._find_best_period(teacher, course)
-            if not period:
-                print(f"  WARNING: No valid period for {course.code} with {teacher.name}")
                 continue
 
             self._place_section(course, teacher, period, "1")
@@ -438,16 +483,11 @@ class BuildEngine:
 
             used_teachers: set[str] = set()
             for _ in range(needed):
-                teacher = self._find_teacher_for_course(course, exclude=used_teachers)
-                if not teacher:
-                    teacher = self._find_teacher_for_course(course)
-                if not teacher:
-                    print(f"  WARNING: No teacher for {course.code}")
-                    break
-
-                period = self._find_best_period(teacher, course)
-                if not period:
-                    print(f"  WARNING: No period for {course.code} with {teacher.name}")
+                teacher, period = self._find_teacher_and_period(course, exclude=used_teachers)
+                if not teacher or not period:
+                    teacher, period = self._find_teacher_and_period(course)
+                if not teacher or not period:
+                    print(f"  WARNING: No teacher/period for {course.code}")
                     break
 
                 sec_num = len(existing) + 1
@@ -477,16 +517,11 @@ class BuildEngine:
 
             used_teachers: set[str] = {s.teacher_name for s in existing}
             for i in range(needed):
-                teacher = self._find_teacher_for_course(course, exclude=used_teachers)
-                if not teacher:
-                    teacher = self._find_teacher_for_course(course)
-                if not teacher:
-                    print(f"  WARNING: No teacher for {course.code}")
-                    break
-
-                period = self._find_best_period(teacher, course)
-                if not period:
-                    print(f"  WARNING: No period for {course.code} with {teacher.name}")
+                teacher, period = self._find_teacher_and_period(course, exclude=used_teachers)
+                if not teacher or not period:
+                    teacher, period = self._find_teacher_and_period(course)
+                if not teacher or not period:
+                    print(f"  WARNING: No teacher/period for {course.code}")
                     break
 
                 sec_num = len(existing) + i + 1
@@ -514,16 +549,11 @@ class BuildEngine:
 
             used_teachers: set[str] = {s.teacher_name for s in existing}
             for i in range(needed):
-                teacher = self._find_teacher_for_course(course, exclude=used_teachers)
-                if not teacher:
-                    teacher = self._find_teacher_for_course(course)
-                if not teacher:
-                    print(f"  WARNING: No teacher for {course.code}")
-                    break
-
-                period = self._find_best_period(teacher, course)
-                if not period:
-                    print(f"  WARNING: No period for {course.code} with {teacher.name}")
+                teacher, period = self._find_teacher_and_period(course, exclude=used_teachers)
+                if not teacher or not period:
+                    teacher, period = self._find_teacher_and_period(course)
+                if not teacher or not period:
+                    print(f"  WARNING: No teacher/period for {course.code}")
                     break
 
                 sec_num = len(existing) + i + 1
@@ -554,32 +584,15 @@ class BuildEngine:
             if needed <= 0:
                 continue
             for i in range(needed):
-                teacher = self._find_teacher_for_course(course)
-                if not teacher:
-                    if "pe" in course.name.lower() or "health" in course.name.lower():
-                        placeholder = Teacher(
-                            name=f"ADMIN_PLACEHOLDER_PE_{self._section_counter}",
-                            department="PE",
-                            subject_specialties=["PE", "Health", "Physical Education"],
-                            max_teaching_periods=6,
-                        )
-                        placeholder.schedule[SEM_PERIOD] = SlotType.SEM
-                        placeholder.schedule[Period.P5A] = SlotType.LUNCH
-                        placeholder.lunch_period = Period.P5A
-                        self.data.teachers[placeholder.name] = placeholder
-                        teacher = placeholder
-                    else:
-                        for t in self.data.teachers.values():
-                            if t.teaching_period_count() < t.max_teaching_periods and len(t.available_periods()) > 0:
-                                teacher = t
-                                break
-                        if not teacher:
-                            print(f"  WARNING: No teacher for {course.code}")
+                teacher, period = self._find_teacher_and_period(course)
+                if not teacher or not period:
+                    for t in self.data.teachers.values():
+                        p = self._find_best_period(t, course)
+                        if p and t.teaching_period_count() < t.max_teaching_periods:
+                            teacher, period = t, p
                             break
-
-                period = self._find_best_period(teacher, course)
-                if not period:
-                    print(f"  WARNING: No period for {course.code}")
+                if not teacher or not period:
+                    print(f"  WARNING: No teacher/period for {course.code}")
                     break
 
                 cap = 30 if ("pe" in course.name.lower() or "gym" in course.name.lower()) else course.standard_capacity
