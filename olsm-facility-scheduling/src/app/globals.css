@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-navy-50 text-navy-900 antialiased;
+  }
+
+  /* Visible focus for keyboard users everywhere; WCAG 2.1 AA 2.4.7. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-gold-500 ring-offset-2 ring-offset-white;
+  }
+
+  h1 {
+    @apply text-2xl font-semibold tracking-tight text-navy-900 sm:text-3xl;
+  }
+
+  h2 {
+    @apply text-lg font-semibold text-navy-900;
+  }
+
+  th {
+    @apply text-left;
+  }
+}
+
+@layer components {
+  .skip-link {
+    @apply sr-only rounded bg-navy-800 px-4 py-2 text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50;
+  }
+}
