@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+screenshots
+walkthrough.html
+coverage
+.storage
+*.tsbuildinfo
+README.md
+DECISIONS.md
+DEPLOY.md

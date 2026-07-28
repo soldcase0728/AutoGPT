@@ -19,8 +19,27 @@ const prisma = new PrismaClient();
 const DATABASE = (process.env.DATABASE_URL ?? "").split("/").pop()?.split("?")[0] ?? "";
 
 async function main() {
-  if (!/_demo$|_e2e$|_test$/.test(DATABASE)) {
-    throw new Error(`Refusing to run against "${DATABASE}". Use a _demo/_e2e/_test database.`);
+  // Safe by default: only obviously disposable databases. A deployed pilot
+  // instance has a normal database name, so it opts in explicitly instead --
+  // which is a deliberate act, not a typo.
+  const disposableName = /_demo$|_e2e$|_test$/.test(DATABASE);
+  const confirmed = process.env.DEMO_DATA_CONFIRM === "yes";
+
+  if (!disposableName && !confirmed) {
+    throw new Error(
+      `Refusing to write demo bookings to "${DATABASE}". Use a _demo/_e2e/_test ` +
+        `database, or set DEMO_DATA_CONFIRM=yes if this really is a throwaway instance.`,
+    );
+  }
+
+  // Loading twice would double every booking, so make it a no-op if the demo
+  // week is already there. Containers re-run their entrypoint on every restart.
+  const alreadyLoaded = await prisma.booking.count({
+    where: { title: "Saturday shooting clinic" },
+  });
+  if (alreadyLoaded > 0) {
+    console.log("demo data: already present, nothing to do.");
+    return;
   }
 
   const user = async (email: string) => prisma.user.findUniqueOrThrow({ where: { email } });

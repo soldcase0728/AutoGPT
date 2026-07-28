@@ -5,7 +5,7 @@
   "description": "Facility reservation, liability and revenue capture system for Orchard Lake St. Mary's Preparatory athletics.",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build && npm run build:scripts",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -20,7 +20,8 @@
     "test:watch": "vitest",
     "e2e": "npm run e2e:setup && playwright test",
     "e2e:setup": "node scripts/e2e-setup.mjs",
-    "e2e:server": "node scripts/e2e-server.mjs"
+    "e2e:server": "node scripts/e2e-server.mjs",
+    "build:scripts": "esbuild prisma/seed.ts prisma/demo-data.ts --bundle --platform=node --target=node22 --format=cjs --external:@prisma/client --outdir=dist-scripts --log-level=warning"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -45,6 +46,7 @@
     "@types/react-dom": "19.2.3",
     "autoprefixer": "10.5.4",
     "dotenv": "17.4.2",
+    "esbuild": "^0.25.12",
     "postcss": "8.5.24",
     "prisma": "6.19.3",
     "tailwindcss": "3.4.19",

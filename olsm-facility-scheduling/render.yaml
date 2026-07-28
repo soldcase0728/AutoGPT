@@ -1,0 +1,79 @@
+# Render blueprint — the shortest path to a URL you can send someone.
+#
+#   1. Push this repository to GitHub.
+#   2. Render dashboard -> New -> Blueprint -> pick the repo.
+#   3. Set the root directory to olsm-facility-scheduling.
+#
+# Render provisions the database, generates SESSION_SECRET, runs the migrations
+# on boot and gives you an HTTPS URL. Nothing else to configure.
+#
+# The free Postgres tier expires after 30 days, which is fine for a pilot and
+# not fine for real bookings.
+
+services:
+  - type: web
+    name: olsm-facilities
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: olsm-facilities-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: JOB_RUNNER_TOKEN
+        generateValue: true
+      - key: APP_URL
+        sync: false # set to the URL Render assigns, after the first deploy
+      - key: TZ
+        value: America/Detroit
+      # A week of sample bookings so the instance is worth clicking through.
+      # Set to 0 before real data goes in.
+      - key: LOAD_DEMO_DATA
+        value: "1"
+      - key: EMAIL_PROVIDER
+        value: console
+      - key: SMS_PROVIDER
+        value: console
+      - key: ESIGN_PROVIDER
+        value: manual
+      - key: STORAGE_PROVIDER
+        value: local
+
+  # Background work. Without these, reminders never send and expired holds
+  # never release their slots.
+  - type: cron
+    name: olsm-process-queue
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "*/5 * * * *"
+    dockerCommand: >
+      sh -c "wget -q -O- --post-data='' --header=\"Authorization: Bearer $JOB_RUNNER_TOKEN\" $APP_URL/api/jobs/process-queue"
+    envVars:
+      - key: JOB_RUNNER_TOKEN
+        fromService:
+          name: olsm-facilities
+          type: web
+          envVarKey: JOB_RUNNER_TOKEN
+      - key: APP_URL
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: olsm-facilities-db
+          property: connectionString
+      - key: SESSION_SECRET
+        fromService:
+          name: olsm-facilities
+          type: web
+          envVarKey: SESSION_SECRET
+
+databases:
+  - name: olsm-facilities-db
+    databaseName: olsm_facilities
+    user: olsm_app
+    plan: free

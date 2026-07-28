@@ -1,0 +1,106 @@
+name: OLSM facility scheduling
+
+on:
+  push:
+    paths: ["olsm-facility-scheduling/**"]
+  pull_request:
+    paths: ["olsm-facility-scheduling/**"]
+
+defaults:
+  run:
+    working-directory: olsm-facility-scheduling
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # The integration tests exercise a real exclusion constraint and real
+    # triggers, so they need a real Postgres. Mocking it would test nothing.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: olsm
+          POSTGRES_PASSWORD: olsm
+          POSTGRES_DB: olsm_facilities_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://olsm:olsm@127.0.0.1:5432/olsm_facilities_test?schema=public
+      TEST_DATABASE_URL: postgresql://olsm:olsm@127.0.0.1:5432/olsm_facilities_test?schema=public
+      SESSION_SECRET: ci-session-secret-at-least-thirty-two-characters
+      TZ: America/Detroit
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: olsm-facility-scheduling/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: olsm
+          POSTGRES_PASSWORD: olsm
+          POSTGRES_DB: olsm_facilities_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://olsm:olsm@127.0.0.1:5432/olsm_facilities_e2e?schema=public
+      E2E_DATABASE_URL: postgresql://olsm:olsm@127.0.0.1:5432/olsm_facilities_e2e?schema=public
+      SESSION_SECRET: ci-session-secret-at-least-thirty-two-characters
+      E2E_TOKEN: ci-e2e-token
+      TZ: America/Detroit
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: olsm-facility-scheduling/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: olsm-facility-scheduling/test-results/
+          retention-days: 7

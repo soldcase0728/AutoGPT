@@ -9,6 +9,16 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+/**
+ * Rendered per request, not prerendered at build time.
+ *
+ * This page reads facilities from the database. Static prerendering would bake
+ * the directory into the build -- so a facility added or renamed in the admin
+ * UI would never appear -- and would require a reachable database during
+ * `docker build`, which there isn't one.
+ */
+export const dynamic = "force-dynamic";
+
 export default async function FacilitiesPage() {
   const facilities = await prisma.facility.findMany({
     where: { active: true },
