@@ -7,6 +7,7 @@ import { instantToLocalDate, instantToLocalTime, shiftISODate, startOfLocalDay }
 import { ACTIVITY_LABELS } from "@/domain/rules-engine";
 import { setupBoard } from "@/services/reporting-service";
 import { MaintenanceForm } from "./maintenance-form";
+import { CheckInButton } from "./check-in-button";
 
 export const metadata: Metadata = { title: "Setup board" };
 
@@ -102,7 +103,14 @@ export default async function CustodialPage() {
                                     {booking.headcount ? ` · ${booking.headcount} people` : ""}
                                   </p>
                                 </div>
-                                <Badge>{ACTIVITY_LABELS[booking.activityType]}</Badge>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge>{ACTIVITY_LABELS[booking.activityType]}</Badge>
+                                  <CheckInButton
+                                    bookingId={booking.id}
+                                    status={booking.status}
+                                    startAt={booking.startAt.toISOString()}
+                                  />
+                                </div>
                               </div>
 
                               {booking.setupNotes && (

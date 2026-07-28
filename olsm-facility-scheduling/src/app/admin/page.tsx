@@ -15,6 +15,7 @@ const SECTIONS = [
   { href: "/admin/rates", title: "Rate cards", blurb: "Hourly rates, day rates, deposits by tier." },
   { href: "/admin/rules", title: "Approval rules", blurb: "The matrix that decides what each request needs." },
   { href: "/admin/blackouts", title: "Blackouts", blurb: "Maintenance and unavailable windows." },
+  { href: "/admin/weather", title: "Weather call", blurb: "Close an outdoor facility for a day, refund everyone." },
   { href: "/admin/reports", title: "Reports", blurb: "Utilisation, revenue, compliance." },
   { href: "/admin/users", title: "People", blurb: "Roles, scope and account status." },
   { href: "/admin/audit", title: "Audit log", blurb: "Every change, append-only." },

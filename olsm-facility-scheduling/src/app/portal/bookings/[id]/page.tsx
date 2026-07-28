@@ -24,6 +24,9 @@ import { ACTIVITY_LABELS } from "@/domain/rules-engine";
 import { DOCUMENT_LABELS } from "@/domain/compliance";
 import { describePolicy } from "@/domain/cancellation";
 import { CancelBookingForm } from "./cancel-form";
+import { RosterPanel } from "./roster-panel";
+import { DayOfControls } from "./day-of-controls";
+import { needsParticipantWaivers, rosterStatus, waiverUrl } from "@/services/participant-service";
 import { CoiUploadForm } from "./coi-upload-form";
 import { sendDocumentAction } from "@/app/actions/document-actions";
 import { Button } from "@/components/ui";
@@ -62,6 +65,9 @@ export default async function BookingDetailPage({
   if (!canView) notFound();
 
   const invoice = booking.invoices[0];
+  // Participant waivers are managed in their own panel; this list is the
+  // paperwork the organiser personally owes.
+  const organiserDocuments = booking.documents.filter((d) => !d.isParticipant);
   const lineItems = (invoice?.lineItems as unknown as LineItem[]) ?? [];
   const snapshot = (booking.requirements?.ruleSnapshot ?? {}) as {
     refundFullDays?: number;
@@ -69,8 +75,11 @@ export default async function BookingDetailPage({
     refundPartialPercent?: number;
   };
 
-  const coi = booking.documents.find((d) => d.type === DocumentType.CERTIFICATE_OF_INSURANCE);
+  const coi = booking.documents.find(
+    (d) => d.type === DocumentType.CERTIFICATE_OF_INSURANCE && !d.isParticipant,
+  );
   const canManage = booking.requesterId === user.id || isAdmin(user.role);
+  const roster = await rosterStatus(booking.id);
 
   return (
     <AppShell user={user}>
@@ -120,13 +129,13 @@ export default async function BookingDetailPage({
           </Card>
 
           <Card title="Documents">
-            {booking.documents.length === 0 ? (
+            {organiserDocuments.length === 0 ? (
               <EmptyState title="No documents required">
                 Routine team activity is covered by the Annual Coach Agreement.
               </EmptyState>
             ) : (
               <ul className="divide-y divide-navy-100">
-                {booking.documents.map((doc) => (
+                {organiserDocuments.map((doc) => (
                   <li key={doc.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{DOCUMENT_LABELS[doc.type]}</p>
@@ -179,6 +188,21 @@ export default async function BookingDetailPage({
               </div>
             )}
           </Card>
+
+          {needsParticipantWaivers(booking.activityType) && canManage && (
+            <Card
+              title="Participants"
+              description="Everyone using the facility signs a release, not just the person who booked it."
+            >
+              <RosterPanel
+                bookingId={booking.id}
+                participants={roster.participants}
+                expected={roster.expected}
+                signed={roster.signed}
+                existingLink={booking.waiverToken ? waiverUrl(booking.waiverToken) : null}
+              />
+            </Card>
+          )}
 
           {invoice && (
             <Card
@@ -274,6 +298,14 @@ export default async function BookingDetailPage({
               <CancelBookingForm bookingId={booking.id} canWaivePolicy={isAdmin(user.role)} />
             </Card>
           )}
+
+          <DayOfControls
+            bookingId={booking.id}
+            status={booking.status}
+            startAt={booking.startAt.toISOString()}
+            canCheckIn={canManage || user.role === "FACILITIES"}
+            canMarkNoShow={isAdmin(user.role)}
+          />
 
           {isAdmin(user.role) && (
             <Card title="Audit trail">

@@ -169,6 +169,21 @@ accepted. If that should be restricted to the business office, tighten it.
 **Waiver signature standard.** The `manual` e-sign provider records a typed
 name, timestamp and IP address. Whether that meets OLSM's evidentiary bar, or
 whether DocuSign/Dropbox Sign is required from day one, is a counsel question.
+This applies to participant waivers too, where the volume is highest — a single
+camp can generate a hundred typed signatures.
+
+**Participant waivers are not a confirmation gate.** They block the *event*, not
+the booking: a camp confirms months before its roster exists, so the system
+chases waivers by email in the 72 hours beforehand and shows the shortfall on
+the booking. Decide whether the athletic office wants a harder stop — for
+example, refusing check-in while anyone is unsigned. The data to enforce that is
+already there (`rosterStatus`), it is only the policy that is undecided.
+
+**Who may keep a security deposit, and on what evidence.** Any admin can
+currently capture part of a hold, with a mandatory written reason that is
+audited and emailed to the renter. If retaining money should need business-office
+sign-off or photographs, that is a workflow decision to make before the first
+external rental.
 
 **Agreement and waiver wording.** `src/app/sign/[token]/terms.ts` contains
 drafting scaffolding so the flow is testable end to end. It is not legal advice

@@ -14,6 +14,8 @@ import { invoicesNeedingReminder } from "@/services/invoice-service";
 import { notifyAdmins } from "@/services/notification-service";
 import { operationsSummary, setupBoard } from "@/services/reporting-service";
 import { sendEmail, sendSms } from "@/integrations/notifications";
+import { sendWaiverReminders } from "@/services/participant-service";
+import { depositsAwaitingResolution } from "@/services/deposit-service";
 import { pruneSessions } from "@/lib/auth/session";
 import { enqueue } from "@/services/job-queue";
 
@@ -71,7 +73,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ na
       const warned = await warnExpiringCertificates();
       const sessions = await pruneSessions();
       const reminders = await sendPaymentReminders();
-      return NextResponse.json({ completed, warned, sessions, reminders });
+      const waivers = await sendWaiverReminders();
+      const deposits = await nudgeUnresolvedDeposits();
+      return NextResponse.json({ completed, warned, sessions, reminders, waivers, deposits });
     }
 
     case "refresh-calendar-channels": {
@@ -226,6 +230,33 @@ async function warnExpiringCertificates(): Promise<number> {
   }
 
   return expiring.length;
+}
+
+/**
+ * A Stripe authorisation lapses after about a week, so an unresolved deposit is
+ * a deadline. Nag until someone releases or captures it.
+ */
+async function nudgeUnresolvedDeposits(): Promise<number> {
+  const pending = await depositsAwaitingResolution();
+  if (pending.length === 0) return 0;
+
+  await notifyAdmins(
+    `${pending.length} security deposit(s) still held after the rental`,
+    pending
+      .map(
+        (invoice) =>
+          `${invoice.booking.title} (${invoice.booking.reference}) — ` +
+          `${formatMoney(invoice.depositCents)} held since ` +
+          `${invoice.booking.endAt.toDateString()}, ${invoice.booking.requester.name}\n` +
+          `  ${env.appUrl}/portal/invoices/${invoice.id}`,
+      )
+      .join("\n\n") +
+      "\n\nRelease or capture each one. Stripe authorisations expire on their own after about " +
+      "seven days, which releases the funds without a decision being recorded.",
+    `deposits-unresolved:${new Date().toISOString().slice(0, 10)}`,
+  );
+
+  return pending.length;
 }
 
 async function sendPaymentReminders(): Promise<number> {

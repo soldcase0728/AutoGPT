@@ -5,10 +5,11 @@ import { requireUser } from "@/lib/auth/current-user";
 import { allowedActivityTypes, canBookFacility, isAdmin } from "@/lib/auth/rbac";
 import { AppShell } from "@/components/app-shell";
 import { Alert, Card, PageHeader } from "@/components/ui";
-import { instantToLocalDate } from "@/lib/time";
+import { formatRange, instantToLocalDate } from "@/lib/time";
 import { ACTIVITY_DESCRIPTIONS, ACTIVITY_LABELS } from "@/domain/rules-engine";
 import { checkAnnualAgreement } from "@/domain/compliance";
 import { QuickBookForm, type BookOption, type SpaceOption } from "./quick-book-form";
+import { WaitlistForm } from "./waitlist-form";
 
 export const metadata: Metadata = { title: "Book a space" };
 
@@ -54,6 +55,13 @@ export default async function BookPage({
   }));
 
   const sports = await prisma.sport.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+
+  const myWaitlist = await prisma.waitlistEntry.findMany({
+    where: { userId: user.id, fulfilledAt: null, windowEnd: { gte: new Date() } },
+    include: { subSpace: { include: { facility: true } } },
+    orderBy: { windowStart: "asc" },
+    take: 10,
+  });
 
   // Sports the coach is assigned to come first; that is the common case.
   const mySportIds = new Set(user.sports.map((s) => s.sportId));
@@ -134,6 +142,32 @@ export default async function BookPage({
                 if the documents or payment are not completed in time, and the time returns to open
                 inventory.
               </p>
+            </Card>
+
+            <Card
+              title="Everything you want is taken?"
+              description="Join the waitlist and you will hear the moment that window frees up."
+            >
+              {myWaitlist.length > 0 && (
+                <ul className="mb-3 space-y-1 text-sm text-navy-700">
+                  {myWaitlist.map((entry) => (
+                    <li key={entry.id}>
+                      {entry.subSpace.facility.name} — {entry.subSpace.name},{" "}
+                      {formatRange(entry.windowStart, entry.windowEnd)}
+                      {entry.notifiedAt && (
+                        <span className="block text-xs text-emerald-800">
+                          A slot opened — check the calendar.
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <WaitlistForm
+                spaces={spaces.map((s) => ({ id: s.id, label: s.label }))}
+                defaultDate={params.date ?? instantToLocalDate(new Date())}
+                activities={activities.map((a) => ({ value: a.value, label: a.label }))}
+              />
             </Card>
           </aside>
         </div>

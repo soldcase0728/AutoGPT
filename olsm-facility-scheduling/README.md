@@ -32,7 +32,7 @@ Sign in at `/sign-in` with any seeded address (`ad@olsm.edu`,
 `bball.head@olsm.edu`, `facilities@olsm.edu`, …), password `ChangeMe123456`.
 
 ```bash
-npm test          # 83 tests: unit + integration against a real database
+npm test          # 114 tests: unit + integration against a real database
 npm run typecheck
 npm run build
 ```
@@ -69,17 +69,25 @@ no logic changes.
 
 ### Liability capture without friction
 
-The **Annual Coach Agreement** is the enforcement mechanism. Every coach,
-trainer and strength coach signs one per school year covering facility rules,
-supervision, emergency/AED procedure, concussion protocol, indemnification, and
-an attestation not to run outside paid instruction without booking it as such.
+Coverage comes in two layers, because the requester and the people on the floor
+are usually not the same population.
 
+**Layer 1 — the Annual Coach Agreement.** Every coach, trainer and strength
+coach signs one per school year covering facility rules, supervision,
+emergency/AED procedure, concussion protocol, indemnification, and an
+attestation not to run outside paid instruction without booking it as such.
 **No current signed agreement ⇒ the account cannot create any booking.** After
-August it costs a head coach nothing, and it means every person on a court is
-covered by something.
+August it costs a head coach nothing.
 
-Per-booking waivers, contracts and certificates of insurance apply only to paid,
-external and non-team activity.
+**Layer 2 — participant waivers.** For camps, clinics, club use and rentals,
+every participant signs their own release, by roster upload or through one
+shared public link per booking. Minors are signed for by a named guardian,
+enforced by a database check constraint. Participant waivers deliberately do
+*not* block `CONFIRMED` — a camp confirms in March and fills its roster in June
+— so they are chased by pre-event reminders and surfaced on the booking instead.
+
+Contracts and certificates of insurance apply only to paid, external and
+non-team activity, and those *do* block confirmation.
 
 ---
 
@@ -148,9 +156,12 @@ the contract or the invoice. Read-only iCal feeds at `/api/feeds/<slug>.ics`
 serve non-Google users and the public site.
 
 **Stripe** — Checkout for card and ACH; no card data touches this app. Security
-deposits use manual-capture authorisations, so they are released rather than
-charged-and-refunded. Webhooks are signature-verified with replay protection and
-every mutating call carries an idempotency key.
+deposits are manual-capture authorisations: after the rental the hold is either
+released untouched or partially captured with a written reason, which is both
+audited and emailed to the renter. An authorisation lapses at Stripe after about
+a week, so unresolved holds raise a nightly admin alert. Webhooks are
+signature-verified with replay protection and every mutating call carries an
+idempotency key.
 
 **DocuSign / Dropbox Sign** — one `EsignProvider` interface, chosen by
 `ESIGN_PROVIDER`. A third `manual` provider keeps the full document state
@@ -175,7 +186,7 @@ reimplementing `enqueue`; no caller changes.
 | `0 * * * *` | `expire-holds` | Release lapsed soft locks |
 | `0 6 * * *` | `daily-digest` | Custodial setup board |
 | `0 7 * * 1` | `weekly-digest` | AD summary |
-| `0 3 * * *` | `nightly` | Completions, COI warnings, payment reminders, session prune |
+| `0 3 * * *` | `nightly` | Completions, COI warnings, payment and waiver reminders, unresolved deposits, session prune |
 | `0 4 * * *` | `refresh-calendar-channels` | Renew Google push subscriptions |
 
 ---
@@ -200,6 +211,10 @@ src/
     allocation.ts           season collision detection, open inventory
     availability.ts         hours, blackouts
   services/                 orchestration and persistence
+    booking-service.ts      creation, gates, bumping, cancellation
+    participant-service.ts  rosters and public waiver links
+    deposit-service.ts      hold, release, partial capture
+    weather-service.ts      close a facility for a day
   integrations/             Google, Stripe, e-sign, mail, storage
   lib/                      db, auth, audit, time
   app/                      Next.js App Router: pages, actions, API routes
@@ -220,15 +235,19 @@ wizard, requester portal (requests, documents, invoices).
 
 **Coach / staff** — unified filterable calendar, quick-book (target: under 30
 seconds for in-season practice), my team's schedule with one-click block
-release, my documents.
+release, waitlist for windows that are already taken, my documents.
 
 **Admin** — approval queue with inline conflict warnings, season allocation
 builder with collision resolution, facility/sub-space/conflict-graph editors,
-rate cards, the rules matrix, blackouts, reports, people, audit log with CSV
-export.
+rate cards, the rules matrix, blackouts, weather call (close an outdoor facility
+for a day in one action), deposit release/capture, reports, people, audit log
+with CSV export.
 
 **Facilities** — daily setup board grouped by building with turnover times and
-setup notes; mark a space unavailable.
+setup notes; check-in; mark a space unavailable.
+
+**Participants** — one public link per booking where anyone in the group signs
+their own release, no account required.
 
 Mobile-first (coaches will use phones on the field), WCAG 2.1 AA, navy and gold.
 
@@ -236,7 +255,7 @@ Mobile-first (coaches will use phones on the field), WCAG 2.1 AA, navy and gold.
 
 ## Verified acceptance criteria
 
-All 83 tests pass. Mapping from the brief:
+All 114 tests pass. Mapping from the brief:
 
 | # | Criterion | Test |
 |---|---|---|
@@ -255,6 +274,12 @@ All 83 tests pass. Mapping from the brief:
 
 Criterion 9's write-back and criterion 11's UI are exercised against the live
 Google API and in the browser respectively; the logic beneath both is tested.
+
+Beyond the twelve, `operations.test.ts` covers the participant-waiver flow
+(including guardian signatures for minors and the refusal to sign after an event
+has finished), the deposit lifecycle (release, partial capture, over-capture
+refusal, double-resolution refusal), and weather cancellation (bulk cancel with
+full refunds inside the no-refund window, plus SMS to opted-in requesters).
 
 ---
 
