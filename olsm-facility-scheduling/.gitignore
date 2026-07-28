@@ -29,3 +29,6 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+
+screenshots/
+walkthrough.html
