@@ -1,7 +1,10 @@
-# syntax=docker/dockerfile:1
-
 # ---------------------------------------------------------------------------
 # OLSM Facility Scheduling
+#
+# There is deliberately no `# syntax=` directive. That line makes BuildKit pull
+# an extra frontend image from Docker Hub before it reads anything else, which
+# is one more thing to fail on a school network. Nothing below needs it -- the
+# builtin frontend handles multi-stage COPY --from, --chown and HEALTHCHECK.
 #
 # Three stages so the runtime image carries no build toolchain and no source:
 #   deps    node_modules from the committed lockfile

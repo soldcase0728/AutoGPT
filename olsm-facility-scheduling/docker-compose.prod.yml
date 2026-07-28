@@ -1,26 +1,33 @@
 # One command to run the whole thing on any machine with Docker:
 #
-#   SESSION_SECRET=$(openssl rand -base64 32) docker compose -f docker-compose.prod.yml up -d
+#   SESSION_SECRET=$(openssl rand -base64 32) \
+#   POSTGRES_PASSWORD=$(openssl rand -base64 24) \
+#   docker compose -f docker-compose.prod.yml up -d --build
 #
 # Then open http://localhost:3000 and sign in with a seeded account.
 #
 # This is a self-hosted pilot setup, not a hardened production deployment:
-# Postgres is exposed only inside the compose network and there is no TLS
-# termination. Put it behind a reverse proxy before anyone outside the school
-# network uses it.
+# Postgres is reachable only inside the compose network and there is no TLS.
+# Put it behind a reverse proxy before anyone outside the school network uses
+# it.
+#
+# NOTE ON QUOTING: every value below is quoted. Values here routinely contain
+# ":" (connection strings, times) and an unquoted colon-space is parsed by YAML
+# as a nested key, which fails with a "mapping values are not allowed" error
+# that points at a column rather than the real cause.
 
 name: olsm-facilities
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: "postgres:16-alpine"
     restart: unless-stopped
     environment:
-      POSTGRES_USER: olsm_app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
-      POSTGRES_DB: olsm_facilities
+      POSTGRES_USER: "olsm_app"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me-in-production}"
+      POSTGRES_DB: "olsm_facilities"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - "pgdata:/var/lib/postgresql/data"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U olsm_app -d olsm_facilities"]
       interval: 5s
@@ -38,40 +45,49 @@ services:
     ports:
       - "${APP_PORT:-3000}:3000"
     environment:
-      # postgres:5432 is the compose service, not localhost.
-      DATABASE_URL: postgresql://olsm_app:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/olsm_facilities?schema=public
-      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required — generate one with: openssl rand -base64 32}
-      APP_URL: ${APP_URL:-http://localhost:3000}
-      TZ: ${TZ:-America/Detroit}
+      # "postgres" is the compose service name, not localhost.
+      DATABASE_URL: "postgresql://olsm_app:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/olsm_facilities?schema=public"
+      # Required. Generate with: openssl rand -base64 32
+      SESSION_SECRET: "${SESSION_SECRET:?set SESSION_SECRET before starting}"
+      APP_URL: "${APP_URL:-http://localhost:3000}"
+      TZ: "${TZ:-America/Detroit}"
 
-      # Load a week of sample bookings so a fresh instance is worth clicking.
+      # Loads a week of sample bookings so a fresh instance is worth clicking.
       # Set to 0 once real data goes in.
-      LOAD_DEMO_DATA: ${LOAD_DEMO_DATA:-1}
+      LOAD_DEMO_DATA: "${LOAD_DEMO_DATA:-1}"
 
       # Integrations stay inert until real credentials are supplied. The app
       # runs fully without them; email and SMS log to the container output.
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
-      SMS_PROVIDER: ${SMS_PROVIDER:-console}
-      ESIGN_PROVIDER: ${ESIGN_PROVIDER:-manual}
-      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
-      JOB_RUNNER_TOKEN: ${JOB_RUNNER_TOKEN:-change-me}
+      EMAIL_PROVIDER: "${EMAIL_PROVIDER:-console}"
+      SMS_PROVIDER: "${SMS_PROVIDER:-console}"
+      ESIGN_PROVIDER: "${ESIGN_PROVIDER:-manual}"
+      STORAGE_PROVIDER: "${STORAGE_PROVIDER:-local}"
+      JOB_RUNNER_TOKEN: "${JOB_RUNNER_TOKEN:-change-me}"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
   # Scheduled work: drains the outbound queue and releases expired holds.
-  # Without this, reminders and hold expiry never run.
+  # Without this, reminders never send and holds never expire.
   cron:
-    image: alpine:3.20
+    image: "curlimages/curl:8.11.1"
     restart: unless-stopped
     depends_on:
-      - app
+      app:
+        condition: service_started
     environment:
-      JOB_RUNNER_TOKEN: ${JOB_RUNNER_TOKEN:-change-me}
-    command: >
-      sh -c "apk add --no-cache curl >/dev/null &&
-      while true; do
-        curl -fsS -X POST -H \"Authorization: Bearer $$JOB_RUNNER_TOKEN\" http://app:3000/api/jobs/process-queue >/dev/null || true;
-        curl -fsS -X POST -H \"Authorization: Bearer $$JOB_RUNNER_TOKEN\" http://app:3000/api/jobs/expire-holds >/dev/null || true;
-        sleep 300;
-      done"
+      JOB_RUNNER_TOKEN: "${JOB_RUNNER_TOKEN:-change-me}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          curl -fsS -X POST -H "Authorization: Bearer $${JOB_RUNNER_TOKEN}" http://app:3000/api/jobs/process-queue > /dev/null || true
+          curl -fsS -X POST -H "Authorization: Bearer $${JOB_RUNNER_TOKEN}" http://app:3000/api/jobs/expire-holds > /dev/null || true
+          sleep 300
+        done
 
 volumes:
   pgdata:

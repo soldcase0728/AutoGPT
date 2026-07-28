@@ -171,8 +171,16 @@ the eight facilities and the rules matrix, demo bookings load, the standalone
 server starts, `/api/health` returns `ok`, public pages serve, and a **second
 boot against the same database is idempotent** (16 bookings, not 32).
 
-Not verified: the Docker image itself. The environment this was built in has no
-Docker daemon, so `docker build` has never been run. The Dockerfile assembles
-the same file layout that was verified by hand, but treat the first
-`docker compose up --build` as the real test. If it fails, it will fail at
-build time with a clear error, not silently at runtime.
+Also verified: `docker-compose.prod.yml` parses and interpolates cleanly under
+Compose v5 (`docker compose config`), which is what catches the YAML-quoting
+class of error.
+
+Not verified: the Docker image itself. `docker build` has never been run
+against this Dockerfile. The environment it was built in can reach Docker Hub's
+manifest API but not its blob CDN, so no base image can be pulled there. The
+Dockerfile assembles the same file layout that was verified by hand outside a
+container, but treat the first `docker compose up --build` as the real test. If
+it fails it will fail loudly at build time, not silently at runtime.
+
+If the build does fail, the useful thing to send back is the last twenty lines
+of the output — the step that failed is named in them.
