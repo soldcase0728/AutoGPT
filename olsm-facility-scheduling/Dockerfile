@@ -5,32 +5,40 @@
 #
 # Three stages so the runtime image carries no build toolchain and no source:
 #   deps    node_modules from the committed lockfile
-#   build   Prisma client + Next standalone output
-#   runner  the standalone server, the Prisma CLI needed to migrate on boot,
-#           and nothing else
+#   build   Prisma client + Next standalone output + bundled seed scripts
+#   runner  the standalone server and what it needs to migrate on boot
+#
+# Base image is Debian slim rather than Alpine. Prisma ships prebuilt query and
+# schema engines per platform, and the glibc builds are the best-tested ones --
+# on Alpine (musl) an engine mismatch shows up as a confusing runtime error.
+# The image is bigger; it is far more likely to work on the first try, on both
+# Intel and Apple Silicon.
 # ---------------------------------------------------------------------------
 
-FROM node:22-alpine AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
-# openssl is a Prisma engine dependency on Alpine.
-RUN apk add --no-cache openssl
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 
-FROM node:22-alpine AS build
+FROM node:22-slim AS build
 WORKDIR /app
-RUN apk add --no-cache openssl
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# `npm run build` runs `prisma generate` first.
+# `npm run build` runs prisma generate, next build, then bundles the seed
+# scripts to plain JS.
 RUN npm run build
 
 
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
-RUN apk add --no-cache openssl tini
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates tini \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -38,9 +46,9 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 
 # Never run the app as root.
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+RUN groupadd -g 1001 nodejs && useradd -m -u 1001 -g nodejs nextjs
 
-# The standalone bundle: server.js plus the modules it actually imports.
+# The standalone bundle: server.js plus the modules the server imports.
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
@@ -69,9 +77,9 @@ RUN chmod +x ./entrypoint.sh
 USER nextjs
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # tini reaps zombies and forwards signals, so the container stops cleanly.
-ENTRYPOINT ["/sbin/tini", "--", "./entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "./entrypoint.sh"]
 CMD ["node", "server.js"]

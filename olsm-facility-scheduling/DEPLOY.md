@@ -45,14 +45,27 @@ tier before anyone depends on it.
 
 ## 2. Docker Compose — on your own machine
 
-Needs Docker. One command:
+Needs Docker Desktop installed **and running** (the whale in the menu bar).
+
+First get the code. You only do this once:
 
 ```bash
-cd olsm-facility-scheduling
+cd ~
+git clone --depth 1 --branch claude/olsm-facility-scheduling-b4mmq5 \
+  https://github.com/soldcase0728/AutoGPT.git olsm
+cd olsm/olsm-facility-scheduling
+```
+
+Then start it:
+
+```bash
 SESSION_SECRET=$(openssl rand -base64 32) \
 POSTGRES_PASSWORD=$(openssl rand -base64 24) \
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+The first build takes several minutes — it installs dependencies and compiles
+the app inside the container. Later starts take seconds.
 
 Then open <http://localhost:3000>. Watch it come up with
 `docker compose -f docker-compose.prod.yml logs -f app`.
