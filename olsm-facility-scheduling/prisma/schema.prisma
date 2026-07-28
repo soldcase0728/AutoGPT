@@ -1,0 +1,710 @@
+// Orchard Lake St. Mary's Preparatory - Facility Scheduling
+//
+// Design notes that are load-bearing and easy to break:
+//
+//  1. Booking.timeRange is a `tstzrange` maintained by a database trigger from
+//     (start_at, end_at) padded with the sub-space buffer minutes. A GiST
+//     exclusion constraint on (subspace_id, time_range) rejects overlapping
+//     blocking bookings. Prisma has no range type, so the column is declared
+//     Unsupported() and every write goes through the trigger. See
+//     migrations/.../overlap_and_audit.sql.
+//
+//  2. Sub-space conflicts (Full floor vs Court A) are NOT expressible in a
+//     single exclusion constraint. They are enforced by expanding a booking
+//     into the set of sub-spaces it occupies (see src/domain/conflict-graph.ts)
+//     and writing one BookingOccupancy row per occupied sub-space. The
+//     exclusion constraint lives on BookingOccupancy, so the database is still
+//     the authority. Booking rows themselves carry the requested sub-space.
+//
+//  3. AuditLog is append-only, enforced by a rule + trigger that raise on
+//     UPDATE and DELETE for every role. Do not "fix" this in application code.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  FACILITY_ADMIN
+  HEAD_COACH
+  ASSISTANT_COACH
+  TRAINER
+  STRENGTH_COACH
+  FACILITIES
+  FINANCE
+  EXTERNAL
+}
+
+enum ActivityType {
+  CONTEST
+  TEAM_PRACTICE
+  TEAM_OFFSEASON
+  SCHOOL_CAMP
+  PRIVATE_INSTRUCTION
+  CLUB_TRAVEL
+  SCHOOL_EVENT
+  EXTERNAL_RENTAL
+  MAINTENANCE
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  AWAITING_DOCUMENTS
+  AWAITING_PAYMENT
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  DENIED
+  EXPIRED
+  NO_SHOW
+}
+
+enum TeamLevel {
+  VARSITY
+  JV
+  FRESHMAN
+  MIDDLE_SCHOOL
+  NONE
+}
+
+enum OrganizationType {
+  INTERNAL
+  CLUB
+  NONPROFIT
+  COMMERCIAL
+  PARISH
+}
+
+enum RateTier {
+  INTERNAL
+  OLSM_AFFILIATED_CLUB
+  PARISH_PARTNER
+  NONPROFIT
+  COMMERCIAL
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  SKIPPED
+}
+
+enum DocumentType {
+  ANNUAL_COACH_AGREEMENT
+  FACILITY_USE_AGREEMENT
+  LIABILITY_WAIVER
+  CAMP_ADDENDUM
+  MINOR_PARTICIPANT_WAIVER
+  CERTIFICATE_OF_INSURANCE
+}
+
+enum DocumentStatus {
+  NOT_STARTED
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  VOIDED
+  EXPIRED
+  UPLOADED
+  REJECTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum CalendarSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  DELETED
+}
+
+enum SeasonCode {
+  FALL
+  WINTER
+  SPRING
+  SUMMER
+}
+
+// ---------------------------------------------------------------------------
+// People and organizations
+// ---------------------------------------------------------------------------
+
+model User {
+  id                    String    @id @default(uuid())
+  name                  String
+  email                 String    @unique
+  phone                 String?
+  smsOptIn              Boolean   @default(false) @map("sms_opt_in")
+  role                  Role
+  googleSub             String?   @unique @map("google_sub")
+  passwordHash          String?   @map("password_hash")
+  emailVerifiedAt       DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  /// Sub-spaces / facilities this user may book beyond their role default.
+  /// Empty means "role default". Used for trainers and strength coaches.
+  facilityScope         String[]  @default([]) @map("facility_scope")
+  organizationId        String?   @map("organization_id")
+  active                Boolean   @default(true)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization          Organization?      @relation(fields: [organizationId], references: [id])
+  sports                CoachAssignment[]
+  bookings              Booking[]          @relation("BookingRequester")
+  supervising           Booking[]          @relation("BookingSupervisor")
+  approvals             ApprovalStep[]
+  documents             Document[]
+  waitlistEntries       WaitlistEntry[]
+  standingBlocks        StandingBlock[]
+
+  @@index([role, active])
+  @@map("users")
+}
+
+model Organization {
+  id               String           @id @default(uuid())
+  name             String
+  type             OrganizationType
+  rateTier         RateTier         @map("rate_tier")
+  contactUserId    String?          @map("contact_user_id")
+  stripeCustomerId String?          @map("stripe_customer_id")
+  /// Denormalised from the current COI document so expiry sweeps stay cheap.
+  coiDocumentId    String?          @map("coi_document_id")
+  coiExpiresAt     DateTime?        @map("coi_expires_at") @db.Timestamptz(3)
+  active           Boolean          @default(true)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  users            User[]
+  bookings         Booking[]
+
+  @@index([coiExpiresAt])
+  @@map("organizations")
+}
+
+model Sport {
+  id         String     @id @default(uuid())
+  name       String     @unique
+  seasonCode SeasonCode @map("season_code")
+  active     Boolean    @default(true)
+
+  coaches        CoachAssignment[]
+  seasons        Season[]
+  standingBlocks StandingBlock[]
+  bookings       Booking[]
+
+  @@map("sports")
+}
+
+model CoachAssignment {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  sportId   String    @map("sport_id")
+  teamLevel TeamLevel @default(VARSITY) @map("team_level")
+  isHead    Boolean   @default(false) @map("is_head")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sportId, teamLevel])
+  @@index([sportId, isHead])
+  @@map("coach_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// Facilities
+// ---------------------------------------------------------------------------
+
+model Facility {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  slug                String   @unique
+  type                String
+  indoor              Boolean
+  capacity            Int
+  requiresSupervision Boolean  @default(false) @map("requires_supervision")
+  /// Roles allowed to satisfy the supervision requirement.
+  supervisionRoles    Role[]   @default([]) @map("supervision_roles")
+  /// { "mon": [{"open":"06:00","close":"22:00"}], ... } in facility local time.
+  defaultHours        Json     @map("default_hours")
+  bufferMinutes       Int      @default(0) @map("buffer_minutes")
+  externallyBookable  Boolean  @default(false) @map("externally_bookable")
+  weatherDependent    Boolean  @default(false) @map("weather_dependent")
+  description         String?
+  photoUrl            String?  @map("photo_url")
+  amenities           String[] @default([])
+  googleCalendarId    String?  @map("google_calendar_id")
+  /// Opaque token for the active Google push-notification channel.
+  googleChannelId     String?  @map("google_channel_id")
+  googleResourceId    String?  @map("google_resource_id")
+  googleChannelExpiry DateTime? @map("google_channel_expiry") @db.Timestamptz(3)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  subSpaces  SubSpace[]
+  rateCards  RateCard[]
+  blackouts  Blackout[]
+
+  @@map("facilities")
+}
+
+model SubSpace {
+  id         String   @id @default(uuid())
+  facilityId String   @map("facility_id")
+  name       String
+  slug       String
+  capacity   Int
+  /// Sub-space ids this one physically occupies when booked, excluding itself.
+  /// "Full floor" lists Court A and Court B. Court A lists nothing.
+  /// Adjacency across facilities (stadium field -> running track) uses the
+  /// same column; it is just another edge in the graph.
+  blocksIds  String[] @default([]) @map("blocks_ids")
+  /// Overrides the facility buffer when set.
+  bufferMinutes Int?  @map("buffer_minutes")
+  sortOrder  Int      @default(0) @map("sort_order")
+  active     Boolean  @default(true)
+
+  facility     Facility        @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  bookings     Booking[]
+  occupancy    BookingOccupancy[]
+  standingBlocks StandingBlock[]
+  blackouts    Blackout[]
+  waitlist     WaitlistEntry[]
+
+  @@unique([facilityId, slug])
+  @@index([facilityId, active])
+  @@map("sub_spaces")
+}
+
+// ---------------------------------------------------------------------------
+// Seasons and standing allocation
+// ---------------------------------------------------------------------------
+
+model Season {
+  id              String     @id @default(uuid())
+  name            String
+  sportId         String?    @map("sport_id")
+  seasonCode      SeasonCode @map("season_code")
+  startDate       DateTime   @map("start_date") @db.Date
+  endDate         DateTime   @map("end_date") @db.Date
+  mhsaaSeasonCode String?    @map("mhsaa_season_code")
+  /// Blocks open self-service booking until allocation is published.
+  published       Boolean    @default(false)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  sport          Sport?          @relation(fields: [sportId], references: [id])
+  standingBlocks StandingBlock[]
+  bookings       Booking[]
+
+  @@index([seasonCode, startDate])
+  @@map("seasons")
+}
+
+model StandingBlock {
+  id         String    @id @default(uuid())
+  seasonId   String    @map("season_id")
+  sportId    String    @map("sport_id")
+  subSpaceId String    @map("sub_space_id")
+  teamLevel  TeamLevel @default(VARSITY) @map("team_level")
+  /// iCalendar RRULE, e.g. FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR
+  rrule      String
+  /// Local wall-clock times, "15:30" / "17:30".
+  startTime  String    @map("start_time")
+  endTime    String    @map("end_time")
+  priority   Int
+  published  Boolean   @default(false)
+  createdById String   @map("created_by_id")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  season    Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  sport     Sport    @relation(fields: [sportId], references: [id])
+  subSpace  SubSpace @relation(fields: [subSpaceId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+  bookings  Booking[]
+
+  @@index([seasonId, published])
+  @@map("standing_blocks")
+}
+
+// ---------------------------------------------------------------------------
+// Bookings
+// ---------------------------------------------------------------------------
+
+model Booking {
+  id              String        @id @default(uuid())
+  reference       String        @unique
+  requesterId     String        @map("requester_id")
+  organizationId  String?       @map("organization_id")
+  subSpaceId      String        @map("sub_space_id")
+  sportId         String?       @map("sport_id")
+  seasonId        String?       @map("season_id")
+  standingBlockId String?       @map("standing_block_id")
+  activityType    ActivityType  @map("activity_type")
+  teamLevel       TeamLevel     @default(NONE) @map("team_level")
+  title           String
+  startAt         DateTime      @map("start_at") @db.Timestamptz(3)
+  endAt           DateTime      @map("end_at") @db.Timestamptz(3)
+  headcount       Int           @default(0)
+  status          BookingStatus @default(DRAFT)
+  priority        Int
+  parentBookingId String?       @map("parent_booking_id")
+  setupNotes      String?       @map("setup_notes")
+  equipmentNotes  String?       @map("equipment_notes")
+  supervisorId    String?       @map("supervisor_id")
+
+  /// Soft lock: the slot is held until this instant while approval, documents
+  /// and payment are outstanding. Null once CONFIRMED or terminal.
+  holdExpiresAt   DateTime?     @map("hold_expires_at") @db.Timestamptz(3)
+
+  googleEventId   String?            @map("google_event_id")
+  googleCalendarId String?           @map("google_calendar_id")
+  calendarSyncStatus CalendarSyncStatus? @map("calendar_sync_status")
+  calendarSyncError String?           @map("calendar_sync_error")
+  /// Bumped 1:1 with each write we push, so a webhook echo of our own change
+  /// can be told apart from a human editing the event in Google Calendar.
+  calendarSyncVersion Int             @default(0) @map("calendar_sync_version")
+
+  /// Unguessable token for the public participant-waiver link. Minted on
+  /// demand so a booking that never needs one never has one.
+  waiverToken     String?       @unique @map("waiver_token")
+
+  cancelledAt     DateTime?     @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason    String?       @map("cancel_reason")
+  bumpedByBookingId String?     @map("bumped_by_booking_id")
+  checkedInAt     DateTime?     @map("checked_in_at") @db.Timestamptz(3)
+
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  requester     User             @relation("BookingRequester", fields: [requesterId], references: [id])
+  supervisor    User?            @relation("BookingSupervisor", fields: [supervisorId], references: [id])
+  organization  Organization?    @relation(fields: [organizationId], references: [id])
+  subSpace      SubSpace         @relation(fields: [subSpaceId], references: [id])
+  sport         Sport?           @relation(fields: [sportId], references: [id])
+  season        Season?          @relation(fields: [seasonId], references: [id])
+  standingBlock StandingBlock?   @relation(fields: [standingBlockId], references: [id])
+  parentBooking Booking?         @relation("BookingSeries", fields: [parentBookingId], references: [id])
+  children      Booking[]        @relation("BookingSeries")
+
+  occupancy     BookingOccupancy[]
+  approvals     ApprovalStep[]
+  documents     Document[]
+  invoices      Invoice[]
+  requirements  BookingRequirement?
+
+  @@index([subSpaceId, startAt])
+  @@index([status, startAt])
+  @@index([requesterId, startAt])
+  @@index([holdExpiresAt])
+  @@map("bookings")
+}
+
+/// One row per sub-space physically occupied by a booking, expanded through
+/// the conflict graph. The overlap exclusion constraint lives here.
+model BookingOccupancy {
+  id         String   @id @default(uuid())
+  bookingId  String   @map("booking_id")
+  subSpaceId String   @map("sub_space_id")
+  /// Padded with setup/teardown buffer. Mirrors booking start/end otherwise.
+  startAt    DateTime @map("start_at") @db.Timestamptz(3)
+  endAt      DateTime @map("end_at") @db.Timestamptz(3)
+  /// Maintained by trigger from start_at/end_at; the exclusion constraint key.
+  timeRange  Unsupported("tstzrange")? @map("time_range")
+
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  subSpace SubSpace @relation(fields: [subSpaceId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, subSpaceId])
+  @@index([subSpaceId, startAt])
+  @@map("booking_occupancy")
+}
+
+model BookingRequirement {
+  bookingId            String   @id @map("booking_id")
+  requiresAdminApproval Boolean @map("requires_admin_approval")
+  requiresHeadCoachApproval Boolean @map("requires_head_coach_approval")
+  requiresContract     Boolean  @map("requires_contract")
+  requiresWaiver       Boolean  @map("requires_waiver")
+  requiresCoi          Boolean  @map("requires_coi")
+  requiresPayment      Boolean  @map("requires_payment")
+  autoApprove          Boolean  @map("auto_approve")
+  /// Snapshot of the Rule row applied, so later rule edits never rewrite
+  /// history on a booking that already cleared its gates.
+  ruleSnapshot         Json     @map("rule_snapshot")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_requirements")
+}
+
+model ApprovalStep {
+  id           String         @id @default(uuid())
+  bookingId    String         @map("booking_id")
+  approverId   String?        @map("approver_id")
+  requiredRole Role?          @map("required_role")
+  /// Set when the step must be decided by a specific person (head coach of the
+  /// requesting assistant's sport) rather than anyone holding a role.
+  requiredUserId String?      @map("required_user_id")
+  sequence     Int            @default(0)
+  status       ApprovalStatus @default(PENDING)
+  decidedAt    DateTime?      @map("decided_at") @db.Timestamptz(3)
+  note         String?
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  approver User?   @relation(fields: [approverId], references: [id])
+
+  @@index([status, requiredRole])
+  @@map("approval_steps")
+}
+
+// ---------------------------------------------------------------------------
+// Documents, invoices, rates, rules
+// ---------------------------------------------------------------------------
+
+model Document {
+  id          String         @id @default(uuid())
+  bookingId   String?        @map("booking_id")
+  userId      String?        @map("user_id")
+  organizationId String?     @map("organization_id")
+  type        DocumentType
+  provider    String         @default("manual")
+  envelopeId  String?        @map("envelope_id")
+  status      DocumentStatus @default(NOT_STARTED)
+  signerEmail String?        @map("signer_email")
+  signerName  String?        @map("signer_name")
+  signedAt    DateTime?      @map("signed_at") @db.Timestamptz(3)
+  fileUrl     String?        @map("file_url")
+  /// COIs and annual agreements expire; per-booking waivers do not.
+  expiresAt   DateTime?      @map("expires_at") @db.Timestamptz(3)
+  /// Public token for participant self-serve waiver links.
+  publicToken String?        @unique @map("public_token")
+  /// Set on participant waivers: the person on the floor, who is usually not
+  /// the person who made the booking.
+  isParticipant Boolean      @default(false) @map("is_participant")
+  /// Under 18 at the time of signing; requires a guardian signature.
+  isMinor     Boolean        @default(false) @map("is_minor")
+  guardianName  String?      @map("guardian_name")
+  guardianEmail String?      @map("guardian_email")
+  metadata    Json?
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId, type, status])
+  @@index([bookingId, type])
+  @@index([expiresAt])
+  @@map("documents")
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  bookingId       String        @map("booking_id")
+  number          String        @unique
+  /// [{ label, quantity, unitAmountCents, amountCents, kind }]
+  lineItems       Json          @map("line_items")
+  subtotalCents   Int           @map("subtotal_cents")
+  taxCents        Int           @default(0) @map("tax_cents")
+  depositCents    Int           @default(0) @map("deposit_cents")
+  totalCents      Int           @map("total_cents")
+  refundedCents   Int           @default(0) @map("refunded_cents")
+  currency        String        @default("usd")
+  status          InvoiceStatus @default(DRAFT)
+  stripeSessionId String?       @map("stripe_session_id")
+  stripePaymentIntentId String?  @map("stripe_payment_intent_id")
+  /// Manual-capture authorisation for refundable security deposits.
+  depositIntentId String?       @map("deposit_intent_id")
+  /// Amount actually taken from the deposit hold. 0 means released untouched.
+  depositCapturedCents Int      @default(0) @map("deposit_captured_cents")
+  /// Set once the hold is resolved either way; a null value on a finished
+  /// rental is what the "deposits awaiting resolution" sweep looks for.
+  depositResolvedAt DateTime?   @map("deposit_resolved_at") @db.Timestamptz(3)
+  depositCaptureReason String?  @map("deposit_capture_reason")
+  dueAt           DateTime?     @map("due_at") @db.Timestamptz(3)
+  issuedAt        DateTime?     @map("issued_at") @db.Timestamptz(3)
+  paidAt          DateTime?     @map("paid_at") @db.Timestamptz(3)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([status, dueAt])
+  @@map("invoices")
+}
+
+model RateCard {
+  id            String       @id @default(uuid())
+  facilityId    String       @map("facility_id")
+  activityType  ActivityType @map("activity_type")
+  rateTier      RateTier     @map("rate_tier")
+  hourlyCents   Int          @map("hourly_cents")
+  flatDayCents  Int?         @map("flat_day_cents")
+  minHours      Float        @default(1) @map("min_hours")
+  depositCents  Int          @default(0) @map("deposit_cents")
+  effectiveFrom DateTime     @map("effective_from") @db.Timestamptz(3)
+  effectiveTo   DateTime?    @map("effective_to") @db.Timestamptz(3)
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId, activityType, rateTier])
+  @@map("rate_cards")
+}
+
+/// Optional per-booking surcharges, admin editable.
+model Surcharge {
+  id         String  @id @default(uuid())
+  code       String  @unique
+  label      String
+  /// "flat" or "hourly"
+  kind       String
+  amountCents Int    @map("amount_cents")
+  active     Boolean @default(true)
+
+  @@map("surcharges")
+}
+
+/// The approval matrix. One row per (activityType, requesterRole). A row with
+/// requesterRole = null is the fallback for that activity type.
+model Rule {
+  id                     String        @id @default(uuid())
+  activityType           ActivityType  @map("activity_type")
+  requesterRole          Role?         @map("requester_role")
+  requiresAdminApproval  Boolean       @default(true) @map("requires_admin_approval")
+  requiresHeadCoachApproval Boolean    @default(false) @map("requires_head_coach_approval")
+  requiresContract       Boolean       @default(false) @map("requires_contract")
+  requiresWaiver         Boolean       @default(false) @map("requires_waiver")
+  requiresCoi            Boolean       @default(false) @map("requires_coi")
+  requiresPayment        Boolean       @default(false) @map("requires_payment")
+  autoApprove            Boolean       @default(false) @map("auto_approve")
+  notifyAdmin            Boolean       @default(false) @map("notify_admin")
+  /// Lower number wins a conflict. Also the bump ordering.
+  priorityRank           Int           @map("priority_rank")
+  /// Hours the soft lock survives while documents are outstanding.
+  documentHoldHours      Int           @default(72) @map("document_hold_hours")
+  paymentHoldHours       Int           @default(120) @map("payment_hold_hours")
+  /// Refund policy, admin editable per activity type.
+  refundFullDays         Int           @default(14) @map("refund_full_days")
+  refundPartialDays      Int           @default(3) @map("refund_partial_days")
+  refundPartialPercent   Int           @default(50) @map("refund_partial_percent")
+  /// Warn the requester that MHSAA out-of-season contact rules may apply.
+  mhsaaComplianceFlag    Boolean       @default(false) @map("mhsaa_compliance_flag")
+  notes                  String?
+  updatedAt              DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([activityType, requesterRole])
+  @@map("rules")
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+model Blackout {
+  id         String   @id @default(uuid())
+  facilityId String?  @map("facility_id")
+  subSpaceId String?  @map("sub_space_id")
+  startAt    DateTime @map("start_at") @db.Timestamptz(3)
+  endAt      DateTime @map("end_at") @db.Timestamptz(3)
+  reason     String
+  createdById String  @map("created_by_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  facility Facility? @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  subSpace SubSpace? @relation(fields: [subSpaceId], references: [id], onDelete: Cascade)
+
+  @@index([startAt, endAt])
+  @@map("blackouts")
+}
+
+model WaitlistEntry {
+  id           String    @id @default(uuid())
+  subSpaceId   String    @map("sub_space_id")
+  userId       String    @map("user_id")
+  windowStart  DateTime  @map("window_start") @db.Timestamptz(3)
+  windowEnd    DateTime  @map("window_end") @db.Timestamptz(3)
+  activityType ActivityType @map("activity_type")
+  notifiedAt   DateTime? @map("notified_at") @db.Timestamptz(3)
+  fulfilledAt  DateTime? @map("fulfilled_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  subSpace SubSpace @relation(fields: [subSpaceId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([subSpaceId, windowStart])
+  @@map("waitlist_entries")
+}
+
+/// Append-only. UPDATE and DELETE raise an exception at the database level.
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  actorId    String?  @map("actor_id")
+  actorLabel String?  @map("actor_label")
+  action     String
+  fromState  String?  @map("from_state")
+  toState    String?  @map("to_state")
+  reason     String?
+  payload    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+/// Outbound integration work (calendar writes, emails, reminders). Processed by
+/// /api/jobs/process-queue; swap for Inngest/BullMQ without touching callers.
+model JobQueue {
+  id          String    @id @default(uuid())
+  kind        String
+  payload     Json
+  runAt       DateTime  @map("run_at") @db.Timestamptz(3)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(6) @map("max_attempts")
+  lockedAt    DateTime? @map("locked_at") @db.Timestamptz(3)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+  failedAt    DateTime? @map("failed_at") @db.Timestamptz(3)
+  lastError   String?   @map("last_error")
+  /// Deduplicates retries of the same logical operation.
+  idempotencyKey String? @unique @map("idempotency_key")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([completedAt, runAt])
+  @@map("job_queue")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId])
+  @@map("sessions")
+}

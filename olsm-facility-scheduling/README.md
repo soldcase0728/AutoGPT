@@ -32,13 +32,16 @@ Sign in at `/sign-in` with any seeded address (`ad@olsm.edu`,
 `bball.head@olsm.edu`, `facilities@olsm.edu`, …), password `ChangeMe123456`.
 
 ```bash
-npm test          # 114 tests: unit + integration against a real database
+npm test          # 132 unit + integration tests against a real database
+npm run e2e       # 39 browser tests, desktop and mobile
 npm run typecheck
 npm run build
 ```
 
-Integration tests need a database. They use `TEST_DATABASE_URL` if set, so they
-never touch development data.
+Each layer gets its own database — `TEST_DATABASE_URL` for the vitest suite,
+`E2E_DATABASE_URL` for Playwright — so a test run never touches development
+data, and `npm run e2e` resets its own database first so the suite is
+repeatable rather than only passing once on a fresh one.
 
 ---
 
@@ -221,6 +224,7 @@ src/
 tests/
   unit/                     domain logic, no database
   integration/              acceptance criteria against real Postgres
+  e2e/                      Playwright, real browser, desktop and mobile
 ```
 
 `src/domain` has no database or network imports, which is why the bulk of the
@@ -233,9 +237,16 @@ logic is testable without fixtures.
 **Public** — facility directory with rates and availability, four-step request
 wizard, requester portal (requests, documents, invoices).
 
-**Coach / staff** — unified filterable calendar, quick-book (target: under 30
-seconds for in-season practice), my team's schedule with one-click block
-release, waitlist for windows that are already taken, my documents.
+**Coach / staff** — calendar in day, week, month and agenda views, with
+drag-to-create on empty time; quick-book (target: under 30 seconds for
+in-season practice); my team's schedule with one-click block release; waitlist
+for windows that are already taken; my documents.
+
+The day view puts *spaces* in the columns rather than days, because "what is in
+Dombrowski on Tuesday" is the question a scheduler actually asks, and a single
+day column stacked with eight bookings across five spaces is unreadable. Drag
+only ever prefills the booking form — every conflict, compliance and pricing
+check still runs server-side on submit.
 
 **Admin** — approval queue with inline conflict warnings, season allocation
 builder with collision resolution, facility/sub-space/conflict-graph editors,
@@ -274,6 +285,12 @@ All 114 tests pass. Mapping from the brief:
 
 Criterion 9's write-back and criterion 11's UI are exercised against the live
 Google API and in the browser respectively; the logic beneath both is tested.
+
+The Playwright suite covers the same ground through a browser: a coach booking
+in one pass, the same coach being gated on paid instruction, a blocked account,
+a participant signing a waiver with no account, the conflict message a person
+actually sees, and drag-to-create. It runs against desktop and a phone
+viewport, because coaches book from the field.
 
 Beyond the twelve, `operations.test.ts` covers the participant-waiver flow
 (including guardian signatures for minors and the refusal to sign after an event

@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Book a space" };
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; subSpace?: string }>;
+  searchParams: Promise<{ date?: string; subSpace?: string; start?: string; end?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -110,6 +110,8 @@ export default async function BookPage({
                 supervisors={supervisors}
                 defaultDate={params.date ?? instantToLocalDate(new Date())}
                 defaultSubSpaceId={params.subSpace}
+                defaultStartTime={params.start}
+                defaultEndTime={params.end}
                 isAdmin={isAdmin(user.role)}
                 defaultSportId={user.sports[0]?.sportId}
                 defaultTeamLevel={user.sports[0]?.teamLevel}

@@ -34,6 +34,8 @@ export function QuickBookForm({
   supervisors,
   defaultDate,
   defaultSubSpaceId,
+  defaultStartTime,
+  defaultEndTime,
   defaultSportId,
   defaultTeamLevel,
   isAdmin,
@@ -44,6 +46,9 @@ export function QuickBookForm({
   supervisors: { id: string; name: string; role: string }[];
   defaultDate: string;
   defaultSubSpaceId?: string;
+  /** Prefilled when the user dragged a range on the calendar. */
+  defaultStartTime?: string;
+  defaultEndTime?: string;
   defaultSportId?: string;
   defaultTeamLevel?: TeamLevel;
   isAdmin: boolean;
@@ -178,10 +183,24 @@ export function QuickBookForm({
           <input id="date" name="date" type="date" required defaultValue={defaultDate} className={inputClass} />
         </Field>
         <Field label="Start" htmlFor="startTime">
-          <input id="startTime" name="startTime" type="time" required defaultValue="15:30" className={inputClass} />
+          <input
+            id="startTime"
+            name="startTime"
+            type="time"
+            required
+            defaultValue={defaultStartTime ?? "15:30"}
+            className={inputClass}
+          />
         </Field>
         <Field label="End" htmlFor="endTime">
-          <input id="endTime" name="endTime" type="time" required defaultValue="17:30" className={inputClass} />
+          <input
+            id="endTime"
+            name="endTime"
+            type="time"
+            required
+            defaultValue={defaultEndTime ?? "17:30"}
+            className={inputClass}
+          />
         </Field>
       </div>
 

@@ -1,3 +1,20 @@
+# ---------------------------------------------------------------------------
+# Re-includes.
+#
+# The repository root .gitignore carries `pri*` and `ig*` (shorthand for
+# "private"/"ignore" scratch files) and `package-lock.json`. Those patterns are
+# fine for the rest of this monorepo but silently swallow core files here:
+#   pri*                -> prisma/  (schema, every migration, the seed)
+#                       -> src/domain/pricing.ts, src/domain/priority.ts
+#   package-lock.json   -> the lockfile this app needs for reproducible installs
+#
+# Without these negations a clean clone has no database schema and does not
+# build, and nothing warns you. Keep them.
+# ---------------------------------------------------------------------------
+!pri*
+!prisma/
+!package-lock.json
+
 node_modules/
 .next/
 out/
@@ -9,3 +26,6 @@ build/
 next-env.d.ts
 .storage/
 coverage/
+test-results/
+playwright-report/
+blob-report/
