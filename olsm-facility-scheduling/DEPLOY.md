@@ -66,11 +66,25 @@ POSTGRES_PASSWORD=$(openssl rand -base64 24)
 EOF
 ```
 
-Do this rather than putting the values on the command line. The database
-password ends up baked into the volume the first time Postgres initialises, so
-a later command that forgets to pass it produces a connection string that no
-longer matches — an authentication failure with no obvious cause. `.env` is
-gitignored.
+Do this **before the first `up`**, not after, and rather than putting the
+values on the command line. `.env` is gitignored.
+
+The ordering matters more than it looks. Postgres bakes `POSTGRES_PASSWORD`
+into the data volume the first time it initialises and ignores the environment
+variable from then on. Set or change the password afterwards and the app's
+connection string no longer matches the volume — the app crash-loops on an
+authentication error while Postgres itself reports healthy, because from its
+point of view nothing is wrong.
+
+If you hit that, and the data is still disposable:
+
+```bash
+docker compose -f docker-compose.prod.yml down -v   # DELETES the database
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Once real bookings exist, take a dump first:
+`docker compose -f docker-compose.prod.yml exec postgres pg_dump -U olsm_app olsm_facilities > backup.sql`
 
 Then start it:
 

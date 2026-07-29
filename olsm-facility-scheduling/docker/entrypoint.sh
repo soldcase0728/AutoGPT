@@ -15,13 +15,42 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 if [ -z "$SESSION_SECRET" ] || [ "${#SESSION_SECRET}" -lt 32 ]; then
-  echo "FATAL: SESSION_SECRET must be set and at least 32 characters." >&2
-  echo "       Generate one with: openssl rand -base64 32" >&2
+  echo "FATAL: SESSION_SECRET is not set (or is shorter than 32 characters)." >&2
+  echo "" >&2
+  echo "  Compose reads .env from the directory holding the compose file." >&2
+  echo "  Create it, then start again:" >&2
+  echo "" >&2
+  echo "    cat > .env <<EOF" >&2
+  echo "    SESSION_SECRET=\$(openssl rand -base64 32)" >&2
+  echo "    POSTGRES_PASSWORD=\$(openssl rand -base64 24)" >&2
+  echo "    EOF" >&2
+  echo "" >&2
+  echo "  If the database has already started once without that file, see the" >&2
+  echo "  note about POSTGRES_PASSWORD in DEPLOY.md -- changing it after the" >&2
+  echo "  volume is initialised requires recreating the volume." >&2
   exit 1
 fi
 
 echo "==> Applying database migrations"
-./node_modules/.bin/prisma migrate deploy
+if ! ./node_modules/.bin/prisma migrate deploy; then
+  echo "" >&2
+  echo "FATAL: could not apply migrations." >&2
+  echo "" >&2
+  echo "  If the error above mentions authentication, the most likely cause is" >&2
+  echo "  a POSTGRES_PASSWORD that changed after the database volume was first" >&2
+  echo "  created. Postgres bakes the password in on first initialisation and" >&2
+  echo "  ignores the environment variable from then on, so a new value in" >&2
+  echo "  .env no longer matches what the volume expects." >&2
+  echo "" >&2
+  echo "  While the data is still disposable, the fix is to recreate it:" >&2
+  echo "" >&2
+  echo "    docker compose -f docker-compose.prod.yml down -v" >&2
+  echo "    docker compose -f docker-compose.prod.yml up -d" >&2
+  echo "" >&2
+  echo "  DELETES THE DATABASE. Fine for a pilot with demo data; make a dump" >&2
+  echo "  first once real bookings exist." >&2
+  exit 1
+fi
 
 # Reference data: the eight facilities, the rules matrix, rate cards, sports.
 # Seeding is upsert-based, so running it on every boot is harmless and keeps a
