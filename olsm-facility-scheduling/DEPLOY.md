@@ -29,17 +29,30 @@ Stripe and DocuSign keys when you're ready; see `.env.example`.
 
 ## 1. Render — fastest to a URL
 
-`render.yaml` is a blueprint: it provisions the database, generates the secrets
-and wires the cron job.
+`render.yaml` is a blueprint: it provisions the database, generates the
+secrets and wires the cron job. It lives at the **repository root**, not in
+this directory — Render only looks for it there. It points back here with
+`rootDir`, so there is nothing to configure by hand.
 
 1. Push this repository to GitHub.
 2. Render → **New** → **Blueprint** → pick the repo.
-3. Set the root directory to `olsm-facility-scheduling`.
-4. Deploy. After the first deploy, set `APP_URL` to the URL Render assigned and
-   redeploy once so links in emails are correct.
+3. Choose the branch the app is on, then **Apply**.
+4. After the first deploy, set `APP_URL` on both the web service and the cron
+   job to the URL Render assigned, then redeploy once so links in emails point
+   somewhere real.
 
-The free Postgres tier expires after 30 days. Fine for a pilot; move to a paid
-tier before anyone depends on it.
+Nothing needs installing locally for this — it runs entirely in the browser,
+which matters if the machine you are on is managed and you cannot install
+Docker.
+
+The web service is on the `starter` plan rather than free: free web services
+sleep when idle, and a scheduling system that takes thirty seconds to wake up
+will not get used. The database is on the free tier, which **expires after 30
+days** — fine for a pilot, not fine for real bookings.
+
+Render hands out a non-superuser database role, which resolves the audit-log
+caveat described further down: on Render the app cannot drop its own audit
+triggers.
 
 ---
 

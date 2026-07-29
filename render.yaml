@@ -1,19 +1,31 @@
-# Render blueprint — the shortest path to a URL you can send someone.
+# Render blueprint -- the shortest path to a URL you can send someone.
 #
-#   1. Push this repository to GitHub.
-#   2. Render dashboard -> New -> Blueprint -> pick the repo.
-#   3. Set the root directory to olsm-facility-scheduling.
+#   1. Render dashboard -> New -> Blueprint -> pick this repo.
+#   2. Choose the branch this app lives on.
+#   3. Apply.
 #
-# Render provisions the database, generates SESSION_SECRET, runs the migrations
-# on boot and gives you an HTTPS URL. Nothing else to configure.
+# This file has to sit at the REPOSITORY ROOT: Render only looks for
+# render.yaml here, not in subdirectories. The app itself lives one level down,
+# which is what `rootDir` below points at -- every path in a service block is
+# resolved relative to that, so dockerfilePath and dockerContext stay simple.
 #
-# The free Postgres tier expires after 30 days, which is fine for a pilot and
-# not fine for real bookings.
+# Render provisions the database, generates SESSION_SECRET and JOB_RUNNER_TOKEN,
+# runs the migrations on boot and gives you an HTTPS URL.
+#
+# After the first deploy, set APP_URL on both services to the URL Render
+# assigned, then redeploy once so links in emails point somewhere real.
+#
+# Costs: the web service is on `starter` (a few dollars a month) rather than
+# free, because free web services sleep when idle and a scheduling system that
+# takes thirty seconds to wake up will not be used. The database is on the free
+# tier, which EXPIRES AFTER 30 DAYS -- fine for a pilot, not fine for real
+# bookings. Move it to a paid tier before anyone depends on it.
 
 services:
   - type: web
     name: olsm-facilities
     runtime: docker
+    rootDir: olsm-facility-scheduling
     dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: starter
@@ -49,6 +61,7 @@ services:
   - type: cron
     name: olsm-process-queue
     runtime: docker
+    rootDir: olsm-facility-scheduling
     dockerfilePath: ./Dockerfile
     dockerContext: .
     schedule: "*/5 * * * *"
