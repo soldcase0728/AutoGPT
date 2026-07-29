@@ -213,12 +213,20 @@ Also verified: `docker-compose.prod.yml` parses and interpolates cleanly under
 Compose v5 (`docker compose config`), which is what catches the YAML-quoting
 class of error.
 
-Not verified: the Docker image itself. `docker build` has never been run
-against this Dockerfile. The environment it was built in can reach Docker Hub's
-manifest API but not its blob CDN, so no base image can be pulled there. The
-Dockerfile assembles the same file layout that was verified by hand outside a
-container, but treat the first `docker compose up --build` as the real test. If
-it fails it will fail loudly at build time, not silently at runtime.
+Also verified, on macOS with Docker Desktop: the image builds from a clean
+checkout, all three containers start, Postgres reports healthy, and
+`/api/health` returns `{"status":"ok","database":"reachable","facilities":8}`
+— which is only true once migrations have applied and the seed has run inside
+the container.
 
-If the build does fail, the useful thing to send back is the last twenty lines
-of the output — the step that failed is named in them.
+Not verified on any other platform. That build was on a single machine; Linux
+hosts and CI runners are untested. Nothing in the Dockerfile pins an
+architecture — there are no Prisma `binaryTargets`, so engines are generated
+inside the container for whatever it is running on — but "should be portable"
+and "was run elsewhere" are different claims and only the first one is being
+made here.
+
+If a build does fail, the useful thing to send back is the last twenty lines of
+the output; the step that failed is named in them. If a *container* fails,
+`docker compose -f docker-compose.prod.yml logs --tail=40 app` — the entrypoint
+prints what it rejected and what to do about it.
