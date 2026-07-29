@@ -47,8 +47,13 @@ services:
     environment:
       # "postgres" is the compose service name, not localhost.
       DATABASE_URL: "postgresql://olsm_app:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/olsm_facilities?schema=public"
-      # Required. Generate with: openssl rand -base64 32
-      SESSION_SECRET: "${SESSION_SECRET:?set SESSION_SECRET before starting}"
+      # Required, and deliberately NOT declared with the "?" required-variable
+      # syntax. That syntax fails interpolation for *every* compose subcommand,
+      # so `ps`, `logs` and `down` all refuse to run unless the secret happens
+      # to be exported in that shell -- which is exactly when you need `logs`.
+      # The entrypoint validates this instead, and refuses to start without at
+      # least 32 characters. Put it in .env; see DEPLOY.md.
+      SESSION_SECRET: "${SESSION_SECRET:-}"
       APP_URL: "${APP_URL:-http://localhost:3000}"
       TZ: "${TZ:-America/Detroit}"
 

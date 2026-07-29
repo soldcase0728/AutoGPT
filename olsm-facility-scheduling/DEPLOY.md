@@ -56,11 +56,25 @@ git clone --depth 1 --branch claude/olsm-facility-scheduling-b4mmq5 \
 cd olsm/olsm-facility-scheduling
 ```
 
+Generate the secrets **once**, into a `.env` file that Compose reads
+automatically:
+
+```bash
+cat > .env <<EOF
+SESSION_SECRET=$(openssl rand -base64 32)
+POSTGRES_PASSWORD=$(openssl rand -base64 24)
+EOF
+```
+
+Do this rather than putting the values on the command line. The database
+password ends up baked into the volume the first time Postgres initialises, so
+a later command that forgets to pass it produces a connection string that no
+longer matches — an authentication failure with no obvious cause. `.env` is
+gitignored.
+
 Then start it:
 
 ```bash
-SESSION_SECRET=$(openssl rand -base64 32) \
-POSTGRES_PASSWORD=$(openssl rand -base64 24) \
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
@@ -69,6 +83,16 @@ the app inside the container. Later starts take seconds.
 
 Then open <http://localhost:3000>. Watch it come up with
 `docker compose -f docker-compose.prod.yml logs -f app`.
+
+Everyday commands, once `.env` exists:
+
+```bash
+docker compose -f docker-compose.prod.yml ps            # container health
+docker compose -f docker-compose.prod.yml logs -f app   # follow the log
+docker compose -f docker-compose.prod.yml restart app   # restart
+docker compose -f docker-compose.prod.yml down          # stop, keep data
+docker compose -f docker-compose.prod.yml down -v       # stop, DELETE the data
+```
 
 This runs three containers: the app, Postgres, and a small loop that hits the
 scheduled-job endpoints every five minutes. There is **no TLS** — put it behind

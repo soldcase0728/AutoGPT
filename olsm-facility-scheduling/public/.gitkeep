@@ -1,0 +1,4 @@
+Static files placed here are served from the site root: public/logo.png is
+served at /logo.png. The directory is intentionally empty -- this file only
+exists because git does not track empty directories, and the Docker build
+copies public/ into the runtime image.
