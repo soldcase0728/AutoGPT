@@ -177,11 +177,39 @@ delete the sample bookings from the admin calendar.
 
 ## Two things to get right before real use
 
-**Run the app as a non-superuser Postgres role.** The append-only audit log is
-enforced by triggers, and a superuser can drop them. A superuser connection
-string quietly removes the guarantee that the liability trail is tamper-proof.
-Render and Neon do this correctly by default; a hand-rolled Postgres often does
-not.
+**Run the app as a non-superuser Postgres role — the compose setup does not.**
+The append-only audit log is enforced by triggers, and a superuser can drop
+them. A superuser connection string quietly removes the guarantee that the
+liability trail is tamper-proof.
+
+Being specific, because this file used to give the advice without admitting it
+breaks its own rule: `docker-compose.prod.yml` sets `POSTGRES_USER=olsm_app`,
+and the official Postgres image creates that role as a **superuser**. So in the
+compose setup the app connects with rights to disable its own audit triggers.
+
+For a pilot on a single machine that is an acceptable trade — the database is
+not reachable outside the compose network, and the people with the connection
+string are the people who own the data anyway. It stops being acceptable once
+the audit log is the thing you would produce in an insurance dispute. Fixing it
+properly means two roles: an admin role that owns the schema and runs
+migrations, and a restricted role for the app with `INSERT`/`SELECT`/`UPDATE`
+on the tables but no ownership of `audit_log` — because a table's owner can
+`ALTER TABLE ... DISABLE TRIGGER` regardless of the trigger's contents.
+
+Render and Neon do not have this problem; both hand out non-superuser roles.
+
+**Check it rather than trusting this paragraph:**
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  psql -U olsm_app -d olsm_facilities < scripts/verify-guarantees.sql
+```
+
+That script attempts a real double-booking and a real audit-log edit against
+the live database and reports whether each was refused. It writes nothing that
+survives. Run it after any migration and after any restore from backup — a
+restore is the most common way these constraints go missing without anyone
+noticing.
 
 **Back up the database.** The audit log is the liability record. Managed
 Postgres does this for you; the compose setup does not — its data lives in a
