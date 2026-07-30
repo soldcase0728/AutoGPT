@@ -65,8 +65,17 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     schedule: "*/5 * * * *"
-    dockerCommand: >
-      sh -c "wget -q -O- --post-data='' --header=\"Authorization: Bearer $JOB_RUNNER_TOKEN\" $APP_URL/api/jobs/process-queue"
+    # node's built-in fetch, not wget: this image is node:22-slim plus openssl,
+    # ca-certificates and tini, and has neither wget nor curl. A wget command
+    # here exits 127 every five minutes. The call lives in a file so there is no
+    # YAML folding or shell quoting between here and node.
+    # Both jobs, because the route supports six and this blueprint previously
+    # scheduled one. expire-holds is the one that matters for correctness: it
+    # releases soft locks whose deadline passed, and without it a submitted
+    # request holds its slot forever. It is a cheap query, so running it on the
+    # queue's five-minute tick costs nothing and is more responsive than the
+    # hourly schedule the route documents.
+    dockerCommand: node run-job.mjs process-queue expire-holds
     envVars:
       - key: JOB_RUNNER_TOKEN
         fromService:
@@ -74,7 +83,14 @@ services:
           type: web
           envVarKey: JOB_RUNNER_TOKEN
       - key: APP_URL
-        sync: false
+        sync: false # set to the URL Render assigns, after the first deploy
+      # This container shares the web service's image and so runs the same
+      # entrypoint. Without these it would migrate and re-seed the database
+      # before every single invocation, twelve times an hour.
+      - key: RUN_MIGRATIONS
+        value: "0"
+      - key: SEED_ON_BOOT
+        value: "0"
       - key: DATABASE_URL
         fromDatabase:
           name: olsm-facilities-db

@@ -31,25 +31,34 @@ if [ -z "$SESSION_SECRET" ] || [ "${#SESSION_SECRET}" -lt 32 ]; then
   exit 1
 fi
 
-echo "==> Applying database migrations"
-if ! ./node_modules/.bin/prisma migrate deploy; then
-  echo "" >&2
-  echo "FATAL: could not apply migrations." >&2
-  echo "" >&2
-  echo "  If the error above mentions authentication, the most likely cause is" >&2
-  echo "  a POSTGRES_PASSWORD that changed after the database volume was first" >&2
-  echo "  created. Postgres bakes the password in on first initialisation and" >&2
-  echo "  ignores the environment variable from then on, so a new value in" >&2
-  echo "  .env no longer matches what the volume expects." >&2
-  echo "" >&2
-  echo "  While the data is still disposable, the fix is to recreate it:" >&2
-  echo "" >&2
-  echo "    docker compose -f docker-compose.prod.yml down -v" >&2
-  echo "    docker compose -f docker-compose.prod.yml up -d" >&2
-  echo "" >&2
-  echo "  DELETES THE DATABASE. Fine for a pilot with demo data; make a dump" >&2
-  echo "  first once real bookings exist." >&2
-  exit 1
+# The cron service shares this image and so runs this entrypoint before every
+# invocation. Migrating and seeding on a five-minute timer is pointless work
+# against the database and races the web service on deploy, so the cron sets
+# RUN_MIGRATIONS=0. The web service leaves it at the default and still migrates
+# before it accepts traffic.
+if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
+  echo "==> Applying database migrations"
+  if ! ./node_modules/.bin/prisma migrate deploy; then
+    echo "" >&2
+    echo "FATAL: could not apply migrations." >&2
+    echo "" >&2
+    echo "  If the error above mentions authentication, the most likely cause is" >&2
+    echo "  a POSTGRES_PASSWORD that changed after the database volume was first" >&2
+    echo "  created. Postgres bakes the password in on first initialisation and" >&2
+    echo "  ignores the environment variable from then on, so a new value in" >&2
+    echo "  .env no longer matches what the volume expects." >&2
+    echo "" >&2
+    echo "  While the data is still disposable, the fix is to recreate it:" >&2
+    echo "" >&2
+    echo "    docker compose -f docker-compose.prod.yml down -v" >&2
+    echo "    docker compose -f docker-compose.prod.yml up -d" >&2
+    echo "" >&2
+    echo "  DELETES THE DATABASE. Fine for a pilot with demo data; make a dump" >&2
+    echo "  first once real bookings exist." >&2
+    exit 1
+  fi
+else
+  echo "==> Skipping migrations (RUN_MIGRATIONS=$RUN_MIGRATIONS)"
 fi
 
 # Reference data: the eight facilities, the rules matrix, rate cards, sports.

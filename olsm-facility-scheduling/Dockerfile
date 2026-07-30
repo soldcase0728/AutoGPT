@@ -77,6 +77,10 @@ COPY --from=build --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
+# How the cron service calls a scheduled job. It uses node's built-in fetch
+# because this image has neither wget nor curl.
+COPY --chown=nextjs:nodejs docker/run-job.mjs ./run-job.mjs
+
 USER nextjs
 EXPOSE 3000
 

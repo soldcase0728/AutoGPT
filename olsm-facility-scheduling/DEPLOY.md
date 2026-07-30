@@ -41,9 +41,22 @@ this directory — Render only looks for it there. It points back here with
    job to the URL Render assigned, then redeploy once so links in emails point
    somewhere real.
 
+**Step 4 is not optional, and the cron job is the reason.** Until `APP_URL` is
+set it has no address to call, so it exits with a clear message every five
+minutes: nothing drains the outbound queue and no expired hold releases its
+slot. The web service itself is fine without it; only links in emails are wrong.
+
 Nothing needs installing locally for this — it runs entirely in the browser,
 which matters if the machine you are on is managed and you cannot install
 Docker.
+
+The cron service runs `process-queue` and `expire-holds` on the same
+five-minute tick. The remaining scheduled jobs — `daily-digest`,
+`weekly-digest`, `nightly` and `refresh-calendar-channels` — are **not wired up
+on Render**, because each needs its own schedule and therefore its own billable
+cron service. Nothing breaks without them, but past bookings are not marked
+complete, certificate-expiry warnings are not sent and stale sessions are not
+pruned. Add them as further `type: cron` services when the pilot warrants it.
 
 The web service is on the `starter` plan rather than free: free web services
 sleep when idle, and a scheduling system that takes thirty seconds to wake up
