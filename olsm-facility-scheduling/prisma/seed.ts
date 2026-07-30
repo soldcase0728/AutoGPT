@@ -5,8 +5,9 @@
  * the one from the project brief, loaded as data so the AD can edit any cell in
  * Admin > Rules without a deploy.
  *
- * Rates are PLACEHOLDERS. Every dollar figure here is marked [DECIDE] and must
- * be replaced before launch -- see DECISIONS.md.
+ * The rental rate is set: a flat $50.00 per hour, every facility, every paid
+ * requester type. Surcharges, the security deposit and the insurance minimums
+ * are still placeholders marked [DECIDE].
  *
  * Run with: npm run db:seed
  */
@@ -402,29 +403,30 @@ const RULES: RuleSeed[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Rates -- ALL PLACEHOLDER VALUES. [DECIDE] before launch.
+// Rates. The hourly rental rate is set; surcharges and the deposit are not.
 // ---------------------------------------------------------------------------
 
-/** Base commercial hourly rate per facility, in cents. Placeholder. */
-const BASE_HOURLY_CENTS: Record<string, number> = {
-  "petry-ziemba-stadium": 30000,
-  "dombrowski-fieldhouse": 20000,
-  "rakoczy-gymnasium": 18000,
-  "athletic-complex": 15000,
-  "milewski-field": 12000,
-  "running-track": 10000,
-  "weight-room": 12000,
-  "crew-house": 12000,
-};
+/**
+ * The rental rate, in cents per hour.
+ *
+ * One flat rate: every facility, every paid requester type. This replaces the
+ * earlier placeholder scheme of a per-facility base rate scaled by a discount
+ * multiplier per tier, so the stadium and the running track now cost the same
+ * per hour, and a commercial renter and a non-profit pay the same.
+ *
+ * If the school later wants to charge more for the stadium than the track, or
+ * to give non-profits a discount, that is a rate card per facility and tier --
+ * the schema already carries both columns, so it is data rather than code.
+ */
+const RENTAL_HOURLY_CENTS = 5000;
 
-/** Multipliers off the commercial rate. Placeholder. */
-const TIER_MULTIPLIER: Record<RateTier, number> = {
-  INTERNAL: 0,
-  OLSM_AFFILIATED_CLUB: 0.4,
-  PARISH_PARTNER: 0.35,
-  NONPROFIT: 0.6,
-  COMMERCIAL: 1,
-};
+/**
+ * Internal school use is not a rental and is not charged. Every other tier pays
+ * the flat rate.
+ */
+function hourlyCentsFor(rateTier: RateTier): number {
+  return rateTier === RateTier.INTERNAL ? 0 : RENTAL_HOURLY_CENTS;
+}
 
 /** Activity types that are billable at all. */
 const BILLABLE: ActivityType[] = [
@@ -551,16 +553,15 @@ async function main() {
   }
   console.log(`  rules: ${RULES.length}`);
 
-  // --- Rate cards (placeholder pricing) ------------------------------------
+  // --- Rate cards ----------------------------------------------------------
   const facilities = await prisma.facility.findMany();
   const effectiveFrom = new Date(Date.UTC(2020, 0, 1));
   let rateCount = 0;
 
   for (const facility of facilities) {
-    const base = BASE_HOURLY_CENTS[facility.slug] ?? 10000;
     for (const activityType of BILLABLE) {
       for (const rateTier of Object.values(RateTier)) {
-        const hourlyCents = Math.round(base * TIER_MULTIPLIER[rateTier]);
+        const hourlyCents = hourlyCentsFor(rateTier);
         const existing = await prisma.rateCard.findFirst({
           where: { facilityId: facility.id, activityType, rateTier, effectiveTo: null },
         });
@@ -586,7 +587,9 @@ async function main() {
       }
     }
   }
-  console.log(`  rate cards: ${rateCount} (PLACEHOLDER pricing — see DECISIONS.md)`);
+  console.log(
+    `  rate cards: ${rateCount} — $${(RENTAL_HOURLY_CENTS / 100).toFixed(2)}/hour for every paid tier`,
+  );
 
   // --- Surcharges ----------------------------------------------------------
   const surcharges = [
@@ -766,7 +769,7 @@ async function main() {
   console.log(`  seasons: ${seasons.length}`);
 
   console.log("\nDone. Sign in at /sign-in with any seeded address, password ChangeMe123456.");
-  console.log("Pricing, insurance minimums, retention and cancellation windows are placeholders.");
+  console.log("Surcharges, deposits, insurance minimums, retention and cancellation windows are placeholders.");
   console.log("See DECISIONS.md before this goes anywhere near a real rental.\n");
 }
 

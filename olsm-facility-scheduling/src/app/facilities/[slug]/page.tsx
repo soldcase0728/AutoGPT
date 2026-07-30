@@ -85,13 +85,27 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
   const hours = parseDefaultHours(facility.defaultHours);
   const days: WeekdayKeyList = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
-  const publishedRates = facility.rateCards.filter((rc) => rc.hourlyCents > 0);
+  // Rate cards exist for every facility, including the ones outside groups may
+  // not book at all -- the schema does not know the difference. Publishing them
+  // advertised a price for a space nobody outside the school can hire, next to
+  // a request button the server would refuse. Eligibility decides first.
+  const publishedRates = facility.externallyBookable
+    ? facility.rateCards.filter((rc) => rc.hourlyCents > 0)
+    : [];
 
   // Rates are set per requester type, and within a type they are usually the
   // same whatever the use. Rendering the raw matrix showed sixteen rows for
   // four actual prices, which reads as pricing complexity the school does not
   // charge. Collapse to one row per distinct price and name the uses only when
   // a use genuinely changes what someone pays.
+  // When one rate covers every tier and every use -- which is the case under
+  // flat pricing -- a table of identical numbers says less than one sentence.
+  const singleRate =
+    publishedRates.length > 0 &&
+    new Set(publishedRates.map((rc) => `${rc.hourlyCents}:${rc.flatDayCents ?? "none"}`)).size === 1
+      ? publishedRates[0]
+      : null;
+
   const rateRows = [...new Set(publishedRates.map((rc) => rc.rateTier))]
     .flatMap((tier) => {
       const forTier = publishedRates.filter((rc) => rc.rateTier === tier);
@@ -119,12 +133,24 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
         title={facility.name}
         description={facility.description ?? facility.type}
         action={
-          <Link
-            href={`/request?facility=${facility.slug}`}
-            className="rounded-md bg-navy-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-navy-700"
-          >
-            Request this facility
-          </Link>
+          facility.externallyBookable ? (
+            <Link
+              href={`/request?facility=${facility.slug}`}
+              className="rounded-md bg-navy-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-navy-700"
+            >
+              Request this facility
+            </Link>
+          ) : (
+            // Offering "Request this facility" here sent people into a form the
+            // server would reject. Authorized staff still need a way in, so the
+            // action points at sign-in rather than disappearing.
+            <Link
+              href="/sign-in"
+              className="rounded-md border border-navy-300 px-3.5 py-2 text-sm font-medium text-navy-800 hover:bg-navy-50"
+            >
+              Sign in to book
+            </Link>
+          )
         }
       />
 
@@ -167,11 +193,30 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
           </Card>
 
           <Card
-            title="Rates"
-            description="Hourly rates by requester type. Internal school use is not charged."
+            title={facility.externallyBookable ? "Rates" : "Who can book this space"}
+            description={facility.externallyBookable ? "Internal school use is not charged." : undefined}
           >
-            {publishedRates.length === 0 ? (
+            {!facility.externallyBookable ? (
+              <p className="text-sm text-navy-700">
+                Available only to authorized OLSM teams and school programs. This space is not
+                offered for outside hire, so no rental rate applies.
+              </p>
+            ) : publishedRates.length === 0 ? (
               <EmptyState title="Not available for paid hire" />
+            ) : singleRate ? (
+              <>
+                <p className="text-2xl font-semibold text-navy-900">
+                  {formatMoney(singleRate.hourlyCents)}{" "}
+                  <span className="text-base font-normal text-navy-700">per hour</span>
+                </p>
+                <p className="mt-1 text-sm text-navy-700">
+                  The same rate for any outside group and any type of use
+                  {singleRate.flatDayCents
+                    ? `, with a full day capped at ${formatMoney(singleRate.flatDayCents)}`
+                    : ""}
+                  .
+                </p>
+              </>
             ) : (
               <>
                 <TableWrap>
@@ -198,12 +243,15 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
                     </tbody>
                   </Table>
                 </TableWrap>
-                <p className="mt-3 text-xs text-navy-600">
-                  Rates shown are provisional and subject to confirmation by the athletic office.
-                  Lights, custodial setup, supervision and athletic trainer coverage may be charged
-                  in addition. External rentals also require a refundable security deposit.
-                </p>
               </>
+            )}
+
+            {publishedRates.length > 0 && (
+              <p className="mt-3 text-xs text-navy-600">
+                Lights, custodial setup, supervision and athletic trainer coverage may be charged in
+                addition, and external rentals require a refundable security deposit. The athletic
+                office confirms the full amount when it reviews your request.
+              </p>
             )}
           </Card>
 

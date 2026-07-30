@@ -11,32 +11,40 @@ money from, or accepting liability for, an outside organisation.
 
 ## 1. Rate card — hourly rates, internal camp rates, deposits, surcharges
 
-**Status:** placeholder. Every dollar figure in the system is invented.
+**Hourly rate: decided.** A flat **$50.00 per hour**, every facility, every paid
+requester type. Full day caps at 6× hourly, so $300.
 
-Seeded model: a base commercial hourly rate per facility, multiplied by tier.
+This replaced the earlier placeholder scheme of a per-facility base rate scaled
+by a tier multiplier. Two consequences worth being deliberate about, because
+both were previously priced differently:
 
-| Facility | Commercial base/hr | Facility | Commercial base/hr |
-|---|---|---|---|
-| Petry/Ziemba Stadium | $300 | Milewski Field | $120 |
-| Dombrowski Fieldhouse | $200 | Running Track | $100 |
-| Rakoczy Gymnasium | $180 | Weight Room | $120 |
-| Athletic Complex | $150 | Crew House | $120 |
+- **Facility no longer affects price.** The stadium and the running track cost
+  the same per hour. Previously $300 and $100.
+- **Requester type no longer affects price.** A commercial renter and a
+  non-profit pay the same. Previously ×1.0 and ×0.6.
 
-Tier multipliers: Internal ×0 · Parish/partner ×0.35 · OLSM-affiliated club ×0.4
-· Non-profit ×0.6 · Commercial ×1.0
+Neither needs code to change back. The schema carries `facilityId` and
+`rateTier` on every rate card, so per-facility or per-tier pricing is data:
+edit the cells in Admin → Rate cards, or change `RENTAL_HOURLY_CENTS` /
+`hourlyCentsFor` in `prisma/seed.ts` for a new default.
 
-Full-day rate caps at 6× hourly. External rental deposit $500. Surcharges:
-lights $75/hr, custodial $50/hr, supervision $45/hr, athletic trainer $65/hr.
+**Internal school use remains $0** — it is not a rental. `SCHOOL_CAMP` at the
+INTERNAL tier is therefore still free, so an OLSM-run camp carries no facility
+cost. If the school wants camps to carry it internally, set that rate; the
+plumbing already bills it.
 
-**Change at:** Admin → Rate cards (no deploy). Seed defaults in
-`prisma/seed.ts` (`BASE_HOURLY_CENTS`, `TIER_MULTIPLIER`, `DEPOSIT_CENTS`).
+**Still placeholder:** external rental deposit $500; surcharges for lights
+$75/hr, custodial $50/hr, supervision $45/hr, athletic trainer $65/hr. These are
+add-on services, not the rental rate, and were not part of the $50 decision.
 
-**Note on internal camp rates:** `SCHOOL_CAMP` at the INTERNAL tier is currently
-$0, so an OLSM-run camp is free. If the school wants camps to carry facility
-cost internally, set that rate — the plumbing already bills it.
+**Careful — the seed overwrites rate cards on every boot.** `SEED_ON_BOOT`
+defaults to `1`, and the rate-card step updates existing rows rather than
+leaving them alone. A rate edited in Admin → Rate cards is therefore reverted to
+the seeded figure by the next restart or redeploy. Until that changes, treat
+`prisma/seed.ts` as the source of truth for rates, not the admin screen.
 
-**Blocks:** any external booking. An unpriced booking is flagged
-`invoice.unpriced` in the audit log rather than silently confirming at $0.
+**Blocks:** nothing now. An unpriced booking is still flagged `invoice.unpriced`
+in the audit log rather than silently confirming at $0.
 
 ---
 

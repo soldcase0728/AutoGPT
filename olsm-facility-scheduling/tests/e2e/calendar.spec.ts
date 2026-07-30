@@ -93,6 +93,27 @@ test.describe("public pages", () => {
     await expect(page.getByText("Published hours")).toBeVisible();
   });
 
+  /**
+   * A space the school does not hire out must not advertise a price or offer a
+   * request button. The server already refuses such a booking; this covers the
+   * public page, which was quoting an hourly rate beside a button that led
+   * straight into a rejection.
+   */
+  test("a school-only facility shows no rate and no request button", async ({ page }) => {
+    await page.goto("/facilities/crew-house");
+
+    await expect(page.getByText(/Available only to authorized OLSM teams/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Request this facility" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Sign in to book" })).toBeVisible();
+    // No money anywhere on the page.
+    await expect(page.locator("body")).not.toContainText("$");
+
+    // A facility that is hired out still shows both.
+    await page.goto("/facilities/rakoczy-gymnasium");
+    await expect(page.getByRole("link", { name: "Request this facility" })).toBeVisible();
+    await expect(page.getByText("per hour")).toBeVisible();
+  });
+
   test("an outside group can start a request with no account", async ({ page }) => {
     await page.goto("/request");
     await expect(page.getByRole("heading", { name: "Request a facility" })).toBeVisible();
