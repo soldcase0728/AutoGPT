@@ -61,6 +61,38 @@ test.describe("head coach quick-book", () => {
     await expect(page.getByText("Certificate of Insurance", { exact: true })).toBeVisible();
     // And it is billed, despite the requester being internal staff.
     await expect(page.getByText(/Invoice INV-/)).toBeVisible();
+
+    // The progress card says which of those is being waited on, so nobody has
+    // to telephone the athletic office to find out.
+    const progress = page.locator("aside").getByRole("list").first();
+    await expect(progress.getByText("Request submitted")).toBeVisible();
+    await expect(progress.getByText("School approval")).toBeVisible();
+    await expect(progress.getByText("Payment")).toBeVisible();
+    await expect(page.getByText("Waiting on: School approval.")).toBeVisible();
+  });
+
+  /**
+   * The same card on a booking that owes nothing. A routine practice should not
+   * be dressed up with four greyed-out compliance steps it never had.
+   */
+  test("a routine practice shows no paperwork it does not owe", async ({ page }, testInfo) => {
+    await signIn(page, USERS.headCoach);
+    await page.goto("/book");
+    await fillBookingForm(page, {
+      activity: "In-season team practice",
+      space: "Rakoczy Gymnasium — Auxiliary / upper",
+      title: "E2E plain practice",
+      ...slot(testInfo, 18),
+    });
+    await page.getByRole("button", { name: "Request booking" }).click();
+    await page.getByRole("link", { name: "View booking" }).click();
+
+    const progress = page.locator("aside").getByRole("list").first();
+    await expect(progress.getByText("Request submitted")).toBeVisible();
+    await expect(progress.getByText("Confirmed")).toBeVisible();
+    await expect(progress.getByText("Agreement")).toHaveCount(0);
+    await expect(progress.getByText("Insurance")).toHaveCount(0);
+    await expect(progress.getByText("Payment")).toHaveCount(0);
   });
 
   test("holds the slot while approval is pending", async ({ page }, testInfo) => {

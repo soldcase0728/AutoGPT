@@ -25,6 +25,7 @@ import { DOCUMENT_LABELS } from "@/domain/compliance";
 import { describePolicy } from "@/domain/cancellation";
 import { CancelBookingForm } from "./cancel-form";
 import { RosterPanel } from "./roster-panel";
+import { BookingProgress, buildStages } from "@/components/booking-progress";
 import { DayOfControls } from "./day-of-controls";
 import { needsParticipantWaivers, rosterStatus, waiverUrl } from "@/services/participant-service";
 import { CoiUploadForm } from "./coi-upload-form";
@@ -80,6 +81,15 @@ export default async function BookingDetailPage({
   );
   const canManage = booking.requesterId === user.id || isAdmin(user.role);
   const roster = await rosterStatus(booking.id);
+
+  // Derived from the booking's own records rather than from status alone: a
+  // document can be signed while a later one is still outstanding.
+  const stages = buildStages(
+    booking.status,
+    booking.documents,
+    invoice,
+    booking.approvals.length > 0,
+  );
 
   return (
     <AppShell user={user}>
@@ -263,6 +273,22 @@ export default async function BookingDetailPage({
         </div>
 
         <aside className="space-y-5">
+          {/*
+            First card in the sidebar on purpose. "Awaiting documents" does not
+            say which document, nor whether approval already happened, and
+            finding that out otherwise means telephoning the athletic office.
+          */}
+          <Card
+            title="Progress"
+            description={
+              stages.find((s) => s.state === "current")
+                ? `Waiting on: ${stages.find((s) => s.state === "current")?.label}.`
+                : undefined
+            }
+          >
+            <BookingProgress stages={stages} />
+          </Card>
+
           <Card title="Approvals">
             {booking.approvals.length === 0 ? (
               <p className="text-sm text-navy-700">
