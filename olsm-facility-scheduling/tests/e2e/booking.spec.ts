@@ -128,7 +128,12 @@ test.describe("head coach quick-book", () => {
   /** The conflict is reported to the person, not just rejected by the database. */
   test("refuses a clashing booking with a readable explanation", async ({ page }, testInfo) => {
     // Both attempts ask for the same slot on purpose.
-    const contested = slot(testInfo, 3);
+    //
+    // Index 12 rather than 3 so this test owns its whole week block. It ends by
+    // accepting a suggested alternative, and suggestions move by one to three
+    // hours -- inside the two-hour spacing `slot` uses -- so a lower index would
+    // book a slot belonging to the next test along.
+    const contested = slot(testInfo, 12);
 
     await signIn(page, USERS.headCoach);
     await page.goto("/book");
@@ -155,6 +160,35 @@ test.describe("head coach quick-book", () => {
 
     await expect(page.getByText("That request did not go through")).toBeVisible();
     await expect(page.getByText(/already held by/)).toBeVisible();
+
+    // A rejected booking must not throw away what was typed, and the form must
+    // show the space it would actually submit -- React resets a form after an
+    // action, which used to leave the select displaying a different one.
+    await expect(page.getByLabel("Title")).toHaveValue("E2E second claim");
+    const shownSpace = await page
+      .locator("#subSpaceId")
+      .evaluate((el: HTMLSelectElement) => el.selectedOptions[0]?.text);
+    expect(shownSpace).toContain("Court A");
+
+    // A clash is a choice, not a dead end: the server offers slots it checked
+    // and would accept, and picking one fills the form in.
+    await expect(page.getByText("These are free instead:")).toBeVisible();
+    const suggestion = page.getByRole("button", { name: /Same (space|time)/ }).first();
+    await expect(suggestion).toBeVisible();
+
+    await suggestion.click();
+    // Something about the slot must have moved.
+    const movedTime = (await page.getByLabel("Start").inputValue()) !== contested.start;
+    const movedDate = (await page.getByLabel("Date").inputValue()) !== contested.date;
+    const movedSpace =
+      (await page
+        .locator("#subSpaceId")
+        .evaluate((el: HTMLSelectElement) => el.selectedOptions[0]?.text)) !== shownSpace;
+    expect(movedTime || movedDate || movedSpace).toBe(true);
+
+    // And the slot it filled in is one the server actually accepts.
+    await page.getByRole("button", { name: "Request booking" }).click();
+    await expect(page.getByText("Confirmed. It is on the facility calendar now.")).toBeVisible();
   });
 
   /**

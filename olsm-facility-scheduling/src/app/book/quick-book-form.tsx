@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ActivityType, TeamLevel } from "@prisma/client";
 import { createBookingAction, type BookingFormState } from "@/app/actions/booking-actions";
@@ -69,6 +69,29 @@ export function QuickBookForm({
   );
   const [subSpaceId, setSubSpaceId] = useState(defaultSubSpaceId ?? spaces[0]?.id ?? "");
   const [showDetails, setShowDetails] = useState(false);
+  const [title, setTitle] = useState(defaultTitle ?? "");
+  const [headcount, setHeadcount] = useState("");
+  const [setupNotes, setSetupNotes] = useState("");
+  const [equipmentNotes, setEquipmentNotes] = useState("");
+  const [date, setDate] = useState(defaultDate);
+  const [startTime, setStartTime] = useState(defaultStartTime ?? "15:30");
+  const [endTime, setEndTime] = useState(defaultEndTime ?? "17:30");
+
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // React resets the form once a form action completes. For the selects that
+  // reverts the DOM to the first option until something else triggers a render,
+  // so straight after a rejected booking the form would show a different space
+  // from the one it holds and would submit. The values are correct underneath;
+  // this re-asserts them so what is on screen matches what would be sent.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const space = form.elements.namedItem("subSpaceId");
+    if (space instanceof HTMLSelectElement) space.value = subSpaceId;
+    const activity = form.elements.namedItem("activityType");
+    if (activity instanceof HTMLSelectElement) activity.value = activityType;
+  }, [state, subSpaceId, activityType]);
 
   const selectedSpace = spaces.find((s) => s.id === subSpaceId);
   const selectedActivity = activities.find((a) => a.value === activityType);
@@ -78,7 +101,7 @@ export function QuickBookForm({
     activityType === ActivityType.TEAM_OFFSEASON;
 
   return (
-    <form action={action} className="space-y-4">
+    <form ref={formRef} action={action} className="space-y-4">
       {state.error && (
         <Alert tone="danger" title="That request did not go through">
           <p>{state.error}</p>
@@ -105,6 +128,41 @@ export function QuickBookForm({
                   Bump these bookings. They will be cancelled, refunded in full and notified.
                 </label>
               )}
+            </div>
+          )}
+
+          {/*
+            A clash should be a choice, not a dead end. Each of these is a slot
+            the server checked and would accept; picking one fills the form in
+            so the next click is the booking itself.
+          */}
+          {state.alternatives && state.alternatives.length > 0 && (
+            <div className="mt-3">
+              <p className="font-medium">These are free instead:</p>
+              <ul className="mt-2 space-y-2">
+                {state.alternatives.map((alt) => (
+                  <li key={`${alt.subSpaceId}-${alt.date}-${alt.startTime}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubSpaceId(alt.subSpaceId);
+                        setDate(alt.date);
+                        setStartTime(alt.startTime);
+                        setEndTime(alt.endTime);
+                      }}
+                      className="w-full rounded-md border border-navy-300 bg-white px-3 py-2 text-left hover:border-navy-500 hover:bg-navy-50"
+                    >
+                      <span className="block font-medium text-navy-900">{alt.when}</span>
+                      <span className="block text-xs text-navy-600">
+                        {alt.label} · {alt.reason}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-navy-600">
+                Choosing one fills the form in. Nothing is booked until you submit.
+              </p>
             </div>
           )}
         </Alert>
@@ -183,15 +241,29 @@ export function QuickBookForm({
           name="title"
           required
           minLength={3}
-          defaultValue={defaultTitle}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           placeholder="Boys Basketball practice"
           className={inputClass}
         />
       </Field>
 
+      {/*
+        Controlled, so choosing a suggested alternative can fill them in. They
+        were uncontrolled defaults before; a suggestion that cannot move the
+        date is not much of a suggestion.
+      */}
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Date" htmlFor="date">
-          <input id="date" name="date" type="date" required defaultValue={defaultDate} className={inputClass} />
+          <input
+            id="date"
+            name="date"
+            type="date"
+            required
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className={inputClass}
+          />
         </Field>
         <Field label="Start" htmlFor="startTime">
           <input
@@ -199,7 +271,8 @@ export function QuickBookForm({
             name="startTime"
             type="time"
             required
-            defaultValue={defaultStartTime ?? "15:30"}
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
             className={inputClass}
           />
         </Field>
@@ -209,7 +282,8 @@ export function QuickBookForm({
             name="endTime"
             type="time"
             required
-            defaultValue={defaultEndTime ?? "17:30"}
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
             className={inputClass}
           />
         </Field>
@@ -270,13 +344,35 @@ export function QuickBookForm({
       {showDetails && (
         <div className="space-y-3 rounded-md border border-navy-200 bg-navy-50 p-3">
           <Field label="Headcount" htmlFor="headcount">
-            <input id="headcount" name="headcount" type="number" min={0} className={inputClass} />
+            <input
+              id="headcount"
+              name="headcount"
+              type="number"
+              min={0}
+              value={headcount}
+              onChange={(e) => setHeadcount(e.target.value)}
+              className={inputClass}
+            />
           </Field>
           <Field label="Setup requirements" htmlFor="setupNotes" hint="Shown on the custodial setup board.">
-            <textarea id="setupNotes" name="setupNotes" rows={2} className={inputClass} />
+            <textarea
+              id="setupNotes"
+              name="setupNotes"
+              rows={2}
+              value={setupNotes}
+              onChange={(e) => setSetupNotes(e.target.value)}
+              className={inputClass}
+            />
           </Field>
           <Field label="Equipment" htmlFor="equipmentNotes">
-            <textarea id="equipmentNotes" name="equipmentNotes" rows={2} className={inputClass} />
+            <textarea
+              id="equipmentNotes"
+              name="equipmentNotes"
+              rows={2}
+              value={equipmentNotes}
+              onChange={(e) => setEquipmentNotes(e.target.value)}
+              className={inputClass}
+            />
           </Field>
         </div>
       )}

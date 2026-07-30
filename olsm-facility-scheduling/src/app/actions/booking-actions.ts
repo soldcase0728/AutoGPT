@@ -6,7 +6,7 @@ import { ActivityType, TeamLevel } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, requireAdmin, requireUser } from "@/lib/auth/current-user";
 import { ComplianceError, ConflictError, errorMessage, isDomainError } from "@/lib/errors";
-import { localToInstant } from "@/lib/time";
+import { formatRange, instantToLocalDate, instantToLocalTime, localToInstant } from "@/lib/time";
 import type { BumpCandidate } from "@/domain/priority";
 import {
   cancelBooking,
@@ -16,6 +16,7 @@ import {
   markNoShow,
   releaseStandingBlockOccurrence,
   type Actor,
+  type Alternative,
 } from "@/services/booking-service";
 import { joinWaitlist } from "@/services/waitlist-service";
 
@@ -29,6 +30,19 @@ export interface BookingFormState {
   warnings?: string[];
   /** Present when an admin must confirm a bump before the request can proceed. */
   bumpable?: { reference: string; title: string; requesterName: string }[];
+  /**
+   * Free slots offered when the requested one was taken, so a clash is a choice
+   * rather than a dead end. Times are pre-formatted for the form's local zone.
+   */
+  alternatives?: {
+    subSpaceId: string;
+    label: string;
+    reason: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    when: string;
+  }[];
   invoiceId?: string;
 }
 
@@ -128,7 +142,9 @@ export async function createBookingAction(
     }
 
     if (error instanceof ConflictError) {
-      const details = error.details as { bumpable?: BumpCandidate[]; requiresConfirmation?: boolean } | undefined;
+      const details = error.details as
+        | { bumpable?: BumpCandidate[]; requiresConfirmation?: boolean; alternatives?: Alternative[] }
+        | undefined;
       return {
         error: error.message,
         bumpable: details?.requiresConfirmation
@@ -138,6 +154,17 @@ export async function createBookingAction(
               requesterName: b.requesterName,
             }))
           : undefined,
+        // Formatted here rather than in the client component: the school's
+        // timezone lives on the server, and the form fields want local values.
+        alternatives: details?.alternatives?.map((a) => ({
+          subSpaceId: a.subSpaceId,
+          label: a.label,
+          reason: a.reason,
+          date: instantToLocalDate(a.startAt),
+          startTime: instantToLocalTime(a.startAt),
+          endTime: instantToLocalTime(a.endAt),
+          when: formatRange(a.startAt, a.endAt),
+        })),
       };
     }
 

@@ -240,10 +240,19 @@ export async function createBooking(
     const assessment = assessBump(priority, conflicts);
 
     if (assessment.blocking.length > 0) {
-      throw new ConflictError(
-        buildConflictMessage(assessment.blocking, subSpace.name),
-        { conflicts: assessment.blocking },
-      );
+      // Offer somewhere to go rather than only saying no. Suggestions are a
+      // courtesy, so a failure to compute them must not replace the conflict
+      // message with a different error.
+      const alternatives = await suggestAlternatives(
+        subSpace.id,
+        input.startAt,
+        input.endAt,
+      ).catch(() => []);
+
+      throw new ConflictError(buildConflictMessage(assessment.blocking, subSpace.name), {
+        conflicts: assessment.blocking,
+        alternatives,
+      });
     }
 
     // Everything in the way is outranked. Bumping is never automatic.
@@ -972,10 +981,125 @@ function computeHoldExpiry(status: BookingStatus, ruleSnapshot: Prisma.JsonValue
 function buildConflictMessage(blocking: readonly BumpCandidate[], subSpaceName: string): string {
   const first = blocking[0];
   const more = blocking.length > 1 ? ` (and ${blocking.length - 1} more)` : "";
-  return (
-    `${subSpaceName} is already held by ${first.title} — ${formatRange(first.startAt, first.endAt)}${more}. ` +
-    "Pick another time or space, or ask the athletic office."
+  return `${subSpaceName} is already held by ${first.title} — ${formatRange(first.startAt, first.endAt)}${more}.`;
+}
+
+/** A free slot offered in place of one that was taken. */
+export interface Alternative {
+  subSpaceId: string;
+  label: string;
+  startAt: Date;
+  endAt: Date;
+  /** Why this is being offered, e.g. "Same space, 2 hours later". */
+  reason: string;
+}
+
+/**
+ * Free slots near a request that could not be met.
+ *
+ * "That time is taken" is a dead end: the person now has to guess again, and
+ * every guess costs another round trip. This looks in the three directions
+ * someone would look themselves -- the same space earlier or later that day,
+ * the same time on the following days, and the other spaces in the same
+ * facility at the requested time -- and offers the first few that are actually
+ * clear.
+ *
+ * Every candidate goes through the same padded-window and conflict check the
+ * real booking would, so an offered slot is one the server would accept rather
+ * than one that merely looks free. Operating hours are honoured too, so this
+ * never proposes six in the morning just because nothing is booked then.
+ */
+export async function suggestAlternatives(
+  subSpaceId: string,
+  startAt: Date,
+  endAt: Date,
+  limit = 4,
+): Promise<Alternative[]> {
+  const durationMs = endAt.getTime() - startAt.getTime();
+  if (durationMs <= 0) return [];
+
+  const subSpace = await prisma.subSpace.findUnique({
+    where: { id: subSpaceId },
+    include: { facility: { include: { subSpaces: { where: { active: true } } } } },
+  });
+  if (!subSpace) return [];
+
+  const allSubSpaces = await prisma.subSpace.findMany({ where: { active: true } });
+  const index = indexSubSpaces(allSubSpaces as SubSpaceNode[]);
+  const facilityBuffers = new Map(
+    (await prisma.facility.findMany({ select: { id: true, bufferMinutes: true } })).map((f) => [
+      f.id,
+      f.bufferMinutes,
+    ]),
   );
+  const hours = parseDefaultHours(subSpace.facility.defaultHours);
+
+  const HOUR = 3_600_000;
+  const DAY = 86_400_000;
+
+  const candidates: Omit<Alternative, "label">[] = [];
+
+  // Same space, shifted within the day. Nearest offsets first.
+  for (const offsetHours of [1, -1, 2, -2, 3, -3]) {
+    candidates.push({
+      subSpaceId,
+      startAt: new Date(startAt.getTime() + offsetHours * HOUR),
+      endAt: new Date(endAt.getTime() + offsetHours * HOUR),
+      reason:
+        offsetHours > 0
+          ? `Same space, ${offsetHours} hour${offsetHours === 1 ? "" : "s"} later`
+          : `Same space, ${-offsetHours} hour${offsetHours === -1 ? "" : "s"} earlier`,
+    });
+  }
+
+  // Same space and time, following days.
+  for (const days of [1, 2, 3, 7]) {
+    candidates.push({
+      subSpaceId,
+      startAt: new Date(startAt.getTime() + days * DAY),
+      endAt: new Date(endAt.getTime() + days * DAY),
+      reason: days === 7 ? "Same space and time, next week" : `Same space and time, ${days} day${days === 1 ? "" : "s"} later`,
+    });
+  }
+
+  // Sibling spaces in the same facility, at the time originally wanted.
+  for (const sibling of subSpace.facility.subSpaces) {
+    if (sibling.id === subSpaceId) continue;
+    candidates.push({
+      subSpaceId: sibling.id,
+      startAt,
+      endAt,
+      reason: "Same time, different space",
+    });
+  }
+
+  const nameById = new Map(subSpace.facility.subSpaces.map((s) => [s.id, s.name]));
+  const found: Alternative[] = [];
+  const now = new Date();
+
+  for (const candidate of candidates) {
+    if (found.length >= limit) break;
+    if (candidate.startAt <= now) continue;
+    if (checkOperatingHours(candidate.startAt, candidate.endAt, hours)) continue;
+
+    const occupied = occupiedSubSpaceIds(candidate.subSpaceId, index);
+    const padded = paddedWindow(
+      candidate.startAt,
+      candidate.endAt,
+      occupied,
+      index,
+      facilityBuffers,
+    );
+    const clashes = await findConflicts(occupied, padded.start, padded.end);
+    if (clashes.length > 0) continue;
+
+    found.push({
+      ...candidate,
+      label: `${subSpace.facility.name} — ${nameById.get(candidate.subSpaceId) ?? subSpace.name}`,
+    });
+  }
+
+  return found;
 }
 
 /**
