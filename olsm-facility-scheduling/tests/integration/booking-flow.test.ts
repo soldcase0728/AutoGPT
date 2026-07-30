@@ -23,6 +23,7 @@ import {
   cancelBooking,
   createBooking,
   decideApproval,
+  MAX_ACTIVE_HOLDS_PER_REQUESTER,
   releaseExpiredHolds,
 } from "@/services/booking-service";
 import { markInvoicePaid } from "@/services/invoice-service";
@@ -552,6 +553,72 @@ describe("audit log", () => {
 // ---------------------------------------------------------------------------
 
 describe("soft locks", () => {
+  /**
+   * One account cannot take an unbounded slice of the calendar out of
+   * circulation by submitting requests and then going quiet. Every requester is
+   * an account the school issued, so this is a fairness cap rather than an
+   * anti-bot measure -- but without it a single account could sit on the whole
+   * gym schedule.
+   */
+  it("stops one account holding more than the permitted number of slots at once", async () => {
+    const coach = await userByEmail("bball.head@olsm.edu");
+    const court = await subSpace("rakoczy-gymnasium", "auxiliary");
+
+    // Paid instruction is gated, so each of these holds its slot rather than
+    // confirming outright.
+    for (let i = 0; i < MAX_ACTIVE_HOLDS_PER_REQUESTER; i += 1) {
+      const { startAt, endAt } = futureSlot(40 + i * 2, 60);
+      await createBooking(
+        {
+          requesterId: coach.id,
+          subSpaceId: court.id,
+          activityType: ActivityType.PRIVATE_INSTRUCTION,
+          title: `Hold cap ${i}`,
+          startAt,
+          endAt,
+          headcount: 4,
+        },
+        actorFor(coach),
+      );
+    }
+
+    const oneTooMany = futureSlot(40 + MAX_ACTIVE_HOLDS_PER_REQUESTER * 2, 60);
+    await expect(
+      createBooking(
+        {
+          requesterId: coach.id,
+          subSpaceId: court.id,
+          activityType: ActivityType.PRIVATE_INSTRUCTION,
+          title: "Hold cap overflow",
+          startAt: oneTooMany.startAt,
+          endAt: oneTooMany.endAt,
+          headcount: 4,
+        },
+        actorFor(coach),
+      ),
+    ).rejects.toThrow(/holding a slot/i);
+
+    // An administrator books on other people's behalf and is not capped.
+    const admin = await userByEmail("ad@olsm.edu");
+    // A different week entirely. Within one day the five holds above plus the
+    // facility's 15-minute buffer leave no gap wide enough.
+    const adminSlot = futureSlot(1, 60, 5);
+    await expect(
+      createBooking(
+        {
+          requesterId: coach.id,
+          subSpaceId: court.id,
+          activityType: ActivityType.PRIVATE_INSTRUCTION,
+          title: "Booked by the office",
+          startAt: adminSlot.startAt,
+          endAt: adminSlot.endAt,
+          headcount: 4,
+        },
+        actorFor(admin),
+      ),
+    ).resolves.toBeDefined();
+  });
+
   it("releases an expired hold and returns the slot to open inventory", async () => {
     const coach = await userByEmail("bball.head@olsm.edu");
     const other = await userByEmail("gbball.head@olsm.edu");

@@ -76,6 +76,120 @@ export const env = {
 
   jobRunnerToken: str("JOB_RUNNER_TOKEN"),
   seedDemoData: bool("SEED_DEMO_DATA", true),
+
+  /**
+   * Whether someone with no account may submit a facility request.
+   *
+   * Off. Every hold then belongs to an account the school issued, which is the
+   * whole anti-abuse story a tool for a known group needs. Turning this on
+   * re-opens a path that also needs verified email, single-use tokens and rate
+   * limits before it faces the public.
+   */
+  allowAnonymousRequests: bool("ALLOW_ANONYMOUS_REQUESTS", false),
 };
+
+/**
+ * Whether real email can leave this instance.
+ *
+ * The "console" provider writes to stdout, which is right for development and
+ * useless to a renter waiting on a verification link. Anything that depends on
+ * a person receiving mail -- verifying an address, claiming a request, being
+ * told a document was rejected -- must check this rather than assume delivery.
+ */
+export function emailIsDeliverable(): boolean {
+  if (env.email.provider === "sendgrid") return Boolean(env.email.sendgridKey);
+  if (env.email.provider === "postmark") return Boolean(env.email.postmarkToken);
+  return false;
+}
+
+/**
+ * Configuration that must be right before production serves a request.
+ *
+ * Each of these fails silently otherwise, which is the dangerous kind: links in
+ * emails that point at localhost, a session secret published in this
+ * repository, or an APP_URL taken from wherever the last deploy happened to
+ * run. Tokens must be built from a known-good origin rather than from anything
+ * a caller can influence, so APP_URL is validated here and never derived from
+ * an incoming Host header.
+ */
+export function productionConfigProblems(): string[] {
+  if (!env.isProduction) return [];
+
+  const problems: string[] = [];
+  const raw = str("APP_URL");
+
+  // A production *build* is not always a production *deployment*. The e2e suite
+  // and the Docker Compose route both run this build on a local host over
+  // plain http quite legitimately. This opt-in is for those; it is never set on
+  // a hosted service, where an http or loopback APP_URL means real links go
+  // somewhere nobody can reach.
+  const allowInsecureUrl = bool("ALLOW_INSECURE_APP_URL", false);
+
+  if (!raw) {
+    problems.push("APP_URL is not set. It must be the public https URL of this instance.");
+  } else {
+    let url: URL | null = null;
+    try {
+      url = new URL(raw);
+    } catch {
+      problems.push(`APP_URL is not a valid URL: ${raw}`);
+    }
+
+    if (url) {
+      if (!allowInsecureUrl) {
+        if (url.protocol !== "https:") {
+          problems.push(`APP_URL must use https, not ${url.protocol.replace(":", "")}.`);
+        }
+        if (/^(localhost$|127\.|0\.0\.0\.0$|\[?::1\]?$)/.test(url.hostname)) {
+          problems.push(
+            `APP_URL points at ${url.hostname}, which nobody outside this container can reach.`,
+          );
+        }
+      }
+
+      // Always enforced when configured. This is the "is this the host we meant"
+      // check, and a local run that opts out of the https rule still should not
+      // be allowed to claim a production hostname.
+      const allowed = str("APP_URL_ALLOWED_HOSTS")
+        .split(",")
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes(url.hostname.toLowerCase())) {
+        problems.push(
+          `APP_URL host "${url.hostname}" is not in APP_URL_ALLOWED_HOSTS (${allowed.join(", ")}).`,
+        );
+      }
+    }
+  }
+
+  if (env.sessionSecret.length < 32) {
+    problems.push("SESSION_SECRET must be at least 32 characters.");
+  }
+  if (env.sessionSecret.startsWith("insecure-development-secret")) {
+    problems.push("SESSION_SECRET is still the development default.");
+  }
+
+  return problems;
+}
+
+/**
+ * Called once at startup. Refusing to boot is deliberate: a production instance
+ * that runs with a broken APP_URL emails links nobody can use and looks healthy
+ * doing it, which is harder to notice than a container that will not start.
+ */
+export function assertProductionConfig(): void {
+  const problems = productionConfigProblems();
+  if (problems.length === 0) return;
+
+  const message = [
+    "FATAL: this instance is not configured for production.",
+    "",
+    ...problems.map((p) => `  - ${p}`),
+    "",
+    "Set these on the service and redeploy.",
+  ].join("\n");
+
+  throw new Error(message);
+}
 
 export type Env = typeof env;

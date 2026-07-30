@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PublicShell } from "@/components/app-shell";
 import { AppShell } from "@/components/app-shell";
@@ -101,6 +102,48 @@ export default async function RequestPage({
           <aside>{intro}</aside>
         </div>
       </AppShell>
+    );
+  }
+
+  // Signed out, and self-service requests are closed. Say who to ask rather
+  // than showing a form the server would reject -- the whole point of the
+  // earlier work on misleading buttons.
+  if (!env.allowAnonymousRequests) {
+    return (
+      <PublicShell>
+        <PageHeader
+          title="Request a facility"
+          description="Facility requests are made from an account."
+        />
+        <div className="grid gap-5 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <Card title="Sign in to request a facility">
+              <p className="text-sm text-navy-700">
+                OLSM coaches and staff sign in with their school account.
+              </p>
+              <p className="mt-2 text-sm text-navy-700">
+                Outside groups — clubs, travel teams, camps and community organizations — are set up
+                with an account by the athletic office. Contact them and they will invite you, then
+                you can request facilities, sign documents and pay invoices here.
+              </p>
+              <Link
+                href="/sign-in"
+                className="mt-4 inline-block rounded-md bg-navy-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-navy-700"
+              >
+                Sign in
+              </Link>
+            </Card>
+          </div>
+          <aside className="space-y-4">
+            {intro}
+            <Card title="Looking around first?">
+              <Link href="/facilities" className="text-sm font-medium underline">
+                Browse the facilities
+              </Link>
+            </Card>
+          </aside>
+        </div>
+      </PublicShell>
     );
   }
 

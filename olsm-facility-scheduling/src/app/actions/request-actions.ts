@@ -57,10 +57,37 @@ export async function submitExternalRequestAction(
     return { error: "The end time must be after the start time." };
   }
 
+  // No authenticated user, no booking, and therefore no inventory hold.
+  //
+  // An anonymous submission used to create an account, mint a session and take
+  // a slot out of inventory, all on the strength of a typed-in address nobody
+  // had checked. Closing that with verification, layered rate limits and
+  // single-use tokens is the right answer for a public rental marketplace. This
+  // is a scheduling tool for a known group, so the simpler answer is better:
+  // everyone who can hold a slot is someone the school issued an account to,
+  // and an abuser has to compromise one first.
+  //
+  // The capability is a flag rather than deleted code because the underlying
+  // business concept -- an outside group starting a request without an account
+  // -- is real, and will matter if OLSM ever puts a rental link on its website.
+  // Turning it on then means setting one variable and completing the
+  // verification work, not rebuilding the path.
+  //
+  // Enforced on the server. The page hides the form; this decides what is
+  // allowed, and a form post is not a page visit.
+  const signedInEarly = await getCurrentUser();
+  if (!signedInEarly && !env.allowAnonymousRequests) {
+    return {
+      error:
+        "Please sign in to request a facility. Outside groups are set up with an account by the " +
+        "athletic office — contact them and they will invite you.",
+    };
+  }
+
   const h = await headers();
   const ipAddress = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
-  const signedIn = await getCurrentUser();
+  const signedIn = signedInEarly;
   let requester = signedIn;
 
   if (!requester) {

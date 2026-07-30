@@ -149,7 +149,30 @@ test.describe("public pages", () => {
     await expect(page.getByText("per hour")).toBeVisible();
   });
 
-  test("an outside group can start a request with no account", async ({ page }) => {
+  /**
+   * The pilot boundary: nobody holds a slot without an account the school
+   * issued. The form is not merely hidden -- the server refuses the post -- but
+   * this covers the part a person sees.
+   */
+  test("a signed-out visitor is asked to sign in rather than shown a request form", async ({
+    page,
+  }) => {
+    await page.goto("/request");
+
+    await expect(page.getByRole("heading", { name: "Sign in to request a facility" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+    await expect(page.getByText(/set up with an account by the athletic office/)).toBeVisible();
+
+    // None of the booking controls are present to be submitted.
+    await expect(page.getByLabel("Facility and space")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Submit request/ })).toHaveCount(0);
+  });
+
+  // Anonymous requests are off for the pilot (ALLOW_ANONYMOUS_REQUESTS). The
+  // path still exists and this covers it; re-enable alongside the verification,
+  // single-use token and rate-limit work that path needs before facing the
+  // public.
+  test.skip("an outside group can start a request with no account", async ({ page }) => {
     await page.goto("/request");
     await expect(page.getByRole("heading", { name: "Request a facility" })).toBeVisible();
     await expect(

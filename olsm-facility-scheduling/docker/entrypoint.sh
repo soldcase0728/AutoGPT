@@ -61,9 +61,26 @@ else
   echo "==> Skipping migrations (RUN_MIGRATIONS=$RUN_MIGRATIONS)"
 fi
 
+# Seeding in production is a configuration error, not a convenience.
+#
+# The seed creates reference data that an administrator is then expected to
+# edit -- rates above all. Running it on every boot means a restart silently
+# reverts those edits, so the admin screen is not actually the source of truth
+# it appears to be. Create-missing-only seeding makes this safe for a first
+# boot, but the intent still has to be explicit.
+if [ "$NODE_ENV" = "production" ] && [ "${SEED_ON_BOOT:-1}" = "1" ] && [ "${ALLOW_PRODUCTION_SEED:-0}" != "1" ]; then
+  echo "FATAL: SEED_ON_BOOT=1 in production." >&2
+  echo "" >&2
+  echo "  Seeding on every boot lets a restart overwrite data an administrator" >&2
+  echo "  changed. Set SEED_ON_BOOT=0 on this service." >&2
+  echo "" >&2
+  echo "  For a genuinely empty database on first deploy, set" >&2
+  echo "  ALLOW_PRODUCTION_SEED=1 for that one boot, then remove it." >&2
+  exit 1
+fi
+
 # Reference data: the eight facilities, the rules matrix, rate cards, sports.
-# Seeding is upsert-based, so running it on every boot is harmless and keeps a
-# redeploy from drifting away from the committed reference data.
+# Creating only what is missing, so a redeploy never rewrites an edited rate.
 if [ "${SEED_ON_BOOT:-1}" = "1" ]; then
   echo "==> Seeding reference data"
   node dist-scripts/seed.js

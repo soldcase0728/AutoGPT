@@ -64,6 +64,13 @@ import { createInvoiceForBooking, refundInvoiceForCancellation } from "./invoice
 import { prepareBookingDocuments } from "./document-service";
 import { notifyBookingStateChange, notifyBumped } from "./notification-service";
 
+/**
+ * Slots one non-admin account may hold at once while paperwork is outstanding.
+ * Deliberately generous: a coach juggling several pending requests is normal,
+ * an account sitting on the whole gym schedule is not.
+ */
+export const MAX_ACTIVE_HOLDS_PER_REQUESTER = 5;
+
 export interface Actor {
   id: string;
   name: string;
@@ -136,6 +143,26 @@ export async function createBooking(
       label: "Sign your Annual Coach Agreement",
       href: "/my-documents",
     });
+  }
+
+  // How many slots one account may hold at once while its paperwork is
+  // outstanding. Not an anti-bot measure -- every requester is an account the
+  // school issued -- but a cap on how much of the calendar a single account can
+  // take out of circulation by submitting and then going quiet. Admins are
+  // exempt: booking on behalf of other people is their job.
+  //
+  // Confirmed bookings do not count. This is about held, unfinished ones.
+  if (!isAdmin(actor.role)) {
+    const heldAlready = await prisma.booking.count({
+      where: { requesterId: requester.id, status: { in: [...SOFT_LOCK_STATES] } },
+    });
+    if (heldAlready >= MAX_ACTIVE_HOLDS_PER_REQUESTER) {
+      throw new ValidationError(
+        `You already have ${heldAlready} requests holding a slot while they wait on approval, ` +
+          "documents or payment. Finish or cancel one of those before requesting another, or ask " +
+          "the athletic office.",
+      );
+    }
   }
 
   // --- 2. Permission and scope ---------------------------------------------

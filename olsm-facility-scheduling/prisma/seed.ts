@@ -557,6 +557,7 @@ async function main() {
   const facilities = await prisma.facility.findMany();
   const effectiveFrom = new Date(Date.UTC(2020, 0, 1));
   let rateCount = 0;
+  let skippedRates = 0;
 
   for (const facility of facilities) {
     for (const activityType of BILLABLE) {
@@ -576,19 +577,29 @@ async function main() {
               : 0,
           effectiveFrom,
         };
+        // Create what is missing; never rewrite what is there.
+        //
+        // This used to update the existing row, which meant a restart reverted
+        // every rate the business office had set through the admin screen --
+        // so the screen looked authoritative and was not. A rate is a business
+        // decision with invoices attached to it; the seed's job is to make a
+        // new database usable, not to keep asserting its opinion over one that
+        // is already in service.
         if (existing) {
-          await prisma.rateCard.update({ where: { id: existing.id }, data });
+          skippedRates += 1;
         } else {
           await prisma.rateCard.create({
             data: { facilityId: facility.id, activityType, rateTier, ...data },
           });
+          rateCount += 1;
         }
-        rateCount += 1;
       }
     }
   }
   console.log(
-    `  rate cards: ${rateCount} — $${(RENTAL_HOURLY_CENTS / 100).toFixed(2)}/hour for every paid tier`,
+    skippedRates > 0
+      ? `  rate cards: ${rateCount} created, ${skippedRates} left as they are (existing rates are never overwritten)`
+      : `  rate cards: ${rateCount} — $${(RENTAL_HOURLY_CENTS / 100).toFixed(2)}/hour for every paid tier`,
   );
 
   // --- Surcharges ----------------------------------------------------------

@@ -22,6 +22,10 @@ export function e2eEnv(extra = {}) {
     ...process.env,
     DATABASE_URL: E2E_DATABASE_URL,
     E2E_TOKEN,
+    // A production build served on http://127.0.0.1 is exactly what the
+    // production APP_URL guard exists to reject, and exactly what this suite
+    // needs. Opt out here rather than weakening the guard.
+    ALLOW_INSECURE_APP_URL: "1",
     // Integrations stay inert: an e2e run must not email a real coach.
     EMAIL_PROVIDER: "console",
     SMS_PROVIDER: "console",

@@ -55,6 +55,9 @@ services:
       # least 32 characters. Put it in .env; see DEPLOY.md.
       SESSION_SECRET: "${SESSION_SECRET:-}"
       APP_URL: "${APP_URL:-http://localhost:3000}"
+      # This route runs on a machine you control, commonly over plain http on
+      # the school network. The https/loopback guard is for hosted services.
+      ALLOW_INSECURE_APP_URL: "1"
       TZ: "${TZ:-America/Detroit}"
 
       # Loads a week of sample bookings so a fresh instance is worth clicking.

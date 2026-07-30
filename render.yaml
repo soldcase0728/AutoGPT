@@ -47,6 +47,21 @@ services:
       # Set to 0 before real data goes in.
       - key: LOAD_DEMO_DATA
         value: "1"
+      # The pilot boundary. Nobody holds a slot without an account the school
+      # issued, so an abuser has to compromise one first. Turning this on needs
+      # verified email, single-use tokens and rate limits on that path.
+      - key: ALLOW_ANONYMOUS_REQUESTS
+        value: "0"
+      # Seeding has to run at least once or a fresh database has no facilities,
+      # no rules and no accounts. It is safe on every boot now that it creates
+      # only what is missing -- it used to update existing rows, so a restart
+      # reverted every rate the business office had set. The entrypoint still
+      # demands ALLOW_PRODUCTION_SEED in production, so that this is a decision
+      # somebody made rather than a default nobody looked at.
+      - key: SEED_ON_BOOT
+        value: "1"
+      - key: ALLOW_PRODUCTION_SEED
+        value: "1"
       - key: EMAIL_PROVIDER
         value: console
       - key: SMS_PROVIDER
