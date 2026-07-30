@@ -85,8 +85,32 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
   const hours = parseDefaultHours(facility.defaultHours);
   const days: WeekdayKeyList = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
-  const publishedRates = facility.rateCards
-    .filter((rc) => rc.hourlyCents > 0)
+  const publishedRates = facility.rateCards.filter((rc) => rc.hourlyCents > 0);
+
+  // Rates are set per requester type, and within a type they are usually the
+  // same whatever the use. Rendering the raw matrix showed sixteen rows for
+  // four actual prices, which reads as pricing complexity the school does not
+  // charge. Collapse to one row per distinct price and name the uses only when
+  // a use genuinely changes what someone pays.
+  const rateRows = [...new Set(publishedRates.map((rc) => rc.rateTier))]
+    .flatMap((tier) => {
+      const forTier = publishedRates.filter((rc) => rc.rateTier === tier);
+      const byPrice = new Map<string, typeof forTier>();
+      for (const rc of forTier) {
+        const key = `${rc.hourlyCents}:${rc.flatDayCents ?? "none"}`;
+        byPrice.set(key, [...(byPrice.get(key) ?? []), rc]);
+      }
+      const priceVariesWithUse = byPrice.size > 1;
+      return [...byPrice.values()].map((group) => ({
+        key: `${tier}-${group[0].hourlyCents}-${group[0].flatDayCents ?? "none"}`,
+        tier,
+        hourlyCents: group[0].hourlyCents,
+        flatDayCents: group[0].flatDayCents,
+        appliesTo: priceVariesWithUse
+          ? group.map((rc) => ACTIVITY_LABELS[rc.activityType]).sort().join(", ")
+          : null,
+      }));
+    })
     .sort((a, b) => a.hourlyCents - b.hourlyCents);
 
   return (
@@ -104,8 +128,17 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
         }
       />
 
+      {/*
+        min-w-0 on both columns. A grid item defaults to min-width:auto, so it
+        refuses to shrink below its widest content -- here the rate table's
+        min-w-[36rem]. That stretched the column past a phone viewport and put a
+        horizontal scrollbar on the whole page, which also defeated the
+        overflow-x-auto on TableWrap: it cannot scroll content that has already
+        stretched its own ancestor. With min-w-0 the column shrinks and the
+        table scrolls inside its card, which is the intended behaviour.
+      */}
       <div className="grid gap-5 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
+        <div className="min-w-0 space-y-5 lg:col-span-2">
           <Card title="Spaces">
             <TableWrap>
               <Table>
@@ -145,20 +178,20 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
                   <Table>
                     <thead>
                       <tr>
-                        <Th>Use</Th>
                         <Th>Requester type</Th>
+                        <Th>Applies to</Th>
                         <Th className="text-right">Hourly</Th>
                         <Th className="text-right">Full day</Th>
                       </tr>
                     </thead>
                     <tbody>
-                      {publishedRates.map((rate) => (
-                        <tr key={rate.id}>
-                          <Td>{ACTIVITY_LABELS[rate.activityType]}</Td>
-                          <Td>{RATE_TIER_LABELS[rate.rateTier]}</Td>
-                          <Td className="text-right font-mono">{formatMoney(rate.hourlyCents)}</Td>
+                      {rateRows.map((row) => (
+                        <tr key={row.key}>
+                          <Td>{RATE_TIER_LABELS[row.tier]}</Td>
+                          <Td>{row.appliesTo ?? "Any external use"}</Td>
+                          <Td className="text-right font-mono">{formatMoney(row.hourlyCents)}</Td>
                           <Td className="text-right font-mono">
-                            {rate.flatDayCents ? formatMoney(rate.flatDayCents) : "—"}
+                            {row.flatDayCents ? formatMoney(row.flatDayCents) : "—"}
                           </Td>
                         </tr>
                       ))}
@@ -207,7 +240,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
           </Card>
         </div>
 
-        <aside className="space-y-5">
+        <aside className="min-w-0 space-y-5">
           <Card title="At a glance">
             <div className="flex flex-wrap gap-2">
               <Badge>{facility.indoor ? "Indoor" : "Outdoor"}</Badge>

@@ -35,15 +35,23 @@ export function AppShell({ user, children }: { user: CurrentUser; children: Reac
       <header className="bg-navy-800 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-            <Link href="/" className="flex items-center gap-2">
+            {/*
+              The mark carries the school's initials and the wordmark carries
+              the descriptor, so the two never repeat each other. A mark reading
+              "OL" beside a wordmark reading "OLSM" ran together as "OLOLSM"
+              wherever the text was read rather than laid out -- plain-text
+              extraction, a failed stylesheet, an email client. The mark is
+              decorative; the link carries its own accessible name.
+            */}
+            <Link href="/" aria-label="OLSM Athletics, facility scheduling home" className="flex items-center gap-2">
               <span
                 aria-hidden
-                className="grid h-8 w-8 place-items-center rounded bg-gold-400 text-sm font-bold text-navy-900"
+                className="grid h-8 place-items-center rounded bg-gold-400 px-1.5 text-sm font-bold text-navy-900"
               >
-                OL
+                OLSM
               </span>
-              <span className="text-sm font-semibold leading-tight">
-                OLSM Athletics
+              <span aria-hidden className="text-sm font-semibold leading-tight">
+                Athletics
                 <span className="block text-xs font-normal text-navy-200">Facility scheduling</span>
               </span>
             </Link>
@@ -106,14 +114,20 @@ export function PublicShell({ children }: { children: ReactNode }) {
       </a>
       <header className="bg-navy-800 text-white">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <Link href="/facilities" className="flex items-center gap-2">
+          <Link
+            href="/facilities"
+            aria-label="OLSM Athletic Facilities home"
+            className="flex items-center gap-2"
+          >
             <span
               aria-hidden
-              className="grid h-8 w-8 place-items-center rounded bg-gold-400 text-sm font-bold text-navy-900"
+              className="grid h-8 place-items-center rounded bg-gold-400 px-1.5 text-sm font-bold text-navy-900"
             >
-              OL
+              OLSM
             </span>
-            <span className="text-sm font-semibold">OLSM Athletic Facilities</span>
+            <span aria-hidden className="text-sm font-semibold">
+              Athletic Facilities
+            </span>
           </Link>
           <nav aria-label="Public" className="flex gap-3 text-sm">
             <Link href="/facilities" className="hover:underline">
