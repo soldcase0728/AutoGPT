@@ -79,6 +79,52 @@ test.describe("head coach quick-book", () => {
     await expect(page.getByText("This slot is held, not confirmed")).toBeVisible();
   });
 
+  /**
+   * Repeating an earlier booking: one click from the Book again list should
+   * carry the space, activity, title and time across, leaving only the date to
+   * think about. The repeat is filed against a fresh slot here so the two
+   * browser projects do not contend for the same next-weekday slot.
+   */
+  test("repeats an earlier practice from one click", async ({ page }, testInfo) => {
+    const original = slot(testInfo, 8);
+
+    await signIn(page, USERS.headCoach);
+    await page.goto("/book");
+    await fillBookingForm(page, {
+      activity: "In-season team practice",
+      space: "Rakoczy Gymnasium — Court 2",
+      title: "E2E repeatable practice",
+      ...original,
+    });
+    await page.getByRole("button", { name: "Request booking" }).click();
+    await expect(page.getByText("Confirmed. It is on the facility calendar now.")).toBeVisible();
+
+    // Land on /book fresh, so the list reflects the booking just made.
+    await page.goto("/book");
+    await page.reload();
+    await page.getByRole("link", { name: /E2E repeatable practice/ }).first().click();
+
+    // Everything except the date came across.
+    await expect(page.getByLabel("Title")).toHaveValue("E2E repeatable practice");
+    await expect(page.getByLabel("Start")).toHaveValue(original.start);
+    await expect(page.getByLabel("End")).toHaveValue(original.end);
+    await expect(page.getByLabel("Activity type")).toHaveValue("TEAM_PRACTICE");
+    const space = await page.getByLabel("Space").inputValue();
+    expect(space).not.toBe("");
+
+    // The suggested date is the next matching weekday, never one in the past.
+    const suggested = await page.getByLabel("Date").inputValue();
+    expect(suggested >= new Date().toISOString().slice(0, 10)).toBe(true);
+
+    const repeat = slot(testInfo, 9);
+    await page.getByLabel("Date").fill(repeat.date);
+    await page.getByLabel("Start").fill(repeat.start);
+    await page.getByLabel("End").fill(repeat.end);
+    await page.getByRole("button", { name: "Request booking" }).click();
+
+    await expect(page.getByText("Confirmed. It is on the facility calendar now.")).toBeVisible();
+  });
+
   /** The conflict is reported to the person, not just rejected by the database. */
   test("refuses a clashing booking with a readable explanation", async ({ page }, testInfo) => {
     // Both attempts ask for the same slot on purpose.

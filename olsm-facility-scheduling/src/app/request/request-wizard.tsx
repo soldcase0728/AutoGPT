@@ -24,6 +24,26 @@ const initial: RequestFormState = {};
 const STEPS = ["When", "Where", "What", "Who"] as const;
 
 /**
+ * Button labels name the thing on the other side of the click, so a reader
+ * never has to look at the stepper to find out what "Next" would do. The last
+ * one says what submitting actually causes -- the slot is held on submit, not
+ * on approval, and that is the part worth being explicit about.
+ */
+const ADVANCE_LABELS = [
+  "Choose a space",
+  "Describe the event",
+  "Add your contact details",
+] as const;
+
+const BACK_LABELS = [
+  "Back to date and time",
+  "Back to the space",
+  "Back to event details",
+] as const;
+
+const SUBMIT_LABEL = "Submit request and hold this time";
+
+/**
  * Four steps in one form. Keeping it a single form means a half-finished
  * request survives a validation error, and the whole thing works without
  * JavaScript if the steps are all revealed.
@@ -72,23 +92,43 @@ export function RequestWizard({
 
   return (
     <form action={action} className="space-y-5">
-      <ol className="flex flex-wrap gap-2 text-xs" aria-label="Progress">
-        {STEPS.map((label, i) => (
-          <li key={label}>
-            <button
-              type="button"
-              onClick={() => setStep(i)}
-              aria-current={step === i ? "step" : undefined}
-              className={
-                step === i
-                  ? "rounded-full bg-navy-800 px-3 py-1 font-medium text-white"
-                  : "rounded-full bg-navy-100 px-3 py-1 text-navy-700"
-              }
-            >
-              {i + 1}. {label}
-            </button>
-          </li>
-        ))}
+      {/*
+        Three states, and none of them signalled by colour alone: the current
+        step carries aria-current, a step already passed carries a tick and the
+        word "done", and a step not yet reached says so. Screen readers get the
+        state in the button's own name rather than from the styling.
+      */}
+      <ol className="flex flex-wrap gap-2 text-xs" aria-label="Request steps">
+        {STEPS.map((label, i) => {
+          const isCurrent = step === i;
+          const isDone = i < step;
+          return (
+            <li key={label}>
+              <button
+                type="button"
+                onClick={() => setStep(i)}
+                aria-current={isCurrent ? "step" : undefined}
+                className={
+                  isCurrent
+                    ? "rounded-full bg-navy-800 px-3 py-1 font-medium text-white"
+                    : isDone
+                      ? "rounded-full bg-navy-100 px-3 py-1 font-medium text-navy-800"
+                      : "rounded-full bg-navy-50 px-3 py-1 text-navy-600"
+                }
+              >
+                {isDone && (
+                  <span aria-hidden className="mr-1">
+                    ✓
+                  </span>
+                )}
+                {i + 1}. {label}
+                <span className="sr-only">
+                  {isCurrent ? " — current step" : isDone ? " — done" : " — not started"}
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ol>
 
       {state.error && <Alert tone="danger">{state.error}</Alert>}
@@ -192,16 +232,16 @@ export function RequestWizard({
       <div className="flex flex-wrap items-center gap-2">
         {step > 0 && (
           <Button type="button" variant="secondary" onClick={() => setStep((s) => s - 1)}>
-            Back
+            {BACK_LABELS[step - 1]}
           </Button>
         )}
         {step < STEPS.length - 1 ? (
           <Button type="button" onClick={() => setStep((s) => s + 1)}>
-            Next
+            {ADVANCE_LABELS[step]}
           </Button>
         ) : (
           <Button type="submit" disabled={pending}>
-            {pending ? "Submitting…" : "Submit request"}
+            {pending ? "Submitting and holding your time…" : SUBMIT_LABEL}
           </Button>
         )}
       </div>

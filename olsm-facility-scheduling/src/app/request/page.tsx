@@ -54,14 +54,31 @@ export default async function RequestPage({
     />
   );
 
+  // Deliberately not a decimal list. The form beside this one numbers its own
+  // four steps, and a second list numbered from 1 sitting next to it made
+  // "step 3" mean two different things on one screen. This is the path a
+  // request travels after the form is done, so it reads as stages rather than
+  // as steps the reader is being asked to take now.
+  const stages = [
+    ["Submitted", "The slot is checked for conflicts and held for you straight away."],
+    ["Under review", "The athletic office approves or declines the request."],
+    ["Agreement and waiver", "You sign a facility use agreement and a liability waiver."],
+    ["Insurance", "You upload a certificate valid through the date of your booking."],
+    ["Payment", "You pay the invoice."],
+    ["Confirmed", "The booking is confirmed only once everything above is complete."],
+  ] as const;
+
   const intro = (
-    <Card title="How an outside request works">
-      <ol className="list-inside list-decimal space-y-1 text-sm text-navy-700">
-        <li>Tell us what you need and when. The slot is checked for conflicts immediately.</li>
-        <li>The athletic office reviews and approves or declines the request.</li>
-        <li>You sign a facility use agreement and a liability waiver.</li>
-        <li>You upload a certificate of insurance valid through the date of your booking.</li>
-        <li>You pay the invoice. The booking is confirmed only after all of the above.</li>
+    <Card title="How a request becomes a booking">
+      <ol className="space-y-2 text-sm text-navy-700">
+        {stages.map(([stage, detail]) => (
+          <li key={stage} className="flex gap-2">
+            <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-navy-400" />
+            <span>
+              <span className="font-medium text-navy-900">{stage}</span> — {detail}
+            </span>
+          </li>
+        ))}
       </ol>
       <p className="mt-3 text-sm text-navy-700">
         Your slot is held from the moment you submit, so nobody else can take it while the paperwork

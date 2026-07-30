@@ -96,10 +96,24 @@ test.describe("public pages", () => {
   test("an outside group can start a request with no account", async ({ page }) => {
     await page.goto("/request");
     await expect(page.getByRole("heading", { name: "Request a facility" })).toBeVisible();
-    await expect(page.getByText("How an outside request works")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "How a request becomes a booking" }),
+    ).toBeVisible();
 
-    // The wizard advances without requiring a login.
-    await page.getByRole("button", { name: "Next" }).click();
+    // Each button names the step it leads to, rather than saying "Next", so the
+    // label alone tells the reader what the click does.
+    await page.getByRole("button", { name: "Choose a space" }).click();
     await expect(page.getByLabel("Facility and space")).toBeVisible();
+
+    await page.getByRole("button", { name: "Describe the event" }).click();
+    await expect(page.getByLabel("Type of use")).toBeVisible();
+
+    await page.getByRole("button", { name: "Add your contact details" }).click();
+    await expect(page.getByLabel("Email address")).toBeVisible();
+
+    // The last action says what submitting actually causes.
+    await expect(
+      page.getByRole("button", { name: "Submit request and hold this time" }),
+    ).toBeVisible();
   });
 });

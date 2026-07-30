@@ -38,6 +38,8 @@ export function QuickBookForm({
   defaultEndTime,
   defaultSportId,
   defaultTeamLevel,
+  defaultActivityType,
+  defaultTitle,
   isAdmin,
 }: {
   spaces: SpaceOption[];
@@ -51,11 +53,19 @@ export function QuickBookForm({
   defaultEndTime?: string;
   defaultSportId?: string;
   defaultTeamLevel?: TeamLevel;
+  /** Prefilled when repeating an earlier booking. */
+  defaultActivityType?: ActivityType;
+  defaultTitle?: string;
   isAdmin: boolean;
 }) {
   const [state, action, pending] = useActionState(createBookingAction, initial);
   const [activityType, setActivityType] = useState<ActivityType>(
-    activities.find((a) => a.value === ActivityType.TEAM_PRACTICE)?.value ?? activities[0]?.value,
+    // A repeat carries the earlier booking's activity; otherwise the common
+    // case is an in-season practice.
+    (defaultActivityType && activities.some((a) => a.value === defaultActivityType)
+      ? defaultActivityType
+      : activities.find((a) => a.value === ActivityType.TEAM_PRACTICE)?.value) ??
+      activities[0]?.value,
   );
   const [subSpaceId, setSubSpaceId] = useState(defaultSubSpaceId ?? spaces[0]?.id ?? "");
   const [showDetails, setShowDetails] = useState(false);
@@ -173,6 +183,7 @@ export function QuickBookForm({
           name="title"
           required
           minLength={3}
+          defaultValue={defaultTitle}
           placeholder="Boys Basketball practice"
           className={inputClass}
         />
