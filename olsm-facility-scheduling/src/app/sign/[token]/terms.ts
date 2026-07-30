@@ -26,5 +26,5 @@ export const WAIVER_TERMS: string[] = [
   "Condition of the facility. I will inspect the space before use and will not use it if it appears unsafe. I will report any damage or hazard to the athletic office immediately.",
   "Insurance. Where required by the booking, I confirm that current general liability insurance is in force naming the school as an additional insured, and that it will remain in force through the date of the booking.",
   "Minors. If any participant is under 18, this release must be signed by that participant's parent or legal guardian.",
-  "Medical treatment. I authorise the school to arrange emergency medical care if needed and accept responsibility for the cost of that care.",
+  "Medical treatment. I authorize the school to arrange emergency medical care if needed and accept responsibility for the cost of that care.",
 ];

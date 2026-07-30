@@ -1,10 +1,10 @@
 /**
  * Security deposits.
  *
- * A deposit is an *authorisation*, not a charge. Stripe holds the funds with
+ * A deposit is an *authorization*, not a charge. Stripe holds the funds with
  * `capture_method: manual`; after the rental the hold is either released
  * (nothing taken, no refund needed, no card-fee churn) or partially captured up
- * to the authorised amount for damage or unreturned equipment.
+ * to the authorized amount for damage or unreturned equipment.
  *
  * Charging and refunding instead would cost the school processing fees on money
  * it never meant to keep, and would put a real debit on a customer's statement
@@ -83,12 +83,12 @@ export async function holdDeposit(
   const customerId = invoice.booking.organization?.stripeCustomerId;
   if (!customerId) {
     throw new ValidationError(
-      "No Stripe customer on file for this organisation, so a deposit cannot be authorised.",
+      "No Stripe customer on file for this organization, so a deposit cannot be authorized.",
     );
   }
 
   if (!stripeConfigured()) {
-    throw new ValidationError("Stripe is not configured; deposits cannot be authorised.");
+    throw new ValidationError("Stripe is not configured; deposits cannot be authorized.");
   }
 
   const intent = await authorizeDeposit({
@@ -189,7 +189,7 @@ export async function captureHeldDeposit(
   if (amountCents <= 0) throw new ValidationError("Enter an amount greater than zero.");
   if (amountCents > invoice.depositCents) {
     throw new ValidationError(
-      `You cannot capture more than the ${formatMoney(invoice.depositCents)} that was authorised.`,
+      `You cannot capture more than the ${formatMoney(invoice.depositCents)} that was authorized.`,
     );
   }
 
@@ -218,7 +218,7 @@ export async function captureHeldDeposit(
     actorLabel: actor.name,
     reason,
     payload: {
-      authorisedCents: invoice.depositCents,
+      authorizedCents: invoice.depositCents,
       capturedCents: amountCents,
       releasedCents: invoice.depositCents - amountCents,
       intentId: invoice.depositIntentId,
@@ -256,7 +256,7 @@ export async function depositsAwaitingResolution(now: Date = new Date()) {
     orderBy: { createdAt: "asc" },
   });
 
-  // A Stripe authorisation lapses on its own after about seven days, so an
+  // A Stripe authorization lapses on its own after about seven days, so an
   // unresolved hold is a deadline, not just untidiness.
   return invoices.filter((invoice) => invoice.depositResolvedAt === null);
 }

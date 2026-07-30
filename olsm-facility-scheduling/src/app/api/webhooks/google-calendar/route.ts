@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   // The token is a shared secret set when the channel was created.
   if (!env.google.calendarWebhookToken || token !== env.google.calendarWebhookToken) {
-    return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   // "sync" is the handshake Google sends when a channel opens; nothing changed.

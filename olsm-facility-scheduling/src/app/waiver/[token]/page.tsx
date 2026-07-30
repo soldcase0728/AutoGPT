@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Sign a waiver", robots: { index: fal
 
 /**
  * The shared participant link. One URL per booking, handed out by the
- * organiser; each person who opens it signs for themselves.
+ * organizer; each person who opens it signs for themselves.
  *
  * Unauthenticated by design — a parent dropping a child at a Saturday clinic is
  * never going to have an account. The token is the credential, and it exposes
@@ -51,14 +51,14 @@ export default async function PublicWaiverPage({
               </span>
               <span className="block">{formatRange(booking.startAt, booking.endAt)}</span>
               {booking.organization && booking.organization.type !== "INTERNAL" && (
-                <span className="block">Organised by {booking.organization.name}</span>
+                <span className="block">Organized by {booking.organization.name}</span>
               )}
             </>
           }
         >
           {cancelled ? (
             <Alert tone="warn" title="This activity is not going ahead">
-              The booking was cancelled, so no waiver is needed. Check with the organiser.
+              The booking was cancelled, so no waiver is needed. Check with the organizer.
             </Alert>
           ) : finished ? (
             <Alert tone="warn" title="This activity has finished">

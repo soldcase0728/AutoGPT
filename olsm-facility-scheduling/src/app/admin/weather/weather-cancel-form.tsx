@@ -40,7 +40,7 @@ export function WeatherCancelForm({
       <Field
         label="Conditions"
         htmlFor="reason"
-        hint="This exact wording is sent to every organiser by email and text."
+        hint="This exact wording is sent to every organizer by email and text."
       >
         <input
           id="reason"

@@ -70,7 +70,7 @@ describe("participant waivers", () => {
     return { booking: result.booking, coach };
   }
 
-  it("collects a signature per participant, not just from the organiser", async () => {
+  it("collects a signature per participant, not just from the organizer", async () => {
     const { booking, coach } = await clinicBooking(1);
 
     await addRoster(
@@ -281,7 +281,7 @@ describe("security deposits", () => {
     );
 
     const invoice = await db.invoice.findFirstOrThrow({ where: { bookingId: result.booking.id } });
-    // Stripe is not configured in tests, so stand in for the authorisation.
+    // Stripe is not configured in tests, so stand in for the authorization.
     await db.invoice.update({
       where: { id: invoice.id },
       data: { depositIntentId: "pi_test_hold" },
@@ -327,7 +327,7 @@ describe("security deposits", () => {
     expect(entry.reason).toMatch(/wall pads/);
   });
 
-  it("will not capture more than was authorised", async () => {
+  it("will not capture more than was authorized", async () => {
     const { invoiceId, admin } = await rentalWithDeposit(10);
     const status = await depositStatus(invoiceId);
 

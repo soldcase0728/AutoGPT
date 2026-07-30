@@ -75,7 +75,7 @@ export default async function RequestPage({
       <AppShell user={user}>
         <PageHeader
           title="Request a facility"
-          description="For club, travel, private-instruction and outside-organisation use."
+          description="For club, travel, private-instruction and outside-organization use."
         />
         <div className="grid gap-5 lg:grid-cols-3">
           <div className="lg:col-span-2">
@@ -91,7 +91,7 @@ export default async function RequestPage({
     <PublicShell>
       <PageHeader
         title="Request a facility"
-        description="Clubs, travel teams and outside organisations. No OLSM account needed to start."
+        description="Clubs, travel teams and outside organizations. No OLSM account needed to start."
       />
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">

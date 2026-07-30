@@ -39,7 +39,8 @@ export default async function RatesPage({
       <div className="mb-5">
         <Alert tone="warn" title="Every figure below is a placeholder">
           The seeded rates are illustrative only. Set real numbers with the athletic office and the
-          business office before the system takes a single external booking — see DECISIONS.md.
+          business office before the system takes a single external booking. Editing them here takes
+          effect immediately; no deployment is needed.
         </Alert>
       </div>
 

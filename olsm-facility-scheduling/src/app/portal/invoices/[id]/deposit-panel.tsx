@@ -47,7 +47,7 @@ export function DepositPanel({
   if (deposit.state === "captured") {
     return (
       <Alert tone="warn" title={`${deposit.capturedFormatted} retained`}>
-        <p>Of the {deposit.amountFormatted} authorised, {deposit.capturedFormatted} was captured.</p>
+        <p>Of the {deposit.amountFormatted} authorized, {deposit.capturedFormatted} was captured.</p>
         {deposit.captureReason && <p className="mt-1 italic">“{deposit.captureReason}”</p>}
       </Alert>
     );
@@ -55,7 +55,7 @@ export function DepositPanel({
 
   if (deposit.state === "pending") {
     return (
-      <Alert tone="info" title="Deposit not yet authorised">
+      <Alert tone="info" title="Deposit not yet authorized">
         A {deposit.amountFormatted} hold is due on this rental. It is placed once a payment method
         is on file.
       </Alert>
@@ -73,7 +73,7 @@ export function DepositPanel({
         </Badge>
         {deposit.awaitingResolution && (
           <span className="text-xs text-gold-900">
-            The rental is over — resolve this before the authorisation lapses.
+            The rental is over — resolve this before the authorization lapses.
           </span>
         )}
       </div>

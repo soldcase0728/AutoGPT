@@ -129,7 +129,7 @@ export default async function WeatherPage({
                     Cancels all {impacted.length} bookings, refunds{" "}
                     {totalPaid > 0 ? formatMoney(totalPaid) : "nothing (none are paid)"} in full
                     regardless of the usual cancellation window, removes them from the facility
-                    calendar, emails every organiser and texts the {reachableBySms} who have opted
+                    calendar, emails every organizer and texts the {reachableBySms} who have opted
                     into SMS. It cannot be undone in one action — restoring means rebooking each
                     group.
                   </Alert>

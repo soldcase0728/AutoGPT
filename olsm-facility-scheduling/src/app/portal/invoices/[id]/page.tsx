@@ -91,7 +91,7 @@ export default async function InvoicePage({
                         {li.label}
                         {li.kind === "deposit" && (
                           <span className="block text-xs text-navy-600">
-                            Held as an authorisation, not charged. Released after the rental unless
+                            Held as an authorization, not charged. Released after the rental unless
                             there is damage or unreturned equipment.
                           </span>
                         )}
@@ -169,7 +169,7 @@ export default async function InvoicePage({
                     ? `Your ${formatMoney(deposit.amountCents)} deposit was released without charge.`
                     : deposit.state === "captured"
                       ? `${formatMoney(deposit.capturedCents)} of your ${formatMoney(deposit.amountCents)} deposit was retained. ${invoice.depositCaptureReason ?? ""}`
-                      : `A ${formatMoney(deposit.amountCents)} refundable deposit is held as an authorisation on your card. It is not charged, and is released after the rental unless there is damage.`}
+                      : `A ${formatMoney(deposit.amountCents)} refundable deposit is held as an authorization on your card. It is not charged, and is released after the rental unless there is damage.`}
                 </p>
               )}
             </Card>

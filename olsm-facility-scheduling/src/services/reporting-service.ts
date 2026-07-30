@@ -2,7 +2,7 @@
  * Reporting.
  *
  * The headline number is revenue captured from non-team use, broken down by
- * facility, activity type and organisation -- that is the metric the whole
+ * facility, activity type and organization -- that is the metric the whole
  * project is justified by, so it gets a first-class query rather than being
  * assembled in the UI.
  */

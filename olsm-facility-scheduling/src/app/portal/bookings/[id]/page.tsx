@@ -66,8 +66,8 @@ export default async function BookingDetailPage({
 
   const invoice = booking.invoices[0];
   // Participant waivers are managed in their own panel; this list is the
-  // paperwork the organiser personally owes.
-  const organiserDocuments = booking.documents.filter((d) => !d.isParticipant);
+  // paperwork the organizer personally owes.
+  const organizerDocuments = booking.documents.filter((d) => !d.isParticipant);
   const lineItems = (invoice?.lineItems as unknown as LineItem[]) ?? [];
   const snapshot = (booking.requirements?.ruleSnapshot ?? {}) as {
     refundFullDays?: number;
@@ -100,7 +100,7 @@ export default async function BookingDetailPage({
               />
               <Detail label="Activity" value={ACTIVITY_LABELS[booking.activityType]} />
               <Detail label="Sport" value={booking.sport?.name ?? "—"} />
-              <Detail label="Organisation" value={booking.organization?.name ?? "—"} />
+              <Detail label="Organization" value={booking.organization?.name ?? "—"} />
               <Detail label="Headcount" value={booking.headcount || "—"} />
               <Detail label="Supervisor" value={booking.supervisor?.name ?? "—"} />
               <Detail label="Created" value={formatDateTime(booking.createdAt)} />
@@ -129,13 +129,13 @@ export default async function BookingDetailPage({
           </Card>
 
           <Card title="Documents">
-            {organiserDocuments.length === 0 ? (
+            {organizerDocuments.length === 0 ? (
               <EmptyState title="No documents required">
                 Routine team activity is covered by the Annual Coach Agreement.
               </EmptyState>
             ) : (
               <ul className="divide-y divide-navy-100">
-                {organiserDocuments.map((doc) => (
+                {organizerDocuments.map((doc) => (
                   <li key={doc.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{DOCUMENT_LABELS[doc.type]}</p>
@@ -234,7 +234,7 @@ export default async function BookingDetailPage({
                           {li.label}
                           {li.kind === "deposit" && (
                             <span className="block text-xs text-navy-600">
-                              Authorised only; released after the rental unless there is damage.
+                              Authorized only; released after the rental unless there is damage.
                             </span>
                           )}
                         </Td>

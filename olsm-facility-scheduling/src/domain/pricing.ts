@@ -135,7 +135,7 @@ export function quote(input: QuoteInput): Quote {
 
   if (depositCents > 0) {
     lineItems.push({
-      label: "Refundable security deposit (authorised, not captured)",
+      label: "Refundable security deposit (authorized, not captured)",
       quantity: 1,
       unitAmountCents: depositCents,
       amountCents: depositCents,
@@ -147,7 +147,7 @@ export function quote(input: QuoteInput): Quote {
     lineItems,
     subtotalCents,
     depositCents,
-    // The deposit is authorised separately, so it is not part of the charge.
+    // The deposit is authorized separately, so it is not part of the charge.
     totalCents: subtotalCents,
     billedHours,
     rateCardId: card.id,
@@ -167,8 +167,8 @@ function formatHours(hours: number): string {
 /**
  * Which rate tier a booking is billed at.
  *
- * The requester's organisation is the usual answer, but not for paid personal
- * use of school property. A head coach belongs to the INTERNAL organisation and
+ * The requester's organization is the usual answer, but not for paid personal
+ * use of school property. A head coach belongs to the INTERNAL organization and
  * would otherwise be billed $0 for the Saturday skills clinic they charge
  * families for -- which is exactly the leakage this system exists to close. For
  * PRIVATE_INSTRUCTION and EXTERNAL_RENTAL the internal tier is never available;

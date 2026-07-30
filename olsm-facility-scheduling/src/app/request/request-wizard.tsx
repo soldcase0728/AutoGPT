@@ -176,7 +176,7 @@ export function RequestWizard({
             <Field label="Mobile number" htmlFor="phone" hint="Used for weather cancellations and day-before reminders.">
               <input id="phone" name="phone" type="tel" autoComplete="tel" className={inputClass} />
             </Field>
-            <Field label="Organisation" htmlFor="organization" hint="Leave blank if you are booking as an individual.">
+            <Field label="Organization" htmlFor="organization" hint="Leave blank if you are booking as an individual.">
               <input id="organization" name="organization" className={inputClass} />
             </Field>
           </>

@@ -114,7 +114,7 @@ export default async function ReportsPage({
           />
         </Card>
 
-        <Card title="Revenue by organisation">
+        <Card title="Revenue by organization">
           <RevenueTable rows={revenue.byOrganization} emptyLabel="No paid bookings in this range." />
         </Card>
 

@@ -141,9 +141,12 @@ const FACILITIES: FacilitySeed[] = [
     externallyBookable: true,
     weatherDependent: true,
     // [DECIDE] Confirm the real sub-space names with the athletic office.
+    // Facility descriptions are public. Say what a reader needs to know -- that
+    // the field names may not match what they are called on campus -- without
+    // naming an internal document they cannot open.
     description:
-      "Multi-field outdoor complex. Sub-space names below are placeholders pending confirmation " +
-      "by the athletic office (see DECISIONS.md).",
+      "Multi-field outdoor complex. Field names here may differ from the names used on campus; " +
+      "the athletic office will confirm the specific field when it reviews your request.",
     amenities: ["Multiple fields", "Baseball/softball diamonds", "Parking"],
     subSpaces: [
       { name: "Whole complex", slug: "whole", capacity: 800, blocks: ["field-1", "field-2", "field-3", "diamond-1", "diamond-2"] },
@@ -167,8 +170,8 @@ const FACILITIES: FacilitySeed[] = [
     externallyBookable: false,
     description:
       "Rowing facility with water access. Water-safety rules apply and a supervision-qualified " +
-      "coach must be named on every booking. Sub-space names are placeholders pending " +
-      "confirmation (see DECISIONS.md).",
+      "coach must be named on every booking. Space names here may differ from the names used on " +
+      "campus; the athletic office will confirm the specific space when it reviews your request.",
     amenities: ["Boat bay", "Ergometers", "Dock access"],
     subSpaces: [
       { name: "Boat bay", slug: "boat-bay", capacity: 30 },

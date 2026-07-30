@@ -6,7 +6,7 @@
  * exposed to. This module collects one signed waiver per participant, by either
  * of the two routes the brief allows:
  *
- *   1. Roster upload  -- the organiser pastes or uploads names and emails, and
+ *   1. Roster upload  -- the organizer pastes or uploads names and emails, and
  *      each participant gets their own signing link.
  *   2. Public link    -- one unguessable URL per booking that participants open
  *      and sign themselves.
@@ -82,7 +82,7 @@ export interface RosterEntry {
 
 /**
  * Parse a pasted or uploaded roster. Accepts CSV or one-per-line, with an
- * optional header. Tolerant on purpose -- an organiser pasting from a
+ * optional header. Tolerant on purpose -- an organizer pasting from a
  * spreadsheet should not have to fight a format.
  *
  * Columns: name, email, minor (yes/no), guardian name, guardian email
@@ -399,7 +399,7 @@ export async function bookingsMissingWaivers(withinHours = 72, now: Date = new D
     .filter((row) => row.missing > 0);
 }
 
-/** Nudge organisers whose events are close and whose rosters are short. */
+/** Nudge organizers whose events are close and whose rosters are short. */
 export async function sendWaiverReminders(withinHours = 72): Promise<number> {
   const rows = await bookingsMissingWaivers(withinHours);
   let sent = 0;

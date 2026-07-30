@@ -75,7 +75,7 @@ export default async function FacilitiesPage() {
       <div className="mt-6">
         <Card title="Want to book one of these?">
           <p className="text-sm text-navy-700">
-            Outside organisations, clubs and travel teams can submit a request without an OLSM
+            Outside organizations, clubs and travel teams can submit a request without an OLSM
             account. Requests go through approval, a facility use agreement, a liability waiver, a
             certificate of insurance and payment before they are confirmed.
           </p>

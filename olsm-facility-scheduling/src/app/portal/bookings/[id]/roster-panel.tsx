@@ -21,7 +21,7 @@ export interface RosterParticipant {
 }
 
 /**
- * Two ways in, because organisers differ: a club with a spreadsheet pastes a
+ * Two ways in, because organizers differ: a club with a spreadsheet pastes a
  * roster, a Saturday clinic hands out a link at the door.
  */
 export function RosterPanel({

@@ -27,7 +27,7 @@ async function actorFor(bookingId: string): Promise<Actor> {
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
   if (!booking) throw new Error("Booking not found.");
 
-  // Only the organiser or an administrator manages a roster.
+  // Only the organizer or an administrator manages a roster.
   if (booking.requesterId !== user.id && !isAdmin(user.role)) {
     throw new Error("You cannot manage the roster for that booking.");
   }

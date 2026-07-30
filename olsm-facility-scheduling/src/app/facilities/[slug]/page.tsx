@@ -36,7 +36,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
   const now = new Date();
   const horizon = new Date(now.getTime() + 14 * 86_400_000);
 
-  // A public availability preview: times and space only, no requester details.
+  // What the public may see: times and space only, never requester details.
   const upcoming = await prisma.booking.findMany({
     where: {
       subSpace: { facilityId: facility.id },
@@ -47,6 +47,40 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
     orderBy: { startAt: "asc" },
     take: 60,
   });
+
+  // Closures matter as much as bookings: a facility shut for maintenance is not
+  // open, and showing only bookings would imply it is. The reason text is
+  // admin-entered and may name people or internal detail, so it is never shown
+  // here -- only that the space is closed.
+  const closures = await prisma.blackout.findMany({
+    where: {
+      OR: [{ facilityId: facility.id }, { subSpace: { facilityId: facility.id } }],
+      startAt: { lt: horizon },
+      endAt: { gt: now },
+    },
+    include: { subSpace: true },
+    orderBy: { startAt: "asc" },
+    take: 60,
+  });
+
+  // One list, ordered by time, so a reader sees the whole committed picture
+  // rather than two half-pictures they have to merge themselves.
+  const committed = [
+    ...upcoming.map((b) => ({
+      id: b.id,
+      startAt: b.startAt,
+      endAt: b.endAt,
+      space: b.subSpace.name,
+      label: "Booked" as const,
+    })),
+    ...closures.map((c) => ({
+      id: c.id,
+      startAt: c.startAt,
+      endAt: c.endAt,
+      space: c.subSpace?.name ?? "Whole facility",
+      label: "Closed" as const,
+    })),
+  ].sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
   const hours = parseDefaultHours(facility.defaultHours);
   const days: WeekdayKeyList = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -141,21 +175,29 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
           </Card>
 
           <Card
-            title="Availability preview"
-            description="Confirmed bookings over the next two weeks. Anything not listed is potentially open."
+            title="Committed time, next two weeks"
+            description="Bookings and closures already on the schedule. This is not the full availability picture — school priority, setup and teardown buffers, and held time are applied when you check a specific date and time."
           >
-            {upcoming.length === 0 ? (
-              <EmptyState title="Nothing booked in the next two weeks" />
+            {committed.length === 0 ? (
+              <EmptyState title="Nothing on the schedule in the next two weeks" />
             ) : (
               <ul className="divide-y divide-navy-100">
-                {upcoming.map((booking) => (
-                  <li key={booking.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
-                    <span className="text-navy-700">{formatRange(booking.startAt, booking.endAt)}</span>
-                    <span className="text-navy-600">{booking.subSpace.name}</span>
+                {committed.map((entry) => (
+                  <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                    <span className="text-navy-700">{formatRange(entry.startAt, entry.endAt)}</span>
+                    <span className="flex items-center gap-2 text-navy-600">
+                      {entry.space}
+                      <Badge tone={entry.label === "Closed" ? "warn" : undefined}>{entry.label}</Badge>
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
+            <p className="mt-3 text-sm">
+              <Link href={`/request?facility=${facility.slug}`} className="font-medium text-navy-800 underline">
+                Check a specific date and time
+              </Link>
+            </p>
             <p className="mt-3 text-xs text-navy-600">
               Subscribe to this facility&apos;s calendar:{" "}
               <Link href={`/api/feeds/${facility.slug}.ics`} className="underline">

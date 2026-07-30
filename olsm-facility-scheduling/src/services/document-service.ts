@@ -40,7 +40,7 @@ export async function prepareBookingDocuments(
 
   for (const type of types) {
     if (type === DocumentType.CERTIFICATE_OF_INSURANCE) {
-      // A COI already on file for the organisation satisfies the gate; do not
+      // A COI already on file for the organization satisfies the gate; do not
       // ask a club for the same certificate every booking.
       const existing = await prisma.document.findFirst({
         where: {
@@ -303,7 +303,7 @@ export async function uploadCertificateOfInsurance(params: {
   });
 
   if (target.organizationId) {
-    // Denormalised onto the organisation so the expiry sweep is a single query.
+    // Denormalised onto the organization so the expiry sweep is a single query.
     await prisma.organization.update({
       where: { id: target.organizationId },
       data: { coiDocumentId: target.id, coiExpiresAt: expiresAt },
@@ -388,9 +388,14 @@ export async function staffMissingAgreements(now: Date = new Date()) {
   });
 }
 
+// Shown to renters on the document checklist and the insurance upload screen.
+// Keep it addressed to the person uploading a certificate: what the coverage
+// must say and whose name must appear on it. The specific limits are set by the
+// school's carrier and counsel and are recorded in the internal open-decisions
+// notes -- do not name that file, or any other internal document, here.
 export const INSURANCE_REQUIREMENT_TEXT =
   "Commercial general liability naming Orchard Lake St. Mary's Preparatory as an " +
-  "additional insured. Limits to be confirmed with the school's carrier and counsel " +
-  "before launch (see DECISIONS.md).";
+  "additional insured, in force for the full date of your event. The athletic " +
+  "office will confirm the required limits when it reviews your request.";
 
 export { DOCUMENT_LABELS };

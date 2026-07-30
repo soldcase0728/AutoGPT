@@ -3,7 +3,7 @@
  *
  * No card data ever touches this application: the requester is sent to Stripe
  * Checkout and comes back with a session id. Security deposits use a
- * manual-capture PaymentIntent so the authorisation can simply be released
+ * manual-capture PaymentIntent so the authorization can simply be released
  * after the rental instead of being charged and refunded.
  */
 
@@ -141,7 +141,7 @@ export async function createCheckoutSession(params: {
   return { id: session.id, url: session.url, paymentIntentId: session.payment_intent };
 }
 
-/** Manual-capture authorisation for a refundable security deposit. */
+/** Manual-capture authorization for a refundable security deposit. */
 export async function authorizeDeposit(params: {
   invoiceId: string;
   amountCents: number;
@@ -164,7 +164,7 @@ export async function authorizeDeposit(params: {
   );
 }
 
-/** Release a deposit authorisation without charging it. */
+/** Release a deposit authorization without charging it. */
 export async function releaseDeposit(paymentIntentId: string): Promise<void> {
   await call(`/payment_intents/${paymentIntentId}/cancel`, {}, `deposit-release:${paymentIntentId}`);
 }

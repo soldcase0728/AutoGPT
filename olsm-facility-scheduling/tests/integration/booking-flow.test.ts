@@ -155,7 +155,7 @@ describe("head coach books private instruction in the same gym", () => {
     expect(await db.bookingOccupancy.count({ where: { bookingId: result.booking.id } })).toBeGreaterThan(0);
 
     // An internal coach doing paid instruction is billed at the commercial rate,
-    // not their organisation's $0 internal rate.
+    // not their organization's $0 internal rate.
     const invoice = await db.invoice.findFirstOrThrow({ where: { bookingId: result.booking.id } });
     expect(invoice.totalCents).toBeGreaterThan(0);
 

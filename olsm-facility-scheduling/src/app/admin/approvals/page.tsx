@@ -109,7 +109,7 @@ export default async function ApprovalsPage() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs uppercase tracking-wide text-navy-600">Organisation</dt>
+                    <dt className="text-xs uppercase tracking-wide text-navy-600">Organization</dt>
                     <dd>{booking.organization?.name ?? "—"}</dd>
                   </div>
                   {booking.headcount > 0 && (

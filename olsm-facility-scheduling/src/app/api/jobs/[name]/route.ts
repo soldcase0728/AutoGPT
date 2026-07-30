@@ -31,7 +31,7 @@ import { enqueue } from "@/services/job-queue";
  */
 export async function POST(request: NextRequest, context: { params: Promise<{ name: string }> }) {
   if (!authorized(request)) {
-    return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   const { name } = await context.params;
@@ -233,7 +233,7 @@ async function warnExpiringCertificates(): Promise<number> {
 }
 
 /**
- * A Stripe authorisation lapses after about a week, so an unresolved deposit is
+ * A Stripe authorization lapses after about a week, so an unresolved deposit is
  * a deadline. Nag until someone releases or captures it.
  */
 async function nudgeUnresolvedDeposits(): Promise<number> {
@@ -251,7 +251,7 @@ async function nudgeUnresolvedDeposits(): Promise<number> {
           `  ${env.appUrl}/portal/invoices/${invoice.id}`,
       )
       .join("\n\n") +
-      "\n\nRelease or capture each one. Stripe authorisations expire on their own after about " +
+      "\n\nRelease or capture each one. Stripe authorizations expire on their own after about " +
       "seven days, which releases the funds without a decision being recorded.",
     `deposits-unresolved:${new Date().toISOString().slice(0, 10)}`,
   );
