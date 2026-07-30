@@ -41,6 +41,10 @@ this directory — Render only looks for it there. It points back here with
    job to the URL Render assigned, then redeploy once so links in emails point
    somewhere real.
 
+Both services take the **same public URL** -- the cron calls the web service
+over HTTPS at its public address, so it wants that, not its own internal Render
+hostname.
+
 **Step 4 is not optional, and the cron job is the reason.** Until `APP_URL` is
 set it has no address to call, so it exits with a clear message every five
 minutes: nothing drains the outbound queue and no expired hold releases its
@@ -284,3 +288,116 @@ If a build does fail, the useful thing to send back is the last twenty lines of
 the output; the step that failed is named in them. If a *container* fails,
 `docker compose -f docker-compose.prod.yml logs --tail=40 app` — the entrypoint
 prints what it rejected and what to do about it.
+
+
+---
+
+## Microsoft Entra ID sign-in and Microsoft Graph mail
+
+One app registration in the OLSM tenant does both jobs: signing staff in, and
+sending mail as one mailbox.
+
+### App registration
+
+1. Entra admin centre → **App registrations** → **New registration**.
+2. Supported account types: **Accounts in this organizational directory only**.
+   This is the setting that matters. It makes the authority tenant-specific, so
+   Microsoft itself refuses personal accounts and other tenants before a token
+   is ever issued. The application checks the `tid` claim as well, but the first
+   line of defence belongs here.
+3. Redirect URI, type **Web**:
+   `https://<your-host>/api/auth/entra/callback`
+4. **Certificates & secrets** → new client secret. Record the expiry; sign-in
+   stops when it lapses.
+5. Copy the directory (tenant) id and application (client) id.
+
+Set on the web service:
+
+```
+ENTRA_TENANT_ID=<directory (tenant) id>
+ENTRA_CLIENT_ID=<application (client) id>
+ENTRA_CLIENT_SECRET=<the secret value, not its id>
+ENTRA_ALLOWED_DOMAINS=olsm.edu
+```
+
+`ENTRA_ALLOWED_DOMAINS` is a second filter on top of the tenant check: a tenant
+can host guest accounts from other domains, and a guest is not an employee.
+
+### Roles
+
+Sign-in never creates an account and never grants a role on its own. An address
+Entra vouches for that has no account here is turned away, because proving who
+you are is not the same as being entitled to book a gym. Accounts are created in
+Admin → People.
+
+To have Entra drive roles, declare **app roles** on the registration and assign
+them in the enterprise application. Recognised values:
+
+| App role | Becomes |
+|---|---|
+| System Administrator | SUPER_ADMIN |
+| Administrator, Athletic Director | FACILITY_ADMIN |
+| Coach, Head Coach | HEAD_COACH |
+| Assistant Coach | ASSISTANT_COACH |
+| Athletic Trainer | TRAINER |
+| Strength Coach | STRENGTH_COACH |
+| Facilities, Maintenance | FACILITIES |
+| Finance, Business Office | FINANCE |
+
+Spacing, case and separators are ignored, so "Athletic Director" and
+`athletic_director` both work. To use existing security groups instead, set
+`ENTRA_GROUP_ROLE_MAP="<group-object-id>=FACILITY_ADMIN,<group-object-id>=FINANCE"`
+and configure the app registration to emit group claims.
+
+A token only ever **raises** somebody's role, never lowers it, and never touches
+an external renter's account. A director whose group membership has not been set
+up yet keeps the role an administrator gave them rather than being demoted to
+coach on every sign-in.
+
+### Mail via Graph
+
+Basic SMTP authentication is not used and is not an option -- Microsoft has
+disabled it for Exchange Online, and it would mean storing a real mailbox
+password.
+
+1. On the same registration: **API permissions** → **Microsoft Graph** →
+   **Application permissions** → `Mail.Send`. Nothing else is needed.
+2. Grant admin consent.
+3. **Restrict it to the one mailbox.** `Mail.Send` granted plainly lets this
+   application send as anybody in the tenant. An application access policy in
+   Exchange Online narrows it:
+
+   ```powershell
+   New-ApplicationAccessPolicy `
+     -AppId <application (client) id> `
+     -PolicyScopeGroupId facilities@olsm.edu `
+     -AccessRight RestrictAccess `
+     -Description "OLSM facility scheduling — send as the facilities mailbox only"
+
+   Test-ApplicationAccessPolicy -Identity facilities@olsm.edu -AppId <client id>
+   ```
+
+Then set:
+
+```
+EMAIL_PROVIDER=graph
+GRAPH_SENDER_MAILBOX=facilities@olsm.edu
+EMAIL_FROM=facilities@olsm.edu
+```
+
+The mailbox comes from configuration, never from the message being sent, so a
+bug elsewhere cannot address the request to a different sender.
+
+### The local fallback
+
+Email-and-password sign-in stays available. Somebody has to be able to get in
+when the tenant is unreachable or a directory change locks staff out. Keep it to
+a small number of accounts, and treat it as a fallback rather than a second
+front door.
+
+### What is never shown to a visitor
+
+Tenant id, client id, client secret, tokens, and provider error text all stay
+server-side. A failed sign-in says only that it failed; detail goes to the log
+and, where there is an identity to attach it to, the audit trail. That includes
+not revealing whether an account exists for a given address.

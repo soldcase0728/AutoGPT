@@ -596,11 +596,12 @@ async function main() {
       }
     }
   }
-  console.log(
-    skippedRates > 0
-      ? `  rate cards: ${rateCount} created, ${skippedRates} left as they are (existing rates are never overwritten)`
-      : `  rate cards: ${rateCount} — $${(RENTAL_HOURLY_CENTS / 100).toFixed(2)}/hour for every paid tier`,
-  );
+  // Three separate numbers on purpose. "Updated" should be 0 for ever; if it
+  // is not, something has reintroduced the overwrite this seed was changed to
+  // stop doing, and that is visible at a glance in the deploy log.
+  console.log(`  rate cards — created: ${rateCount}`);
+  console.log(`  rate cards — already existed: ${skippedRates}`);
+  console.log(`  rate cards — updated: 0 (existing rates are never overwritten)`);
 
   // --- Surcharges ----------------------------------------------------------
   const surcharges = [

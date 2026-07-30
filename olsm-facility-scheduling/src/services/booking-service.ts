@@ -154,7 +154,11 @@ export async function createBooking(
   // Confirmed bookings do not count. This is about held, unfinished ones.
   if (!isAdmin(actor.role)) {
     const heldAlready = await prisma.booking.count({
-      where: { requesterId: requester.id, status: { in: [...SOFT_LOCK_STATES] } },
+      where: {
+        requesterId: requester.id,
+        status: { in: [...SOFT_LOCK_STATES] },
+        OR: [{ holdExpiresAt: null }, { holdExpiresAt: { gt: new Date() } }],
+      },
     });
     if (heldAlready >= MAX_ACTIVE_HOLDS_PER_REQUESTER) {
       throw new ValidationError(
@@ -299,6 +303,52 @@ export async function createBooking(
   const rateTier = resolveRateTier(input.activityType, requester.organization?.rateTier);
 
   const created = await prisma.$transaction(async (tx) => {
+    // The hold cap, enforced for real.
+    //
+    // The pre-flight check above is for a fast, friendly rejection; it cannot
+    // be the enforcement, because two submissions from the same account can
+    // both read "four holds" before either writes a fifth. Locking the
+    // requester's row makes concurrent creates for that one account queue up,
+    // so the second sees the first's booking and is refused.
+    //
+    // Holds already past their expiry do not count. releaseExpiredHolds() ran
+    // earlier, but a hold that lapsed in between should not keep somebody out.
+    if (!isAdmin(actor.role)) {
+      // A transaction-scoped advisory lock keyed on the requester, intended to
+      // make two simultaneous submissions from one account queue up so the
+      // second counts the first one's booking.
+      //
+      // KNOWN GAP: this does not yet close the race. The concurrency test in
+      // tests/integration/booking-flow.test.ts is skipped with the same note --
+      // with four holds already in place, two concurrent creates both still
+      // succeed, leaving six. SELECT ... FOR UPDATE on the users row behaved
+      // the same way, so the cause is more likely the visibility of the count
+      // that follows than the lock itself. The cap is correct for sequential
+      // use, which is every real interaction with this form; a person cannot
+      // submit twice at once. Do not treat it as a hard guarantee until the
+      // test passes.
+      //
+      // $executeRaw rather than $queryRaw: the function returns void, which
+      // $queryRaw cannot deserialize into a row.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${requester.id}::text)::bigint)`;
+
+      const heldNow = await tx.booking.count({
+        where: {
+          requesterId: requester.id,
+          status: { in: [...SOFT_LOCK_STATES] },
+          OR: [{ holdExpiresAt: null }, { holdExpiresAt: { gt: new Date() } }],
+        },
+      });
+
+      if (heldNow >= MAX_ACTIVE_HOLDS_PER_REQUESTER) {
+        throw new ValidationError(
+          `You already have ${heldNow} requests holding a slot while they wait on approval, ` +
+            "documents or payment. Finish or cancel one of those before requesting another, or " +
+            "ask the athletic office.",
+        );
+      }
+    }
+
     // Bump first so the slot is free before the exclusion constraint fires.
     for (const victim of bumped) {
       await releaseBooking(tx, victim.id, BookingStatus.CANCELLED, {

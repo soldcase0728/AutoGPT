@@ -8,6 +8,21 @@ function str(name: string, fallback = ""): string {
   return process.env[name]?.trim() || fallback;
 }
 
+/**
+ * "<guid>=FACILITY_ADMIN,<guid>=FINANCE" into a lookup.
+ *
+ * Unknown role names are dropped rather than throwing: a typo in this variable
+ * should cost that one mapping, not the ability to start the application.
+ */
+function parseGroupRoleMap(raw: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pair of raw.split(",")) {
+    const [id, role] = pair.split("=").map((part) => part.trim());
+    if (id && role) out[id.toLowerCase()] = role.toUpperCase();
+  }
+  return out;
+}
+
 function bool(name: string, fallback = false): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
   if (!raw) return fallback;
@@ -34,6 +49,29 @@ export const env = {
     calendarWebhookToken: str("GOOGLE_CALENDAR_WEBHOOK_TOKEN"),
   },
 
+  /**
+   * Microsoft Entra ID. The tenant id makes the authority tenant-specific,
+   * which is what refuses personal Microsoft accounts and other tenants before
+   * a token is issued at all.
+   */
+  entra: {
+    tenantId: str("ENTRA_TENANT_ID"),
+    clientId: str("ENTRA_CLIENT_ID"),
+    clientSecret: str("ENTRA_CLIENT_SECRET"),
+    /** Guest accounts live in the tenant too; empty means tenant alone decides. */
+    allowedDomains: str("ENTRA_ALLOWED_DOMAINS")
+      .split(",")
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean),
+    /** "<group-object-id>=FACILITY_ADMIN,<group-object-id>=FINANCE" */
+    groupRoleMap: parseGroupRoleMap(str("ENTRA_GROUP_ROLE_MAP")),
+  },
+
+  graph: {
+    /** The one mailbox this application is permitted to send as. */
+    senderMailbox: str("GRAPH_SENDER_MAILBOX"),
+  },
+
   stripe: {
     secretKey: str("STRIPE_SECRET_KEY"),
     webhookSecret: str("STRIPE_WEBHOOK_SECRET"),
@@ -55,7 +93,7 @@ export const env = {
   },
 
   email: {
-    provider: str("EMAIL_PROVIDER", "console") as "sendgrid" | "postmark" | "console",
+    provider: str("EMAIL_PROVIDER", "console") as "graph" | "sendgrid" | "postmark" | "console",
     from: str("EMAIL_FROM", "athletics@olsm.edu"),
     sendgridKey: str("SENDGRID_API_KEY"),
     postmarkToken: str("POSTMARK_SERVER_TOKEN"),
@@ -97,6 +135,9 @@ export const env = {
  * told a document was rejected -- must check this rather than assume delivery.
  */
 export function emailIsDeliverable(): boolean {
+  if (env.email.provider === "graph") {
+    return Boolean(env.entra.tenantId && env.entra.clientId && env.entra.clientSecret && env.graph.senderMailbox);
+  }
   if (env.email.provider === "sendgrid") return Boolean(env.email.sendgridKey);
   if (env.email.provider === "postmark") return Boolean(env.email.postmarkToken);
   return false;

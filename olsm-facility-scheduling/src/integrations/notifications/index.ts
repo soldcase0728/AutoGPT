@@ -7,6 +7,7 @@
  */
 
 import { env } from "@/lib/env";
+import { getGraphAccessToken, graphConfigured } from "@/lib/auth/entra";
 
 export interface EmailMessage {
   to: string;
@@ -29,6 +30,9 @@ export interface DeliveryResult {
 
 export async function sendEmail(message: EmailMessage): Promise<DeliveryResult> {
   switch (env.email.provider) {
+    case "graph":
+      if (!graphConfigured()) break;
+      return sendViaGraph(message);
     case "sendgrid":
       if (!env.email.sendgridKey) break;
       return sendViaSendgrid(message);
@@ -39,6 +43,57 @@ export async function sendEmail(message: EmailMessage): Promise<DeliveryResult> 
       break;
   }
   return consoleEmail(message);
+}
+
+/**
+ * Microsoft Graph, sending as one designated mailbox.
+ *
+ * Application permissions with a client-credentials token, not Basic SMTP
+ * authentication -- which Microsoft has disabled for Exchange Online anyway,
+ * and which would mean storing a password for a real mailbox.
+ *
+ * The permission this needs is Mail.Send. Granted plainly it lets this
+ * application send as anyone in the tenant, so it should be narrowed to the one
+ * mailbox with an application access policy; DEPLOY.md has the command. The
+ * mailbox is named in configuration rather than taken from the message, so a
+ * bug elsewhere cannot address the request to a different sender.
+ */
+async function sendViaGraph(message: EmailMessage): Promise<DeliveryResult> {
+  const token = await getGraphAccessToken();
+  const mailbox = encodeURIComponent(env.graph.senderMailbox);
+
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${mailbox}/sendMail`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      message: {
+        subject: message.subject,
+        body: message.html
+          ? { contentType: "HTML", content: message.html }
+          : { contentType: "Text", content: message.text },
+        toRecipients: [{ emailAddress: { address: message.to } }],
+        ...(message.replyTo
+          ? { replyTo: [{ emailAddress: { address: message.replyTo } }] }
+          : {}),
+      },
+      saveToSentItems: true,
+    }),
+  });
+
+  if (!res.ok) {
+    // Graph error bodies quote the mailbox and the application id. Keep the
+    // status, drop the rest.
+    return {
+      delivered: false,
+      provider: "graph",
+      detail: `Graph sendMail failed (${res.status}).`,
+    };
+  }
+
+  return { delivered: true, provider: "graph" };
 }
 
 async function sendViaSendgrid(message: EmailMessage): Promise<DeliveryResult> {

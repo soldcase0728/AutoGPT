@@ -159,6 +159,9 @@ model User {
   smsOptIn              Boolean   @default(false) @map("sms_opt_in")
   role                  Role
   googleSub             String?   @unique @map("google_sub")
+  /// Entra ID object id. Immutable per user within the tenant, so it survives
+  /// a rename or an address change in a way the email address does not.
+  entraOid              String?   @unique @map("entra_oid")
   passwordHash          String?   @map("password_hash")
   emailVerifiedAt       DateTime? @map("email_verified_at") @db.Timestamptz(3)
   /// Sub-spaces / facilities this user may book beyond their role default.
