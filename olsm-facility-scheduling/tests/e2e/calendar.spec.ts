@@ -99,6 +99,41 @@ test.describe("public pages", () => {
    * public page, which was quoting an hourly rate beside a button that led
    * straight into a rejection.
    */
+  /** Four doors, not a redirect straight into the directory. */
+  test("the home page offers a path per audience", async ({ page }) => {
+    await page.goto("/");
+    for (const path of [
+      "Schedule a team practice",
+      "Rent a facility",
+      "My reservations",
+      "Administration",
+    ]) {
+      await expect(page.getByRole("link", { name: new RegExp(path) }).first()).toBeVisible();
+    }
+  });
+
+  /** Filter state lives in the URL, so a filtered view survives a reload. */
+  test("the directory filters, and says so when nothing matches", async ({ page }) => {
+    // Scoped to the results list: the filter dropdown carries these same
+    // words as option labels, and an <option> is not visible.
+    const results = page.getByRole("list").filter({ has: page.getByRole("listitem") }).last();
+
+    await page.goto("/facilities");
+    const all = await results.getByRole("listitem").count();
+    expect(all).toBeGreaterThan(1);
+
+    await page.goto("/facilities?access=school");
+    await expect(results.getByText("School use only").first()).toBeVisible();
+    await expect(results.getByText("Available to outside groups")).toHaveCount(0);
+    expect(await results.getByRole("listitem").count()).toBeLessThan(all);
+
+    await page.goto("/facilities?q=zzzznomatch");
+    await expect(page.getByText("No facilities match those filters")).toBeVisible();
+    await page.getByRole("link", { name: "Clear filters" }).first().click();
+    await expect(page).toHaveURL(/\/facilities$/);
+    expect(await results.getByRole("listitem").count()).toBe(all);
+  });
+
   test("a school-only facility shows no rate and no request button", async ({ page }) => {
     await page.goto("/facilities/crew-house");
 

@@ -129,12 +129,20 @@ export function PublicShell({ children }: { children: ReactNode }) {
               Athletic Facilities
             </span>
           </Link>
-          <nav aria-label="Public" className="flex gap-3 text-sm">
+          {/*
+            Only routes that exist. The brief also lists rental policies, a
+            campus map and a contact page; those are not built, and a nav item
+            pointing at a 404 is worse than its absence.
+          */}
+          <nav aria-label="Public" className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
             <Link href="/facilities" className="hover:underline">
               Facilities
             </Link>
             <Link href="/request" className="hover:underline">
-              Request a facility
+              Rent a facility
+            </Link>
+            <Link href="/portal" className="hover:underline">
+              My reservations
             </Link>
             <Link href="/sign-in" className="hover:underline">
               Sign in
