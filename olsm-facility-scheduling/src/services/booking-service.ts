@@ -318,6 +318,14 @@ export async function createBooking(
       // make two simultaneous submissions from one account queue up so the
       // second counts the first one's booking.
       //
+      // KNOWN LOW-SEVERITY DEFECT, accepted for the internal pilot. Do not
+      // describe this cap as a database guarantee until the test below passes.
+      // The eventual fix is to stop counting and start claiming: five
+      // UserHoldSlot rows per account with UNIQUE(userId, slotNumber), so a
+      // sixth concurrent request fails on a constraint rather than on a count
+      // that two transactions can both read. Admin -> Approvals surfaces any
+      // account that has gone over in the meantime, and holds expire anyway.
+      //
       // KNOWN GAP: this does not yet close the race. The concurrency test in
       // tests/integration/booking-flow.test.ts is skipped with the same note --
       // with four holds already in place, two concurrent creates both still

@@ -354,6 +354,20 @@ an external renter's account. A director whose group membership has not been set
 up yet keeps the role an administrator gave them rather than being demoted to
 coach on every sign-in.
 
+**This has a cost, and it needs a procedure rather than more code.** Removing
+somebody from an administrator group in Entra does *not* remove their privileges
+here. Raising is automatic; lowering is deliberate. So:
+
+- Entra may elevate a role. Only a local administrator may lower one.
+- **Disabling the local account overrides everything.** It is the reliable
+  off-switch, not the Entra group.
+- Admin → People shows where each role came from, so a role Entra no longer
+  supports is visible rather than silently retained.
+- Review roles quarterly. It is a short list.
+- When somebody leaves, disable **both** the Microsoft account and the local
+  account here. Disabling only the Microsoft account leaves password sign-in
+  working.
+
 ### Mail via Graph
 
 Basic SMTP authentication is not used and is not an option -- Microsoft has
@@ -363,19 +377,53 @@ password.
 1. On the same registration: **API permissions** → **Microsoft Graph** →
    **Application permissions** → `Mail.Send`. Nothing else is needed.
 2. Grant admin consent.
-3. **Restrict it to the one mailbox.** `Mail.Send` granted plainly lets this
-   application send as anybody in the tenant. An application access policy in
-   Exchange Online narrows it:
+3. **Scope it to the one mailbox.** `Mail.Send` as an application permission
+   authorizes sending as *any* mailbox in the tenant. Narrow it with **Exchange
+   Online RBAC for Applications**, which is Microsoft's current mechanism --
+   Application Access Policies (`New-ApplicationAccessPolicy`) are superseded
+   and new ones are advised against, since they will need migrating later.
+
+   In Exchange Online PowerShell:
 
    ```powershell
-   New-ApplicationAccessPolicy `
+   # The application, as Exchange sees it.
+   New-ServicePrincipal `
      -AppId <application (client) id> `
-     -PolicyScopeGroupId facilities@olsm.edu `
-     -AccessRight RestrictAccess `
-     -Description "OLSM facility scheduling — send as the facilities mailbox only"
+     -ObjectId <service principal object id> `
+     -DisplayName "OLSM facility scheduling"
 
-   Test-ApplicationAccessPolicy -Identity facilities@olsm.edu -AppId <client id>
+   # A scope containing only the facilities mailbox.
+   New-ManagementScope `
+     -Name "OLSM facilities mailbox" `
+     -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'facilities@olsm.edu'"
+
+   # Send-as, limited to that scope.
+   New-ManagementRoleAssignment `
+     -Name "OLSM facility scheduling send as facilities" `
+     -App <service principal object id> `
+     -Role "Application Mail.Send" `
+     -CustomResourceScope "OLSM facilities mailbox"
    ```
+
+   Then prove both halves, because only the second one tells you the scope is
+   doing anything:
+
+   ```powershell
+   Test-ServicePrincipalAuthorization -Identity <service principal object id> `
+     -Resource facilities@olsm.edu     # expect the role to be listed
+
+   Test-ServicePrincipalAuthorization -Identity <service principal object id> `
+     -Resource <some other employee>   # expect nothing
+   ```
+
+   **Do not layer these mechanisms.** Permissions granted through Entra,
+   Application Access Policies and Exchange RBAC are additive: an unrestricted
+   Entra `Mail.Send` consent sitting alongside a scoped RBAC assignment gives
+   the broader access, not the narrower one. Grant the Exchange application role
+   scoped to the mailbox, and do not also leave a tenant-wide grant in place.
+
+   Record the service principal object id and the mailbox scope somewhere the
+   next administrator will find them.
 
 Then set:
 

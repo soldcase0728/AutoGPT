@@ -56,6 +56,17 @@ export default async function UsersPage() {
               action={
                 <div className="flex flex-wrap gap-2">
                   <Badge>{ROLE_LABELS[u.role]}</Badge>
+                  {/*
+                    Where the role came from. Entra can raise a role but never
+                    lower it, so removing somebody from an administrator group
+                    there does not remove their privileges here. Showing the
+                    source makes a role Entra no longer supports visible to the
+                    person doing the quarterly review, instead of it sitting
+                    unnoticed. Disabling the account is the reliable off-switch.
+                  */}
+                  <Badge tone={u.entraOid ? undefined : "warn"}>
+                    {u.entraOid ? "Microsoft sign-in linked" : "Local sign-in only"}
+                  </Badge>
                   {!u.active && <Badge tone="danger">Inactive</Badge>}
                   {agreement.ok ? (
                     <Badge tone="good">Agreement current</Badge>

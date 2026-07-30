@@ -6,6 +6,8 @@ import { headCoachSportIds, requireUser } from "@/lib/auth/current-user";
 import { isAdmin } from "@/lib/auth/rbac";
 import { AppShell } from "@/components/app-shell";
 import { Alert, Badge, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
+import { SOFT_LOCK_STATES } from "@/domain/booking-state";
+import { MAX_ACTIVE_HOLDS_PER_REQUESTER } from "@/services/booking-service";
 import { formatRange } from "@/lib/time";
 import { formatMoney } from "@/domain/pricing";
 import { ACTIVITY_LABELS } from "@/domain/rules-engine";
@@ -60,6 +62,42 @@ export default async function ApprovalsPage() {
     if (conflicts.length > 0) conflictsByStep.set(step.id, conflicts);
   }
 
+  // Accounts sitting on more holds than the cap allows.
+  //
+  // The cap is enforced when a booking is created, but two simultaneous
+  // submissions from one account can still both pass it -- a known,
+  // low-severity defect recorded in the skipped concurrency test. Rather than
+  // claim a guarantee the database does not yet make, surface the overage here
+  // so an administrator can see it and release the extra hold. Holds also
+  // expire on their own, so this is a tidy-up rather than an emergency.
+  const overCap = admin
+    ? await prisma.booking.groupBy({
+        by: ["requesterId"],
+        where: {
+          status: { in: [...SOFT_LOCK_STATES] },
+          OR: [{ holdExpiresAt: null }, { holdExpiresAt: { gt: new Date() } }],
+        },
+        _count: { _all: true },
+        having: { requesterId: { _count: { gt: MAX_ACTIVE_HOLDS_PER_REQUESTER } } },
+      })
+    : [];
+
+  // Only the accounts the grouping actually flagged, with their counts.
+  const overCapAccounts =
+    overCap.length > 0
+      ? await prisma.user
+          .findMany({
+            where: { id: { in: overCap.map((row) => row.requesterId) } },
+            select: { id: true, name: true },
+          })
+          .then((users) =>
+            users.map((u) => ({
+              ...u,
+              holds: overCap.find((row) => row.requesterId === u.id)?._count._all ?? 0,
+            })),
+          )
+      : [];
+
   return (
     <AppShell user={user}>
       <PageHeader
@@ -70,6 +108,29 @@ export default async function ApprovalsPage() {
             : "Requests from your assistant coaches waiting on your OK."
         }
       />
+
+      {overCapAccounts.length > 0 && (
+        <div className="mb-5">
+          <Alert
+            tone="warn"
+            title={`${overCapAccounts.length} account${overCapAccounts.length === 1 ? "" : "s"} hold more slots than the limit allows`}
+          >
+            <p>
+              The per-account limit is {MAX_ACTIVE_HOLDS_PER_REQUESTER}. Two requests submitted at
+              the same moment can both pass that check, so an account can end up one over. The extra
+              hold expires on its own; release it sooner from the account&apos;s bookings if the slot
+              is wanted.
+            </p>
+            <ul className="mt-2 list-inside list-disc">
+              {overCapAccounts.map((u) => (
+                <li key={u.id}>
+                  {u.name} — {u.holds} active holds
+                </li>
+              ))}
+            </ul>
+          </Alert>
+        </div>
+      )}
 
       {steps.length === 0 ? (
         <Card>
