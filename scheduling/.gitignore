@@ -50,6 +50,13 @@ OLSM_Book_Catalog_v7.xlsx
 OLSM_Book_Catalog_v8.xlsx
 email_bigideas_math_quote.md
 email_savvas_bio_spanish.md
+Savvas_Bio_Spanish_Email.docx
+Savvas_Bio_Spanish_Email.txt
+Savvas_Bio_Spanish_Email.pdf
+build_savvas_email.js
+node_modules/
+package.json
+package-lock.json
 textbook_reconciliation.xlsx
 course_worklist.csv
 *.local.csv
