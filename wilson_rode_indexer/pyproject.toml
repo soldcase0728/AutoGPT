@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wilson-rode-indexer"
+version = "1.0.0"
+description = "Local, read-only document indexing and triage for a Bates-numbered legal document production"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary - internal case work product" }
+
+dependencies = [
+    "PyMuPDF>=1.24",
+    "pypdf>=4.2",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+    "python-dateutil>=2.9",
+    "rapidfuzz>=3.9",
+    "tqdm>=4.66",
+    "Pillow>=10.3",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "pytest-cov>=5.0"]
+
+[project.scripts]
+wri = "src.cli:main"
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,0 +1,13 @@
+# Runtime dependencies. All local; nothing here calls a network service.
+PyMuPDF>=1.24
+pypdf>=4.2
+pandas>=2.2
+openpyxl>=3.1
+python-dateutil>=2.9
+rapidfuzz>=3.9
+tqdm>=4.66
+Pillow>=10.3
+PyYAML>=6.0
+
+# Development / test
+pytest>=8.2
