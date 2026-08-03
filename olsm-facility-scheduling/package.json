@@ -21,7 +21,8 @@
     "e2e": "npm run e2e:setup && playwright test",
     "e2e:setup": "node scripts/e2e-setup.mjs",
     "e2e:server": "node scripts/e2e-server.mjs",
-    "build:scripts": "esbuild prisma/seed.ts prisma/demo-data.ts --bundle --platform=node --target=node22 --format=cjs --external:@prisma/client --outdir=dist-scripts --log-level=warning"
+    "build:scripts": "esbuild prisma/seed.ts prisma/demo-data.ts prisma/grant-admin.ts --bundle --platform=node --target=node22 --format=cjs --conditions=react-server --external:@prisma/client --outdir=dist-scripts --log-level=warning",
+    "admin:grant": "node --conditions=react-server --import tsx prisma/grant-admin.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

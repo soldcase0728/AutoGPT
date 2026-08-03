@@ -215,6 +215,28 @@ The athletic office (facility admin) can add people and send links. Changing
 somebody's role or switching an account off stays with the Athletic Director,
 and nobody can create an account that outranks their own.
 
+**Set up a second Athletic Director before you need one.** With a single
+administrator, one forgotten password locks the whole system: the reset button
+lives behind the sign-in you cannot get past. Add a second one from
+**Admin → People**, role *Athletic Director*.
+
+If that has already happened and nobody can sign in, open the Render shell on
+the web service and run:
+
+```
+node dist-scripts/grant-admin.js someone@olsm.edu "Their Name"
+```
+
+It creates the account if it does not exist, raises it to Athletic Director,
+switches it back on if it was disabled, and prints a one-time link for setting a
+password. It never sets or prints a password, and it retires any earlier link for
+that account. The grant is written to the audit log marked as coming from the
+shell rather than from a person clicking something.
+
+Anyone who can run it already has shell access and could edit the database
+directly, so there is no extra lock on it — what it adds is the audit record and
+a correct password hash, which a hand-written `psql` update gives you neither of.
+
 If no email provider is configured yet, adding somebody still works — the page
 shows you the link to pass on by hand, and warns you that nothing was sent.
 
