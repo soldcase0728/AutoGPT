@@ -25,7 +25,8 @@ import {
 } from "@prisma/client";
 import { agreementExpiryFor } from "../src/domain/compliance";
 import { STANDARD_HOURS } from "../src/domain/availability";
-import { hashPassword } from "../src/lib/auth/password";
+import { hashPassword, verifyPassword } from "../src/lib/auth/password";
+import { recordAudit } from "../src/lib/audit";
 
 const prisma = new PrismaClient();
 
@@ -633,7 +634,19 @@ async function main() {
   await upsertOrg("Lakeshore Athletics LLC", OrganizationType.COMMERCIAL, RateTier.COMMERCIAL);
 
   // --- Users ---------------------------------------------------------------
-  const password = await hashPassword("ChangeMe123456");
+  // The published default, and why production never gets it.
+  //
+  // This repository is public. A seeded password written here is a password
+  // anybody can read, so on a hosted instance it is not a starting credential --
+  // it is an open door to a SUPER_ADMIN account. Production therefore seeds
+  // accounts with no password at all: they cannot be signed into until somebody
+  // sets one through a one-time link.
+  //
+  // Development and the test suites keep the known value, because there the
+  // database is disposable and the whole point is to sign in without ceremony.
+  const DEFAULT_PASSWORD = "ChangeMe123456";
+  const hosted = process.env.NODE_ENV === "production";
+  const password = hosted ? null : await hashPassword(DEFAULT_PASSWORD);
 
   const users: {
     name: string;
@@ -708,7 +721,9 @@ async function main() {
         email: seed.email,
         role: seed.role,
         passwordHash: password,
-        emailVerifiedAt: new Date(),
+        // Null on a hosted instance: the address is not proven until the person
+        // uses the link that sets their password.
+        emailVerifiedAt: password ? new Date() : null,
         organizationId: internalOrg.id,
         facilityScope: (seed.facilityScopeSlugs ?? [])
           .map((s) => facilityIdBySlug.get(s))
@@ -748,7 +763,47 @@ async function main() {
       }
     }
   }
-  console.log(`  users: ${users.length} (password for all seeded accounts: ChangeMe123456)`);
+  // Close the door on an instance seeded before this changed.
+  //
+  // Accounts already carrying the published password are the live exposure, and
+  // they exist on every instance deployed from this repository so far. Clearing
+  // the hash is safe in a way that overwriting it would not be: it touches only
+  // accounts still on the value anybody can read, and it never disturbs a
+  // password somebody has chosen.
+  let disarmed = 0;
+  if (hosted) {
+    for (const seed of users) {
+      const account = await prisma.user.findUnique({ where: { email: seed.email } });
+      if (!account?.passwordHash) continue;
+      if (!(await verifyPassword(DEFAULT_PASSWORD, account.passwordHash))) continue;
+      await prisma.user.update({
+        where: { id: account.id },
+        data: { passwordHash: null },
+      });
+      await recordAudit({
+        entityType: "user",
+        entityId: account.id,
+        action: "user.default_password_cleared",
+        actorLabel: "seed",
+        reason:
+          "The account was still on the password published in this repository. " +
+          "Cleared on boot; a one-time link is required to set a real one.",
+      });
+      disarmed += 1;
+    }
+  }
+
+  if (hosted) {
+    console.log(`  users: ${users.length} (no passwords set — this instance is hosted)`);
+    if (disarmed > 0) {
+      console.log(
+        `  ${disarmed} account(s) were still on the password published in this repository.`,
+      );
+      console.log("  Those passwords no longer work. Nobody can sign in with them.");
+    }
+  } else {
+    console.log(`  users: ${users.length} (password for all seeded accounts: ${DEFAULT_PASSWORD})`);
+  }
 
   // --- Seasons -------------------------------------------------------------
   const year = new Date().getUTCFullYear();
@@ -772,8 +827,36 @@ async function main() {
   }
   console.log(`  seasons: ${seasons.length}`);
 
-  console.log("\nDone. Sign in at /sign-in with any seeded address, password ChangeMe123456.");
-  console.log("Surcharges, insurance minimums, retention and cancellation windows are placeholders.");
+  if (hosted) {
+    // A hosted instance has no password to hand anybody, so it prints the way
+    // in instead. The link is one-time and expires in seven days, and this log
+    // is visible only to whoever can already see the deploy -- which is a far
+    // smaller audience than a password committed to a public repository.
+    //
+    // Imported here rather than at the top of the file: the token module is
+    // marked server-only, which throws under the plain `tsx` runner used in
+    // development. This branch never executes there.
+    const { issueAccessToken } = await import("../src/lib/auth/access-token");
+    const director = await prisma.user.findFirst({
+      where: { role: Role.SUPER_ADMIN, active: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    console.log("\nThis instance is hosted, so no account has a password.");
+    if (director) {
+      const token = await issueAccessToken({ userId: director.id });
+      const base = (process.env.APP_URL ?? "").replace(/\/$/, "");
+      console.log(`\nOne-time link to set a password for ${director.email}:\n`);
+      console.log(`  ${base}/set-password/${token}`);
+      console.log("\nIt works once and expires in seven days. Open it now: this log is the only");
+      console.log("place it appears, and the next deploy will replace it with a different one.");
+    } else {
+      console.log("No super admin exists. Run: node dist-scripts/grant-admin.js you@olsm.edu");
+    }
+  } else {
+    console.log(`\nDone. Sign in at /sign-in with any seeded address, password ${DEFAULT_PASSWORD}.`);
+  }
+  console.log("\nSurcharges, insurance minimums, retention and cancellation windows are placeholders.");
   console.log("See DECISIONS.md before this goes anywhere near a real rental.\n");
 }
 

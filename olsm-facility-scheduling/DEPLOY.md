@@ -186,7 +186,25 @@ The compose file runs the first two. The rest matter once real bookings exist.
 **Check `/api/health`.** It returns `ok` only when the database is reachable
 *and* reference data is loaded. A load balancer should watch this path.
 
-**Sign in.** Seeded accounts all use `ChangeMe123456`:
+**Sign in.** On a hosted instance the seed sets **no passwords at all** — this
+repository is public, so a password written into it is not a starting credential,
+it is an open door to an administrator account. The seed instead prints a
+one-time link for the Athletic Director in the deploy log:
+
+```
+One-time link to set a password for ad@olsm.edu:
+  https://your-host/set-password/…
+```
+
+Open it from the Render deploy log. It works once, expires in seven days, and
+the next deploy replaces it. If you miss it, run
+`node dist-scripts/grant-admin.js you@olsm.edu` from the shell for a new one.
+
+Any account still carrying the old published password is cleared on boot, with
+an entry in the audit log. A password somebody actually chose is never touched.
+
+Locally — where the database is disposable and the point is to sign in without
+ceremony — the seed still uses `ChangeMe123456` for these accounts:
 
 | Account | Role |
 |---|---|
@@ -195,9 +213,6 @@ The compose file runs the first two. The rest matter once real bookings exist.
 | `bball.assistant@olsm.edu` | Assistant coach — routes to the head coach |
 | `facilities@olsm.edu` | Facilities — setup board |
 | `finance@olsm.edu` | Business office — read-only, invoices and reports |
-
-**Change those passwords** before the instance is reachable by anyone outside
-your network. They are published in this file and in the repository.
 
 **Add the real people.** Sign in as the Athletic Director and go to
 **Admin → People → Add a person**. This is the only way an account comes into
