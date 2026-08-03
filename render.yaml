@@ -12,8 +12,14 @@
 # Render provisions the database, generates SESSION_SECRET and JOB_RUNNER_TOKEN,
 # runs the migrations on boot and gives you an HTTPS URL.
 #
-# After the first deploy, set APP_URL on both services to the URL Render
-# assigned, then redeploy once so links in emails point somewhere real.
+# APP_URL is set below to the hostname Render assigned this blueprint. It used
+# to be `sync: false`, on the theory that somebody would fill it in from the
+# dashboard after the first deploy. Nobody did, and the failure was opaque: the
+# app refuses to boot without it -- deliberately, because an unset APP_URL means
+# every emailed sign-in link points at localhost -- so every deploy died on the
+# health check with nothing in the events list explaining why. A value the
+# blueprint owns cannot be forgotten. Change it here if you move to a custom
+# domain.
 #
 # Costs: the web service is on `starter` (a few dollars a month) rather than
 # free, because free web services sleep when idle and a scheduling system that
@@ -40,7 +46,7 @@ services:
       - key: JOB_RUNNER_TOKEN
         generateValue: true
       - key: APP_URL
-        sync: false # set to the URL Render assigns, after the first deploy
+        value: https://olsm-facilities.onrender.com
       - key: TZ
         value: America/Detroit
       # A week of sample bookings so the instance is worth clicking through.
@@ -98,7 +104,7 @@ services:
           type: web
           envVarKey: JOB_RUNNER_TOKEN
       - key: APP_URL
-        sync: false # set to the URL Render assigns, after the first deploy
+        value: https://olsm-facilities.onrender.com
       # This container shares the web service's image and so runs the same
       # entrypoint. Without these it would migrate and re-seed the database
       # before every single invocation, twelve times an hour.
