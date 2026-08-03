@@ -1,0 +1,19 @@
+name: Governed Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # ci-workflows v1.1.0. Update this SHA through a reviewed PR.
+    uses: img2threejs/ci-workflows/.github/workflows/governed-tag-release.yml@dd3a7730cacb6ab00cc853be606ce72de389a54c
+    with:
+      tag: ${{ github.ref_name }}
+      version-file: SKILL.md
+      bootstrap-release: ${{ github.ref_name == 'v1.4.3' }}
+      # For the first governed tag this remains empty. Update it in the next release-prep PR.
+      previous-governed-tag: ""
