@@ -1,3 +1,13 @@
+# INERT ON THIS FORK.
+#
+# This file is upstream AutoGPT's and is kept byte-similar so the diff against
+# upstream stays readable. It builds the AutoGPT platform -- Poetry, pnpm,
+# Docker, Supabase, Prisma against AutoGPT's schema -- none of which applies
+# here, and several steps of which fail on a fork. The job condition below
+# restricts it to the upstream repository.
+#
+# On this fork, Claude is served by claude-olsm.yml instead.
+
 # Claude Dependabot PR Review Workflow
 # 
 # This workflow automatically runs Claude analysis on Dependabot PRs to:
@@ -18,7 +28,7 @@ on:
 jobs:
   dependabot-review:
     # Only run on Dependabot PRs
-    if: github.actor == 'dependabot[bot]'
+    if: github.repository == 'Significant-Gravitas/AutoGPT' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

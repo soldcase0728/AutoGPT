@@ -1,0 +1,111 @@
+# Claude, scoped to the OLSM facility scheduling app.
+#
+# This fork develops one thing: olsm-facility-scheduling. The inherited
+# claude.yml builds the whole AutoGPT platform first -- Poetry, pnpm, nine
+# Docker images, Supabase, Prisma against a schema that is not this app's --
+# which costs about ten minutes per mention and has steps that fail on a fork.
+# This does the setup this app actually needs and nothing else.
+#
+# The author-association gate is the same as claude.yml's and is deliberate:
+# on a public fork it is what stops a stranger spending the repository owner's
+# API credit.
+
+name: Claude (OLSM)
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      ) && (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR' ||
+        github.event.review.author_association == 'OWNER' ||
+        github.event.review.author_association == 'MEMBER' ||
+        github.event.review.author_association == 'COLLABORATOR' ||
+        github.event.issue.author_association == 'OWNER' ||
+        github.event.issue.author_association == 'MEMBER' ||
+        github.event.issue.author_association == 'COLLABORATOR'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read
+
+    # A real Postgres, because this app's tests exercise the exclusion
+    # constraint and the append-only audit trigger. Those cannot be mocked, so
+    # a run without a database can only check types.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: olsm_facilities
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/olsm_facilities?schema=public
+      # Long enough to satisfy the startup check. Not a secret: this database
+      # exists for the length of one job and holds seed data.
+      SESSION_SECRET: github-actions-ephemeral-session-secret-not-a-real-one
+      TZ: America/Detroit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: olsm-facility-scheduling/package-lock.json
+
+      - name: Install dependencies
+        working-directory: olsm-facility-scheduling
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepare the database
+        working-directory: olsm-facility-scheduling
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --allowedTools "Bash(npm:*),Bash(npx:*),Bash(git:*),Edit,Replace,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --model opus
+          additional_permissions: |
+            actions: read

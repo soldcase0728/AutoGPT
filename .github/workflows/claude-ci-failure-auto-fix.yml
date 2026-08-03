@@ -1,3 +1,13 @@
+# INERT ON THIS FORK.
+#
+# This file is upstream AutoGPT's and is kept byte-similar so the diff against
+# upstream stays readable. It builds the AutoGPT platform -- Poetry, pnpm,
+# Docker, Supabase, Prisma against AutoGPT's schema -- none of which applies
+# here, and several steps of which fail on a fork. The job condition below
+# restricts it to the upstream repository.
+#
+# On this fork, Claude is served by claude-olsm.yml instead.
+
 name: Auto Fix CI Failures
 
 on:
@@ -16,6 +26,7 @@ permissions:
 jobs:
   auto-fix:
     if: |
+      github.repository == 'Significant-Gravitas/AutoGPT' &&
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.pull_requests[0] &&
       !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')

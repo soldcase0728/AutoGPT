@@ -1,3 +1,13 @@
+# INERT ON THIS FORK.
+#
+# This file is upstream AutoGPT's and is kept byte-similar so the diff against
+# upstream stays readable. It builds the AutoGPT platform -- Poetry, pnpm,
+# Docker, Supabase, Prisma against AutoGPT's schema -- none of which applies
+# here, and several steps of which fail on a fork. The job condition below
+# restricts it to the upstream repository.
+#
+# On this fork, Claude is served by claude-olsm.yml instead.
+
 name: Claude Code
 
 on:
@@ -13,6 +23,7 @@ on:
 jobs:
   claude:
     if: |
+      github.repository == 'Significant-Gravitas/AutoGPT' && (
       (
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
         (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
@@ -28,7 +39,7 @@ jobs:
         github.event.issue.author_association == 'OWNER' ||
         github.event.issue.author_association == 'MEMBER' ||
         github.event.issue.author_association == 'COLLABORATOR'
-      )
+      ))
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
