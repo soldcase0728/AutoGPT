@@ -37,8 +37,12 @@ audit trigger, neither of which exists outside a real Postgres.
 | `npm run e2e` | Playwright, desktop and mobile projects |
 | `npm run build` | Production build |
 
-Seeded accounts all use the password `ChangeMe123456` — `ad@olsm.edu` is a
-super admin, `bball.head@olsm.edu` a head coach.
+Locally, seeded accounts use `ChangeMe123456` — `ad@olsm.edu` is a super admin,
+`bball.head@olsm.edu` a head coach. **A hosted instance seeds no passwords at
+all**, because this repository is public and a password written into it is an
+open door rather than a starting credential. There the seed prints a one-time
+link in the deploy log, and `node dist-scripts/grant-admin.js <email>` issues
+another from the server shell.
 
 ## How the system is arranged
 
@@ -56,6 +60,19 @@ quietly skipping the liability check.
 
 `src/app/` is Next.js App Router. Server actions do the mutations.
 
+## How somebody gets an account
+
+There is no self-registration and no self-service password reset. Every account
+is created by an administrator at **Admin → People**, and the person receives a
+one-time link that sets their password. Signing in with Microsoft or Google
+links to an account that already exists and **never** creates one.
+
+The link mechanism is in `src/lib/auth/access-token.ts`. Two properties the rest
+of the app depends on: only a SHA-256 of the token is stored, and consuming it is
+a single atomic write. Landing on `/set-password/<token>` must never spend it —
+link scanners fetch every URL in inbound mail, so a token consumed on GET is a
+token the recipient always finds already used. It is spent on submit.
+
 ## Things that look like bugs and are not
 
 - **The seed never overwrites.** It creates what is missing and leaves the
@@ -70,7 +87,14 @@ quietly skipping the liability check.
   first. Enforcement is in the server action, not just the page.
 - **The app refuses to boot in production without a valid `APP_URL`.** That is
   intended. A service emailing links to `localhost` passes its health check
-  while being useless.
+  while being useless. `render.yaml` now sets it, so it cannot be forgotten;
+  when it was left to be filled in by hand, every deploy died on the health
+  check with nothing in the events list explaining why.
+- **Weather, Google Calendar push-sync and security deposits were deleted, on
+  purpose.** Roughly 2,400 lines, removed because fifty users will not miss
+  them. Read-only iCal feeds replace the calendar sync. A rained-out booking is
+  cancelled the ordinary way, with the admin's waive-the-window tick for a full
+  refund. Do not reintroduce any of the three without being asked.
 
 ## Known open items
 
