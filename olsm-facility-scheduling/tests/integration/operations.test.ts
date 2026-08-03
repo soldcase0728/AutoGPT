@@ -224,7 +224,7 @@ describe("participant waivers", () => {
         await db.document.update({
           where: { id: doc.id },
           data: {
-            status: DocumentStatus.UPLOADED,
+            status: DocumentStatus.ACCEPTED,
             expiresAt: new Date(endAt.getTime() + 365 * 86_400_000),
           },
         });

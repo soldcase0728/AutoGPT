@@ -29,7 +29,10 @@ export default async function PortalPage() {
 
   const outstandingDocs = bookings.flatMap((b) =>
     b.documents.filter(
-      (d) => d.status !== DocumentStatus.SIGNED && d.status !== DocumentStatus.UPLOADED,
+      (d) =>
+        d.status !== DocumentStatus.SIGNED &&
+        d.status !== DocumentStatus.ACCEPTED &&
+        d.status !== DocumentStatus.SUPERSEDED,
     ).map((d) => ({ doc: d, booking: b })),
   );
 

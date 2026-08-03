@@ -29,6 +29,7 @@ import { BookingProgress, buildStages } from "@/components/booking-progress";
 import { DayOfControls } from "./day-of-controls";
 import { needsParticipantWaivers, rosterStatus, waiverUrl } from "@/services/participant-service";
 import { CoiUploadForm } from "./coi-upload-form";
+import { CoiReviewForm } from "./coi-review-form";
 import { sendDocumentAction } from "@/app/actions/document-actions";
 import { Button } from "@/components/ui";
 
@@ -50,7 +51,7 @@ export default async function BookingDetailPage({
       organization: true,
       sport: true,
       subSpace: { include: { facility: true } },
-      documents: true,
+      documents: { include: { reviewedBy: { select: { name: true } } } },
       invoices: true,
       approvals: { include: { approver: true } },
       requirements: true,
@@ -76,8 +77,13 @@ export default async function BookingDetailPage({
     refundPartialPercent?: number;
   };
 
+  // The live certificate. Superseded versions stay in the documents list for
+  // the record, but the panel acts on the current one.
   const coi = booking.documents.find(
-    (d) => d.type === DocumentType.CERTIFICATE_OF_INSURANCE && !d.isParticipant,
+    (d) =>
+      d.type === DocumentType.CERTIFICATE_OF_INSURANCE &&
+      !d.isParticipant &&
+      d.status !== DocumentStatus.SUPERSEDED,
   );
   const canManage = booking.requesterId === user.id || isAdmin(user.role);
   const roster = await rosterStatus(booking.id);
@@ -155,16 +161,34 @@ export default async function BookingDetailPage({
                         {doc.expiresAt ? ` · valid to ${formatDateTime(doc.expiresAt)}` : ""}
                       </p>
                     </div>
+                    {/*
+                      Four states worth telling apart, not two. "Outstanding"
+                      covering both "we have not looked at it" and "we rejected
+                      it" is what sends people to the telephone.
+                    */}
                     <Badge
                       tone={
-                        doc.status === DocumentStatus.SIGNED || doc.status === DocumentStatus.UPLOADED
+                        doc.status === DocumentStatus.SIGNED ||
+                        doc.status === DocumentStatus.ACCEPTED
                           ? "good"
-                          : "warn"
+                          : doc.status === DocumentStatus.REJECTED
+                            ? "danger"
+                            : doc.status === DocumentStatus.SUPERSEDED
+                              ? undefined
+                              : "warn"
                       }
                     >
-                      {doc.status === DocumentStatus.SIGNED || doc.status === DocumentStatus.UPLOADED
+                      {doc.status === DocumentStatus.SIGNED ||
+                      doc.status === DocumentStatus.ACCEPTED
                         ? "Complete"
-                        : "Outstanding"}
+                        : doc.status === DocumentStatus.REJECTED
+                          ? "Rejected"
+                          : doc.status === DocumentStatus.SUPERSEDED
+                            ? "Replaced"
+                            : doc.status === DocumentStatus.UNDER_REVIEW ||
+                                doc.status === DocumentStatus.UPLOADED
+                              ? "Under review"
+                              : "Outstanding"}
                     </Badge>
                     {doc.fileUrl && (
                       <Link href={`/api/documents/${doc.id}/file`} className="text-sm underline">
@@ -191,12 +215,60 @@ export default async function BookingDetailPage({
               </ul>
             )}
 
-            {coi && canManage && coi.status !== DocumentStatus.UPLOADED && (
-              <div className="mt-4 border-t border-navy-100 pt-4">
-                <h3 className="mb-2 text-sm font-semibold">Upload certificate of insurance</h3>
-                <CoiUploadForm documentId={coi.id} bookingId={booking.id} />
+            {/*
+              The rejection, in the renter's own view, with the reason verbatim.
+              Being told "rejected" without being told why is the thing that
+              generates a phone call and a second wrong upload.
+            */}
+            {coi?.status === DocumentStatus.REJECTED && coi.rejectionReason && (
+              <div className="mt-4">
+                <Alert tone="danger" title="Your certificate of insurance was not accepted">
+                  <p>{coi.rejectionReason}</p>
+                  <p className="mt-2 text-xs">
+                    Reviewed {coi.reviewedAt ? formatDateTime(coi.reviewedAt) : ""}
+                    {coi.reviewedBy ? ` by ${coi.reviewedBy.name}` : ""}. Upload a corrected
+                    certificate below — the version you sent is kept on file.
+                  </p>
+                </Alert>
               </div>
             )}
+
+            {coi?.status === DocumentStatus.UNDER_REVIEW && (
+              <div className="mt-4">
+                <Alert tone="info" title="Certificate received">
+                  It is with the athletic office for review. You will get an email either way.
+                </Alert>
+              </div>
+            )}
+
+            {/*
+              Admin review. Only for a certificate that has actually arrived and
+              has not already been decided or replaced.
+            */}
+            {coi &&
+              isAdmin(user.role) &&
+              coi.fileUrl &&
+              (coi.status === DocumentStatus.UNDER_REVIEW ||
+                coi.status === DocumentStatus.UPLOADED) && (
+                <div className="mt-4 border-t border-navy-100 pt-4">
+                  <h3 className="mb-2 text-sm font-semibold">Review certificate of insurance</h3>
+                  <CoiReviewForm documentId={coi.id} />
+                </div>
+              )}
+
+            {coi &&
+              canManage &&
+              coi.status !== DocumentStatus.UNDER_REVIEW &&
+              coi.status !== DocumentStatus.ACCEPTED && (
+                <div className="mt-4 border-t border-navy-100 pt-4">
+                  <h3 className="mb-2 text-sm font-semibold">
+                    {coi.status === DocumentStatus.REJECTED
+                      ? "Upload a corrected certificate"
+                      : "Upload certificate of insurance"}
+                  </h3>
+                  <CoiUploadForm documentId={coi.id} bookingId={booking.id} />
+                </div>
+              )}
           </Card>
 
           {needsParticipantWaivers(booking.activityType) && canManage && (

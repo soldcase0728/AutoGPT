@@ -23,6 +23,7 @@ import { formatMoney } from "@/domain/pricing";
 import { formatDateTime } from "@/lib/time";
 import { esignProvider, type EnvelopeFields } from "@/integrations/esign";
 import { documentKey, storage } from "@/integrations/storage";
+import { enqueue } from "./job-queue";
 import type { Actor } from "./booking-service";
 
 /** Create the placeholder rows for a booking's required documents. */
@@ -40,13 +41,15 @@ export async function prepareBookingDocuments(
 
   for (const type of types) {
     if (type === DocumentType.CERTIFICATE_OF_INSURANCE) {
-      // A COI already on file for the organization satisfies the gate; do not
-      // ask a club for the same certificate every booking.
+      // A COI already *accepted* for the organization satisfies the gate; do
+      // not ask a club for the same certificate every booking. Accepted only:
+      // one still under review, or rejected, must not carry over and quietly
+      // satisfy a second booking.
       const existing = await prisma.document.findFirst({
         where: {
           organizationId: booking.organizationId ?? undefined,
           type,
-          status: { in: [DocumentStatus.UPLOADED, DocumentStatus.SIGNED] },
+          status: DocumentStatus.ACCEPTED,
           OR: [{ expiresAt: null }, { expiresAt: { gte: booking.endAt } }],
         },
       });
@@ -274,20 +277,54 @@ export async function uploadCertificateOfInsurance(params: {
   const document = params.documentId
     ? await prisma.document.findUnique({ where: { id: params.documentId } })
     : await prisma.document.findFirst({
-        where: { bookingId: params.bookingId, type: DocumentType.CERTIFICATE_OF_INSURANCE },
+        where: {
+          bookingId: params.bookingId,
+          type: DocumentType.CERTIFICATE_OF_INSURANCE,
+          status: { not: DocumentStatus.SUPERSEDED },
+        },
       });
 
+  // A replacement for a decided certificate becomes a new row, and the old one
+  // is marked SUPERSEDED rather than overwritten. The rejected version and the
+  // reason it was rejected are the audit trail; writing over them would destroy
+  // the record of why a correction was needed.
+  const replacing =
+    document &&
+    (document.status === DocumentStatus.REJECTED || document.status === DocumentStatus.ACCEPTED)
+      ? document
+      : null;
+
+  if (replacing) {
+    await prisma.document.update({
+      where: { id: replacing.id },
+      data: { status: DocumentStatus.SUPERSEDED },
+    });
+    await recordAudit({
+      entityType: "document",
+      entityId: replacing.id,
+      action: "document.coi_superseded",
+      actorId: actor.id === "system" ? null : actor.id,
+      actorLabel: actor.name,
+      fromState: replacing.status,
+      toState: DocumentStatus.SUPERSEDED,
+      reason: "Replaced by a newly uploaded certificate.",
+    });
+  }
+
   const target =
-    document ??
-    (await prisma.document.create({
-      data: {
-        bookingId: params.bookingId ?? null,
-        organizationId: params.organizationId ?? null,
-        type: DocumentType.CERTIFICATE_OF_INSURANCE,
-        status: DocumentStatus.NOT_STARTED,
-        provider: "upload",
-      },
-    }));
+    replacing || !document
+      ? await prisma.document.create({
+          data: {
+            bookingId: (replacing?.bookingId ?? params.bookingId) ?? null,
+            organizationId: (replacing?.organizationId ?? params.organizationId) ?? null,
+            userId: replacing?.userId ?? null,
+            type: DocumentType.CERTIFICATE_OF_INSURANCE,
+            status: DocumentStatus.NOT_STARTED,
+            provider: "upload",
+            supersedesId: replacing?.id ?? null,
+          },
+        })
+      : document;
 
   const key = documentKey(target.id, filename);
   await storage().put(key, file, contentType);
@@ -295,20 +332,21 @@ export async function uploadCertificateOfInsurance(params: {
   const updated = await prisma.document.update({
     where: { id: target.id },
     data: {
-      status: DocumentStatus.UPLOADED,
+      // Not "done" -- waiting on a person. Only ACCEPTED satisfies the gate.
+      status: DocumentStatus.UNDER_REVIEW,
       fileUrl: key,
       expiresAt,
+      reviewedById: null,
+      reviewedAt: null,
+      rejectionReason: null,
       metadata: { filename, contentType, sizeBytes: file.byteLength } as Prisma.InputJsonValue,
     },
   });
 
-  if (target.organizationId) {
-    // Denormalised onto the organization so the expiry sweep is a single query.
-    await prisma.organization.update({
-      where: { id: target.organizationId },
-      data: { coiDocumentId: target.id, coiExpiresAt: expiresAt },
-    });
-  }
+  // The organization's certificate-on-file is deliberately *not* updated here.
+  // That field is what lets another booking skip asking for a certificate, so
+  // it must only ever point at an accepted one. reviewCertificateOfInsurance
+  // sets it.
 
   await recordAudit({
     entityType: "document",
@@ -316,13 +354,132 @@ export async function uploadCertificateOfInsurance(params: {
     action: "document.coi_uploaded",
     actorId: actor.id === "system" ? null : actor.id,
     actorLabel: actor.name,
-    toState: DocumentStatus.UPLOADED,
-    payload: { expiresAt: expiresAt.toISOString(), filename },
+    toState: DocumentStatus.UNDER_REVIEW,
+    payload: {
+      expiresAt: expiresAt.toISOString(),
+      filename,
+      supersedes: replacing?.id ?? null,
+    },
   });
 
   if (target.bookingId) {
     const { advanceBooking } = await import("./booking-service");
     await advanceBooking(target.bookingId, actor);
+  }
+
+  return updated;
+}
+
+export type CoiDecision = "ACCEPTED" | "REJECTED";
+
+/**
+ * Accept or reject an uploaded certificate.
+ *
+ * Accepting is an attestation: the person doing it is saying the coverage and
+ * the additional-insured wording are adequate. The system checks that a
+ * certificate exists and covers the event date; it cannot read limits off a
+ * PDF, so the judgement and the name against it both matter.
+ *
+ * A rejection must say what is wrong. "Invalid document" gives the renter
+ * nothing to act on and guarantees a second wrong upload, so the reason is
+ * required here rather than merely encouraged in the UI, and it is shown to
+ * them verbatim.
+ */
+export async function reviewCertificateOfInsurance(params: {
+  documentId: string;
+  decision: CoiDecision;
+  reason?: string;
+  internalNote?: string;
+  actor: Actor;
+}): Promise<Document> {
+  const { documentId, decision, actor } = params;
+  const reason = params.reason?.trim();
+
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+    include: { booking: { include: { requester: true } } },
+  });
+  if (!document) throw new NotFoundError("Document");
+
+  if (document.type !== DocumentType.CERTIFICATE_OF_INSURANCE) {
+    throw new ValidationError("Only a certificate of insurance is reviewed this way.");
+  }
+  if (document.status === DocumentStatus.SUPERSEDED) {
+    throw new ValidationError(
+      "That certificate has been replaced by a newer one. Review the current version.",
+    );
+  }
+  if (!document.fileUrl) {
+    throw new ValidationError("There is no uploaded certificate to review yet.");
+  }
+  if (decision === "REJECTED" && !reason) {
+    throw new ValidationError(
+      "Give a reason for rejecting the certificate. The renter is shown it word for word, so " +
+        "it needs to say what to correct.",
+    );
+  }
+
+  const status = decision === "ACCEPTED" ? DocumentStatus.ACCEPTED : DocumentStatus.REJECTED;
+
+  const updated = await prisma.document.update({
+    where: { id: documentId },
+    data: {
+      status,
+      reviewedById: actor.id === "system" ? null : actor.id,
+      reviewedAt: new Date(),
+      rejectionReason: decision === "REJECTED" ? reason : null,
+      internalNote: params.internalNote?.trim() || null,
+    },
+  });
+
+  // Only now does the organization have a certificate on file. Doing this at
+  // upload time would let an unreviewed document satisfy a later booking.
+  if (decision === "ACCEPTED" && document.organizationId) {
+    await prisma.organization.update({
+      where: { id: document.organizationId },
+      data: { coiDocumentId: document.id, coiExpiresAt: document.expiresAt },
+    });
+  }
+
+  await recordAudit({
+    entityType: "document",
+    entityId: documentId,
+    action: decision === "ACCEPTED" ? "document.coi_accepted" : "document.coi_rejected",
+    actorId: actor.id === "system" ? null : actor.id,
+    actorLabel: actor.name,
+    fromState: document.status,
+    toState: status,
+    reason: reason ?? null,
+  });
+
+  if (document.booking?.requester) {
+    await enqueue({
+      kind: "notify.email",
+      payload: {
+        to: document.booking.requester.email,
+        subject:
+          decision === "ACCEPTED"
+            ? `Certificate of insurance accepted — ${document.booking.reference}`
+            : `Certificate of insurance needs correcting — ${document.booking.reference}`,
+        text:
+          decision === "ACCEPTED"
+            ? `${document.booking.requester.name},\n\nYour certificate of insurance for ` +
+              `${document.booking.title} (${document.booking.reference}) has been accepted.\n\n` +
+              `${env.appUrl}/portal/bookings/${document.booking.id}`
+            : `${document.booking.requester.name},\n\nThe certificate of insurance for ` +
+              `${document.booking.title} (${document.booking.reference}) could not be accepted.\n\n` +
+              `${reason}\n\nUpload a corrected certificate here:\n` +
+              `${env.appUrl}/portal/bookings/${document.booking.id}`,
+      },
+      idempotencyKey: `coi-review:${documentId}:${status}:${updated.reviewedAt?.toISOString()}`,
+    });
+  }
+
+  // Acceptance may be the last outstanding gate; rejection may pull a booking
+  // back from the brink of confirming.
+  if (document.bookingId) {
+    const { advanceBooking } = await import("./booking-service");
+    await advanceBooking(document.bookingId, actor);
   }
 
   return updated;
@@ -364,7 +521,7 @@ export async function expiringCertificates(withinDays: number, now: Date = new D
   return prisma.document.findMany({
     where: {
       type: DocumentType.CERTIFICATE_OF_INSURANCE,
-      status: { in: [DocumentStatus.UPLOADED, DocumentStatus.SIGNED] },
+      status: { in: [DocumentStatus.ACCEPTED, DocumentStatus.SIGNED] },
       expiresAt: { not: null, lte: cutoff, gte: now },
     },
     include: { booking: { include: { requester: true, organization: true } } },

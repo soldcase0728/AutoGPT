@@ -119,8 +119,16 @@ enum DocumentStatus {
   DECLINED
   VOIDED
   EXPIRED
+  /// A file has arrived but nobody has looked at it. Uploading is not the same
+  /// as being accepted: whoever accepts a certificate is attesting its limits
+  /// are adequate, and that is a judgement a person makes.
   UPLOADED
+  UNDER_REVIEW
+  ACCEPTED
   REJECTED
+  /// Replaced by a later version. Kept, never deleted -- the rejected
+  /// certificate and the reason it was rejected are the audit trail.
+  SUPERSEDED
 }
 
 enum InvoiceStatus {
@@ -183,6 +191,8 @@ model User {
 
   @@index([role, active])
   @@map("users")
+  reviewedDocuments Document[] @relation("DocumentReviewer")
+
 }
 
 model Organization {
@@ -511,11 +521,27 @@ model Document {
   isMinor     Boolean        @default(false) @map("is_minor")
   guardianName  String?      @map("guardian_name")
   guardianEmail String?      @map("guardian_email")
+
+  /// Review trail. Set together, by reviewCertificateOfInsurance.
+  reviewedById   String?   @map("reviewed_by_id")
+  reviewedAt     DateTime? @map("reviewed_at") @db.Timestamptz(3)
+  /// Shown to the requester verbatim, so it has to say what to fix. Required
+  /// on a rejection.
+  rejectionReason String?  @map("rejection_reason")
+  /// Staff-only. Never rendered on the portal.
+  internalNote   String?   @map("internal_note")
+  /// The version this one replaced, so the chain is walkable in either
+  /// direction without deleting anything.
+  supersedesId   String?   @unique @map("supersedes_id")
+
   metadata    Json?
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("DocumentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  supersedes  Document?  @relation("DocumentSupersession", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy Document? @relation("DocumentSupersession")
   user    User?    @relation(fields: [userId], references: [id])
 
   @@index([userId, type, status])

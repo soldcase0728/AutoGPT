@@ -27,7 +27,11 @@ import {
   releaseExpiredHolds,
 } from "@/services/booking-service";
 import { markInvoicePaid } from "@/services/invoice-service";
-import { recordSignature, uploadCertificateOfInsurance } from "@/services/document-service";
+import {
+  recordSignature,
+  reviewCertificateOfInsurance,
+  uploadCertificateOfInsurance,
+} from "@/services/document-service";
 import { ComplianceError, ConflictError } from "@/lib/errors";
 import { SOFT_LOCK_STATES } from "@/domain/booking-state";
 
@@ -195,6 +199,21 @@ describe("head coach books private instruction in the same gym", () => {
       actor: actorFor(admin),
     });
 
+    // Uploading is not accepting. The booking waits on a person.
+    current = await db.booking.findUniqueOrThrow({ where: { id: result.booking.id } });
+    expect(current.status).toBe(BookingStatus.AWAITING_DOCUMENTS);
+
+    const uploaded = await db.document.findFirstOrThrow({
+      where: { bookingId: result.booking.id, type: DocumentType.CERTIFICATE_OF_INSURANCE },
+    });
+    expect(uploaded.status).toBe(DocumentStatus.UNDER_REVIEW);
+
+    await reviewCertificateOfInsurance({
+      documentId: uploaded.id,
+      decision: "ACCEPTED",
+      actor: actorFor(admin),
+    });
+
     current = await db.booking.findUniqueOrThrow({ where: { id: result.booking.id } });
     expect(current.status).toBe(BookingStatus.AWAITING_PAYMENT);
 
@@ -231,12 +250,15 @@ describe("head coach books private instruction in the same gym", () => {
       await recordSignature(doc.id, { name: coach.name, email: coach.email });
     }
 
-    // A certificate valid today but expiring before the booking date.
+    // A certificate valid today but expiring before the booking date, and
+    // accepted -- so this proves the date check bites even once a person has
+    // signed off on the coverage, rather than the booking merely stalling
+    // because nobody reviewed it yet.
     const coi = docs.find((d) => d.type === DocumentType.CERTIFICATE_OF_INSURANCE)!;
     await db.document.update({
       where: { id: coi.id },
       data: {
-        status: DocumentStatus.UPLOADED,
+        status: DocumentStatus.ACCEPTED,
         expiresAt: new Date(startAt.getTime() - 86_400_000),
       },
     });
@@ -968,7 +990,7 @@ async function createExternalRental(
       await db.document.update({
         where: { id: doc.id },
         data: {
-          status: DocumentStatus.UPLOADED,
+          status: DocumentStatus.ACCEPTED,
           expiresAt: new Date(endAt.getTime() + 365 * 86_400_000),
         },
       });
@@ -980,3 +1002,205 @@ async function createExternalRental(
   await advanceBooking(result.booking.id, actorFor(admin));
   return result.booking;
 }
+
+// ---------------------------------------------------------------------------
+// Certificate of insurance review
+// ---------------------------------------------------------------------------
+
+describe("certificate of insurance review", () => {
+  async function gatedBooking(slotIndex: number) {
+    const coach = await userByEmail("bball.head@olsm.edu");
+    const admin = await userByEmail("ad@olsm.edu");
+    const court = await subSpace("rakoczy-gymnasium", "court-1");
+    const { startAt, endAt } = futureSlot(slotIndex, 60);
+
+    const result = await createBooking(
+      {
+        requesterId: coach.id,
+        subSpaceId: court.id,
+        activityType: ActivityType.PRIVATE_INSTRUCTION,
+        title: "COI review case",
+        startAt,
+        endAt,
+      },
+      actorFor(coach),
+    );
+
+    const step = await db.approvalStep.findFirstOrThrow({
+      where: { bookingId: result.booking.id },
+    });
+    await decideApproval(step.id, "APPROVED", actorFor(admin));
+
+    const docs = await db.document.findMany({ where: { bookingId: result.booking.id } });
+    for (const doc of docs.filter((d) => d.type !== DocumentType.CERTIFICATE_OF_INSURANCE)) {
+      await recordSignature(doc.id, { name: coach.name, email: coach.email });
+    }
+
+    return { result, admin, coach, endAt, docs };
+  }
+
+  const file = () => new TextEncoder().encode("%PDF-1.4 test certificate");
+
+  it("will not accept a rejection without a reason the renter can act on", async () => {
+    const { result, admin, endAt } = await gatedBooking(6);
+    const coi = await db.document.findFirstOrThrow({
+      where: { bookingId: result.booking.id, type: DocumentType.CERTIFICATE_OF_INSURANCE },
+    });
+
+    await uploadCertificateOfInsurance({
+      documentId: coi.id,
+      file: file(),
+      filename: "coi.pdf",
+      contentType: "application/pdf",
+      expiresAt: new Date(endAt.getTime() + 200 * 86_400_000),
+      actor: actorFor(admin),
+    });
+
+    await expect(
+      reviewCertificateOfInsurance({
+        documentId: coi.id,
+        decision: "REJECTED",
+        actor: actorFor(admin),
+      }),
+    ).rejects.toThrow(/reason/i);
+
+    // And it is still reviewable rather than left in some half-decided state.
+    const after = await db.document.findUniqueOrThrow({ where: { id: coi.id } });
+    expect(after.status).toBe(DocumentStatus.UNDER_REVIEW);
+  });
+
+  it("rejects with a reason, then accepts the replacement, keeping both versions", async () => {
+    const { result, admin, endAt } = await gatedBooking(8);
+    const expiresAt = new Date(endAt.getTime() + 200 * 86_400_000);
+    const original = await db.document.findFirstOrThrow({
+      where: { bookingId: result.booking.id, type: DocumentType.CERTIFICATE_OF_INSURANCE },
+    });
+
+    await uploadCertificateOfInsurance({
+      documentId: original.id,
+      file: file(),
+      filename: "first.pdf",
+      contentType: "application/pdf",
+      expiresAt,
+      actor: actorFor(admin),
+    });
+
+    const reason =
+      "The certificate does not list Orchard Lake Schools as an additional insured. " +
+      "Upload a corrected certificate showing the required additional-insured wording.";
+
+    await reviewCertificateOfInsurance({
+      documentId: original.id,
+      decision: "REJECTED",
+      reason,
+      internalNote: "Broker contacted 30 July.",
+      actor: actorFor(admin),
+    });
+
+    const rejected = await db.document.findUniqueOrThrow({ where: { id: original.id } });
+    expect(rejected.status).toBe(DocumentStatus.REJECTED);
+    expect(rejected.rejectionReason).toBe(reason);
+    expect(rejected.reviewedById).toBe(admin.id);
+    expect(rejected.reviewedAt).not.toBeNull();
+
+    // The booking is held back, and the requester is told exactly why.
+    const held = await advanceBooking(result.booking.id, actorFor(admin));
+    expect(held.booking.status).toBe(BookingStatus.AWAITING_DOCUMENTS);
+    expect(held.outstanding.join(" ")).toContain("additional insured");
+
+    // --- the corrected certificate ---
+    await uploadCertificateOfInsurance({
+      bookingId: result.booking.id,
+      file: file(),
+      filename: "corrected.pdf",
+      contentType: "application/pdf",
+      expiresAt,
+      actor: actorFor(admin),
+    });
+
+    // The rejected version is kept, not overwritten: it and its reason are the
+    // record of why a correction was needed.
+    const superseded = await db.document.findUniqueOrThrow({ where: { id: original.id } });
+    expect(superseded.status).toBe(DocumentStatus.SUPERSEDED);
+    expect(superseded.rejectionReason).toBe(reason);
+
+    const replacement = await db.document.findFirstOrThrow({
+      where: {
+        bookingId: result.booking.id,
+        type: DocumentType.CERTIFICATE_OF_INSURANCE,
+        status: DocumentStatus.UNDER_REVIEW,
+      },
+    });
+    expect(replacement.id).not.toBe(original.id);
+    expect(replacement.supersedesId).toBe(original.id);
+    // A fresh upload carries none of the previous decision.
+    expect(replacement.rejectionReason).toBeNull();
+    expect(replacement.reviewedById).toBeNull();
+
+    await reviewCertificateOfInsurance({
+      documentId: replacement.id,
+      decision: "ACCEPTED",
+      actor: actorFor(admin),
+    });
+
+    const accepted = await db.document.findUniqueOrThrow({ where: { id: replacement.id } });
+    expect(accepted.status).toBe(DocumentStatus.ACCEPTED);
+    expect(accepted.reviewedById).toBe(admin.id);
+
+    // The insurance gate is satisfied and the booking moves on to money.
+    const advanced = await advanceBooking(result.booking.id, actorFor(admin));
+    expect(advanced.booking.status).toBe(BookingStatus.AWAITING_PAYMENT);
+
+    // Both versions survive, and the audit trail records each decision.
+    const all = await db.document.findMany({
+      where: { bookingId: result.booking.id, type: DocumentType.CERTIFICATE_OF_INSURANCE },
+    });
+    expect(all).toHaveLength(2);
+
+    const actions = (
+      await db.auditLog.findMany({ where: { entityId: { in: all.map((d) => d.id) } } })
+    ).map((a) => a.action);
+    expect(actions).toContain("document.coi_rejected");
+    expect(actions).toContain("document.coi_superseded");
+    expect(actions).toContain("document.coi_accepted");
+  });
+
+  it("will not review a version that has already been replaced", async () => {
+    const { result, admin, endAt } = await gatedBooking(10);
+    const expiresAt = new Date(endAt.getTime() + 200 * 86_400_000);
+    const original = await db.document.findFirstOrThrow({
+      where: { bookingId: result.booking.id, type: DocumentType.CERTIFICATE_OF_INSURANCE },
+    });
+
+    await uploadCertificateOfInsurance({
+      documentId: original.id,
+      file: file(),
+      filename: "first.pdf",
+      contentType: "application/pdf",
+      expiresAt,
+      actor: actorFor(admin),
+    });
+    await reviewCertificateOfInsurance({
+      documentId: original.id,
+      decision: "REJECTED",
+      reason: "Expired before the event date.",
+      actor: actorFor(admin),
+    });
+    await uploadCertificateOfInsurance({
+      bookingId: result.booking.id,
+      file: file(),
+      filename: "corrected.pdf",
+      contentType: "application/pdf",
+      expiresAt,
+      actor: actorFor(admin),
+    });
+
+    await expect(
+      reviewCertificateOfInsurance({
+        documentId: original.id,
+        decision: "ACCEPTED",
+        actor: actorFor(admin),
+      }),
+    ).rejects.toThrow(/replaced/i);
+  });
+});

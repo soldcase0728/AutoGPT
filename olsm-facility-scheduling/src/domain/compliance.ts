@@ -91,11 +91,13 @@ export function checkAnnualAgreement(
 export interface CoiLike {
   status: DocumentStatus;
   expiresAt: Date | null;
+  /** Shown to the requester when the reason is REJECTED. */
+  rejectionReason?: string | null;
 }
 
 export interface CoiCheck {
   ok: boolean;
-  reason?: "MISSING" | "UNAPPROVED" | "EXPIRED" | "EXPIRES_BEFORE_EVENT";
+  reason?: "MISSING" | "UNDER_REVIEW" | "REJECTED" | "UNAPPROVED" | "EXPIRED" | "EXPIRES_BEFORE_EVENT";
   message?: string;
   expiresAt?: Date | null;
 }
@@ -117,10 +119,45 @@ export function checkCertificateOfInsurance(
     };
   }
 
-  const accepted = cois.filter(
-    (c) => c.status === DocumentStatus.UPLOADED || c.status === DocumentStatus.SIGNED,
-  );
+  // Only an accepted certificate satisfies the gate.
+  //
+  // Uploading used to be enough, which meant a booking could confirm on a file
+  // nobody had opened -- while the message here claimed the opposite. Accepting
+  // one is an attestation that its limits are adequate, and that is a judgement
+  // a person makes, not a state a file arrives in.
+  //
+  // A superseded version never counts: it is kept for the audit trail, not to
+  // satisfy anything.
+  const live = cois.filter((c) => c.status !== DocumentStatus.SUPERSEDED);
+  const accepted = live.filter((c) => c.status === DocumentStatus.ACCEPTED);
+
   if (accepted.length === 0) {
+    // Say which of the three "not accepted" situations this is, because the
+    // thing the requester should do next differs completely between them.
+    const rejected = live.find((c) => c.status === DocumentStatus.REJECTED);
+    if (rejected) {
+      return {
+        ok: false,
+        reason: "REJECTED",
+        message:
+          rejected.rejectionReason?.trim() ||
+          "The certificate of insurance was not accepted. Upload a corrected certificate.",
+      };
+    }
+
+    if (
+      live.some(
+        (c) =>
+          c.status === DocumentStatus.UNDER_REVIEW || c.status === DocumentStatus.UPLOADED,
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "UNDER_REVIEW",
+        message: "The certificate of insurance is with the athletic office for review.",
+      };
+    }
+
     return {
       ok: false,
       reason: "UNAPPROVED",

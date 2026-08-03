@@ -33,7 +33,8 @@ interface InvoiceLike {
   status: string;
 }
 
-const SATISFIED: DocumentStatus[] = [DocumentStatus.SIGNED, DocumentStatus.UPLOADED];
+// Uploaded is not satisfied: a certificate waits on a person to accept it.
+const SATISFIED: DocumentStatus[] = [DocumentStatus.SIGNED, DocumentStatus.ACCEPTED];
 
 const PRE_APPROVAL: BookingStatus[] = [BookingStatus.DRAFT, BookingStatus.PENDING_APPROVAL];
 
@@ -61,8 +62,12 @@ function documentStage(
   // the booking does not have.
   if (owed.length === 0) return null;
 
-  const satisfied = owed.every((d) => SATISFIED.includes(d.status));
-  const rejected = owed.some((d) => d.status === DocumentStatus.REJECTED);
+  // A replaced version neither satisfies nor blocks; it is kept for the record.
+  const live = owed.filter((d) => d.status !== DocumentStatus.SUPERSEDED);
+  if (live.length === 0) return null;
+
+  const satisfied = live.every((d) => SATISFIED.includes(d.status));
+  const rejected = live.some((d) => d.status === DocumentStatus.REJECTED);
 
   return {
     label,

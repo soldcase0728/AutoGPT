@@ -25,7 +25,10 @@ export default async function MyDocumentsPage() {
   const annual = documents.filter((d) => d.type === DocumentType.ANNUAL_COACH_AGREEMENT);
   const perBooking = documents.filter((d) => d.type !== DocumentType.ANNUAL_COACH_AGREEMENT);
   const outstanding = perBooking.filter(
-    (d) => d.status !== DocumentStatus.SIGNED && d.status !== DocumentStatus.UPLOADED,
+    (d) =>
+        d.status !== DocumentStatus.SIGNED &&
+        d.status !== DocumentStatus.ACCEPTED &&
+        d.status !== DocumentStatus.SUPERSEDED,
   );
 
   return (
@@ -120,7 +123,7 @@ export default async function MyDocumentsPage() {
                   </div>
                   <Badge
                     tone={
-                      doc.status === DocumentStatus.SIGNED || doc.status === DocumentStatus.UPLOADED
+                      doc.status === DocumentStatus.SIGNED || doc.status === DocumentStatus.ACCEPTED
                         ? "good"
                         : "warn"
                     }
