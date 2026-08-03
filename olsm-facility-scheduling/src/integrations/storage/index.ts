@@ -154,42 +154,6 @@ class S3Storage implements StorageProvider {
   }
 }
 
-// ---------------------------------------------------------------------------
-// GCS (via the service account already configured for Calendar)
-// ---------------------------------------------------------------------------
-
-class GcsStorage implements StorageProvider {
-  readonly name = "gcs";
-
-  private async token(): Promise<string> {
-    const { getCalendarAccessToken } = await import("@/lib/auth/google");
-    return getCalendarAccessToken();
-  }
-
-  async put(key: string, body: Uint8Array, contentType: string): Promise<StoredObject> {
-    const res = await fetch(
-      `https://storage.googleapis.com/upload/storage/v1/b/${env.storage.bucket}/o?uploadType=media&name=${encodeURIComponent(key)}`,
-      {
-        method: "POST",
-        headers: { authorization: `Bearer ${await this.token()}`, "content-type": contentType },
-        body: toBodyInit(body),
-      },
-    );
-    if (!res.ok) throw new Error(`GCS upload ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    return { key, size: body.byteLength, contentType };
-  }
-
-  async get(key: string): Promise<Uint8Array | null> {
-    const res = await fetch(
-      `https://storage.googleapis.com/storage/v1/b/${env.storage.bucket}/o/${encodeURIComponent(key)}?alt=media`,
-      { headers: { authorization: `Bearer ${await this.token()}` } },
-    );
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`GCS get ${res.status}`);
-    return new Uint8Array(await res.arrayBuffer());
-  }
-}
-
 let cached: StorageProvider | null = null;
 
 export function storage(): StorageProvider {
@@ -197,9 +161,6 @@ export function storage(): StorageProvider {
   switch (env.storage.provider) {
     case "s3":
       cached = env.storage.bucket ? new S3Storage() : new LocalStorage();
-      break;
-    case "gcs":
-      cached = env.storage.bucket ? new GcsStorage() : new LocalStorage();
       break;
     default:
       cached = new LocalStorage();

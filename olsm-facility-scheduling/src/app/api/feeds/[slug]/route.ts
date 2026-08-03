@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildIcsFeed } from "@/services/calendar-sync-service";
+import { buildIcsFeed } from "@/services/ical-feed";
 
 /**
  * Read-only iCal feed per facility, for people who are not on Google Workspace

@@ -145,26 +145,24 @@ request never squats on a slot waiting for the next cron tick.
 
 ## Integrations
 
-All four are behind adapters and degrade to an inert local mode when
-unconfigured, so the app boots and the test suite runs with zero third-party
-credentials.
+All are behind adapters and degrade to an inert local mode when unconfigured,
+so the app boots and the test suite runs with zero third-party credentials.
 
-**Google Calendar** — service account with domain-wide delegation, one calendar
-per facility, **one-way**. The app writes; Google displays. Edits made directly
-in Google Calendar are detected via push notification and **reverted**, with a
-note to the booking owner. Two-way sync on a system with approval and payment
-gates creates conflict states nobody can resolve: a coach dragging a confirmed,
-paid rental to another court in Google has no way to re-run the conflict check,
-the contract or the invoice. Read-only iCal feeds at `/api/feeds/<slug>.ics`
-serve non-Google users and the public site.
+**Calendars — read-only iCal feeds** at `/api/feeds/<slug>.ics`, one per
+facility. Subscribing puts a facility's schedule into Google Calendar, Outlook
+or a phone, and it cannot drift because it only flows one way. A two-way Google
+push sync used to live here and was removed: it bought write-back from a coach's
+calendar into the booking record, which is not a thing anybody wanted, at the
+cost of webhook channels needing renewal and a sync status needing explanation.
+On a system with approval and payment gates, a coach dragging a confirmed, paid
+rental to another court in Google has no way to re-run the conflict check, the
+contract or the invoice.
 
-**Stripe** — Checkout for card and ACH; no card data touches this app. Security
-deposits are manual-capture authorisations: after the rental the hold is either
-released untouched or partially captured with a written reason, which is both
-audited and emailed to the renter. An authorisation lapses at Stripe after about
-a week, so unresolved holds raise a nightly admin alert. Webhooks are
-signature-verified with replay protection and every mutating call carries an
-idempotency key.
+**Stripe** — Checkout for card and ACH; no card data touches this app. Webhooks
+are signature-verified with replay protection and every mutating call carries an
+idempotency key. There are no security deposits: a manual-capture hold lapses at
+Stripe after about a week, so for a rental booked two months out it was expired
+before the date it was meant to cover — a control in appearance only.
 
 **DocuSign / Dropbox Sign** — one `EsignProvider` interface, chosen by
 `ESIGN_PROVIDER`. A third `manual` provider keeps the full document state
@@ -189,8 +187,7 @@ reimplementing `enqueue`; no caller changes.
 | `0 * * * *` | `expire-holds` | Release lapsed soft locks |
 | `0 6 * * *` | `daily-digest` | Custodial setup board |
 | `0 7 * * 1` | `weekly-digest` | AD summary |
-| `0 3 * * *` | `nightly` | Completions, COI warnings, payment and waiver reminders, unresolved deposits, session prune |
-| `0 4 * * *` | `refresh-calendar-channels` | Renew Google push subscriptions |
+| `0 3 * * *` | `nightly` | Completions, COI warnings, payment and waiver reminders, session and token prune |
 
 ---
 
@@ -216,8 +213,6 @@ src/
   services/                 orchestration and persistence
     booking-service.ts      creation, gates, bumping, cancellation
     participant-service.ts  rosters and public waiver links
-    deposit-service.ts      hold, release, partial capture
-    weather-service.ts      close a facility for a day
   integrations/             Google, Stripe, e-sign, mail, storage
   lib/                      db, auth, audit, time
   app/                      Next.js App Router: pages, actions, API routes
@@ -250,9 +245,8 @@ check still runs server-side on submit.
 
 **Admin** — approval queue with inline conflict warnings, season allocation
 builder with collision resolution, facility/sub-space/conflict-graph editors,
-rate cards, the rules matrix, blackouts, weather call (close an outdoor facility
-for a day in one action), deposit release/capture, reports, people, audit log
-with CSV export.
+rate cards, the rules matrix, blackouts, reports, people (add a person and send
+them a sign-in link), audit log with CSV export.
 
 **Facilities** — daily setup board grouped by building with turnover times and
 setup notes; check-in; mark a space unavailable.
@@ -292,11 +286,10 @@ a participant signing a waiver with no account, the conflict message a person
 actually sees, and drag-to-create. It runs against desktop and a phone
 viewport, because coaches book from the field.
 
-Beyond the twelve, `operations.test.ts` covers the participant-waiver flow
-(including guardian signatures for minors and the refusal to sign after an event
-has finished), the deposit lifecycle (release, partial capture, over-capture
-refusal, double-resolution refusal), and weather cancellation (bulk cancel with
-full refunds inside the no-refund window, plus SMS to opted-in requesters).
+Beyond the twelve, `operations.test.ts` covers the participant-waiver flow,
+including guardian signatures for minors and the refusal to sign after an event
+has finished, and `invitation.test.ts` covers the one-time sign-in link: stored
+hashed, spent once, unspendable by merely being looked at.
 
 ---
 

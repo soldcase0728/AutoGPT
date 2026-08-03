@@ -16,7 +16,6 @@ export function FacilityEditor({
     bufferMinutes: number;
     externallyBookable: boolean;
     requiresSupervision: boolean;
-    googleCalendarId: string | null;
     description: string | null;
     active: boolean;
   };
@@ -66,19 +65,6 @@ export function FacilityEditor({
         </Field>
       </div>
 
-      <Field
-        label="Google Calendar ID"
-        htmlFor={`cal-${facility.id}`}
-        hint="Confirmed bookings for this facility are written here. Leave blank to disable calendar sync for this facility."
-      >
-        <input
-          id={`cal-${facility.id}`}
-          name="googleCalendarId"
-          defaultValue={facility.googleCalendarId ?? ""}
-          placeholder="c_xxxxx@group.calendar.google.com"
-          className={inputClass}
-        />
-      </Field>
 
       <Field label="Public description" htmlFor={`desc-${facility.id}`}>
         <textarea

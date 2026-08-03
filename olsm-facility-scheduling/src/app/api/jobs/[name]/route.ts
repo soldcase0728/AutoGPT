@@ -7,7 +7,6 @@ import { formatRange } from "@/lib/time";
 import { formatMoney } from "@/domain/pricing";
 import { COI_WARNING_DAYS } from "@/domain/compliance";
 import { processDueJobs, reclaimStuckJobs, registerHandler } from "@/services/job-queue";
-import { registerCalendarHandlers, refreshWatchChannels } from "@/services/calendar-sync-service";
 import { completePastBookings, releaseExpiredHolds } from "@/services/booking-service";
 import { expiringCertificates, staffMissingAgreements } from "@/services/document-service";
 import { invoicesNeedingReminder } from "@/services/invoice-service";
@@ -15,7 +14,6 @@ import { notifyAdmins } from "@/services/notification-service";
 import { operationsSummary, setupBoard } from "@/services/reporting-service";
 import { sendEmail, sendSms } from "@/integrations/notifications";
 import { sendWaiverReminders } from "@/services/participant-service";
-import { depositsAwaitingResolution } from "@/services/deposit-service";
 import { pruneSessions } from "@/lib/auth/session";
 import { pruneAccessTokens } from "@/lib/auth/access-token";
 import { enqueue } from "@/services/job-queue";
@@ -28,7 +26,6 @@ import { enqueue } from "@/services/job-queue";
  *   0 6 * * *      daily-digest      custodial setup board
  *   0 7 * * 1      weekly-digest     AD summary
  *   0 3 * * *      nightly           completions, COI warnings, session prune
- *   0 4 * * *      refresh-calendar-channels
  */
 export async function POST(request: NextRequest, context: { params: Promise<{ name: string }> }) {
   if (!authorized(request)) {
@@ -76,7 +73,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ na
       const accessTokens = await pruneAccessTokens();
       const reminders = await sendPaymentReminders();
       const waivers = await sendWaiverReminders();
-      const deposits = await nudgeUnresolvedDeposits();
       return NextResponse.json({
         completed,
         warned,
@@ -84,14 +80,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ na
         accessTokens,
         reminders,
         waivers,
-        deposits,
       });
     }
 
-    case "refresh-calendar-channels": {
-      const refreshed = await refreshWatchChannels();
-      return NextResponse.json({ refreshed });
-    }
 
     default:
       return NextResponse.json({ error: `Unknown job "${name}".` }, { status: 404 });
@@ -111,7 +102,6 @@ let handlersRegistered = false;
 
 function registerHandlers(): void {
   if (handlersRegistered) return;
-  registerCalendarHandlers();
 
   registerHandler("notify.email", async (payload) => {
     await sendEmail({
@@ -192,9 +182,6 @@ async function sendAdDigest(): Promise<number> {
     `Denied in the last 30 days: ${summary.deniedLast30}`,
     `Bumped in the last 30 days: ${summary.bumpedLast30}`,
     `No-shows in the last 30 days: ${summary.noShowLast30}`,
-    summary.failedCalendarSyncs > 0
-      ? `CALENDAR SYNC FAILURES: ${summary.failedCalendarSyncs} — these bookings are not on Google.`
-      : "",
     "",
     `Reports: ${env.appUrl}/admin/reports`,
   ]
@@ -240,33 +227,6 @@ async function warnExpiringCertificates(): Promise<number> {
   }
 
   return expiring.length;
-}
-
-/**
- * A Stripe authorization lapses after about a week, so an unresolved deposit is
- * a deadline. Nag until someone releases or captures it.
- */
-async function nudgeUnresolvedDeposits(): Promise<number> {
-  const pending = await depositsAwaitingResolution();
-  if (pending.length === 0) return 0;
-
-  await notifyAdmins(
-    `${pending.length} security deposit(s) still held after the rental`,
-    pending
-      .map(
-        (invoice) =>
-          `${invoice.booking.title} (${invoice.booking.reference}) — ` +
-          `${formatMoney(invoice.depositCents)} held since ` +
-          `${invoice.booking.endAt.toDateString()}, ${invoice.booking.requester.name}\n` +
-          `  ${env.appUrl}/portal/invoices/${invoice.id}`,
-      )
-      .join("\n\n") +
-      "\n\nRelease or capture each one. Stripe authorizations expire on their own after about " +
-      "seven days, which releases the funds without a decision being recorded.",
-    `deposits-unresolved:${new Date().toISOString().slice(0, 10)}`,
-  );
-
-  return pending.length;
 }
 
 async function sendPaymentReminders(): Promise<number> {

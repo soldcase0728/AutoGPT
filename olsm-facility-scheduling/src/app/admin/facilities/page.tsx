@@ -53,7 +53,6 @@ export default async function AdminFacilitiesPage() {
                 bufferMinutes: facility.bufferMinutes,
                 externallyBookable: facility.externallyBookable,
                 requiresSupervision: facility.requiresSupervision,
-                googleCalendarId: facility.googleCalendarId,
                 description: facility.description,
                 active: facility.active,
               }}

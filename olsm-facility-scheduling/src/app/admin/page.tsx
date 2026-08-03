@@ -12,7 +12,7 @@ const SECTIONS = [
   { href: "/admin/approvals", title: "Approval queue", blurb: "Decide pending requests." },
   { href: "/admin/allocation", title: "Season allocation", blurb: "Standing blocks and collision resolution." },
   { href: "/admin/facilities", title: "Facilities & spaces", blurb: "Names, buffers, calendars, conflict rules." },
-  { href: "/admin/rates", title: "Rate cards", blurb: "Hourly rates, day rates, deposits by tier." },
+  { href: "/admin/rates", title: "Rate cards", blurb: "Hourly and day rates by tier." },
   { href: "/admin/rules", title: "Approval rules", blurb: "The matrix that decides what each request needs." },
   { href: "/admin/blackouts", title: "Blackouts", blurb: "Maintenance and unavailable windows." },
   { href: "/admin/weather", title: "Weather call", blurb: "Close an outdoor facility for a day, refund everyone." },
@@ -45,11 +45,6 @@ export default async function AdminHome() {
           hint={summary.unsignedAgreementCount > 0 ? "These accounts cannot book." : undefined}
         />
         <Stat label="Bumped (30 days)" value={summary.bumpedLast30} />
-        <Stat
-          label="Calendar sync failures"
-          value={summary.failedCalendarSyncs}
-          hint={summary.failedCalendarSyncs > 0 ? "Investigate; these are not on Google." : undefined}
-        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

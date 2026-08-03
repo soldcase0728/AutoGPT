@@ -43,10 +43,6 @@ export const env = {
       .split(",")
       .map((d) => d.trim().toLowerCase())
       .filter(Boolean),
-    serviceAccountEmail: str("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
-    serviceAccountKey: str("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n"),
-    impersonateUser: str("GOOGLE_CALENDAR_IMPERSONATE_USER"),
-    calendarWebhookToken: str("GOOGLE_CALENDAR_WEBHOOK_TOKEN"),
   },
 
   /**
@@ -107,7 +103,7 @@ export const env = {
   },
 
   storage: {
-    provider: str("STORAGE_PROVIDER", "local") as "s3" | "gcs" | "local",
+    provider: str("STORAGE_PROVIDER", "local") as "s3" | "local",
     bucket: str("STORAGE_BUCKET"),
     localDir: str("STORAGE_LOCAL_DIR", "./.storage"),
   },

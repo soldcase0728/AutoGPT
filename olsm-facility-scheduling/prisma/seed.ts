@@ -6,7 +6,7 @@
  * Admin > Rules without a deploy.
  *
  * The rental rate is set: a flat $50.00 per hour, every facility, every paid
- * requester type. Surcharges, the security deposit and the insurance minimums
+ * requester type. Surcharges and the insurance minimums
  * are still placeholders marked [DECIDE].
  *
  * Run with: npm run db:seed
@@ -398,12 +398,12 @@ const RULES: RuleSeed[] = [
     requiresPayment: true,
     autoApprove: false,
     priorityRank: 90,
-    notes: "Third-party rental. Full rate plus a refundable security deposit.",
+    notes: "Third-party rental. Full rate, agreement, waiver, insurance and payment.",
   },
 ];
 
 // ---------------------------------------------------------------------------
-// Rates. The hourly rental rate is set; surcharges and the deposit are not.
+// Rates. The hourly rental rate is set; surcharges are not.
 // ---------------------------------------------------------------------------
 
 /**
@@ -435,10 +435,6 @@ const BILLABLE: ActivityType[] = [
   ActivityType.CLUB_TRAVEL,
   ActivityType.EXTERNAL_RENTAL,
 ];
-
-const DEPOSIT_CENTS: Record<string, number> = {
-  EXTERNAL_RENTAL: 50000, // [DECIDE]
-};
 
 // ---------------------------------------------------------------------------
 
@@ -571,10 +567,6 @@ async function main() {
           // Full-day cap at six hours of the hourly rate. Placeholder.
           flatDayCents: hourlyCents > 0 ? hourlyCents * 6 : null,
           minHours: 1,
-          depositCents:
-            activityType === ActivityType.EXTERNAL_RENTAL && rateTier !== RateTier.INTERNAL
-              ? DEPOSIT_CENTS.EXTERNAL_RENTAL
-              : 0,
           effectiveFrom,
         };
         // Create what is missing; never rewrite what is there.
@@ -781,7 +773,7 @@ async function main() {
   console.log(`  seasons: ${seasons.length}`);
 
   console.log("\nDone. Sign in at /sign-in with any seeded address, password ChangeMe123456.");
-  console.log("Surcharges, deposits, insurance minimums, retention and cancellation windows are placeholders.");
+  console.log("Surcharges, insurance minimums, retention and cancellation windows are placeholders.");
   console.log("See DECISIONS.md before this goes anywhere near a real rental.\n");
 }
 

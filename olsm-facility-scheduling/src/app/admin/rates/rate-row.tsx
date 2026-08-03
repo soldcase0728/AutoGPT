@@ -13,7 +13,6 @@ export function RateRow({
     id: string;
     hourlyCents: number;
     flatDayCents: number | null;
-    depositCents: number;
     minHours: number;
   };
 }) {
@@ -25,10 +24,9 @@ export function RateRow({
       {state.error && <Alert tone="danger">{state.error}</Alert>}
       {state.notice && <Alert tone="success">{state.notice}</Alert>}
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Money name="hourlyDollars" label="Hourly" cents={rate.hourlyCents} />
         <Money name="flatDayDollars" label="Full day cap" cents={rate.flatDayCents} />
-        <Money name="depositDollars" label="Security deposit" cents={rate.depositCents} />
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-navy-800">Minimum hours</span>
           <input

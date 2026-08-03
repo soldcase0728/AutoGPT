@@ -56,7 +56,7 @@ Docker.
 
 The cron service runs `process-queue` and `expire-holds` on the same
 five-minute tick. The remaining scheduled jobs — `daily-digest`,
-`weekly-digest`, `nightly` and `refresh-calendar-channels` — are **not wired up
+`weekly-digest` and `nightly` — are **not wired up
 on Render**, because each needs its own schedule and therefore its own billable
 cron service. Nothing breaks without them, but past bookings are not marked
 complete, certificate-expiry warnings are not sent and stale sessions are not
@@ -175,8 +175,7 @@ and the custodial digest never arrives. Each is a `POST` with
 | `0 * * * *` | `/api/jobs/expire-holds` | Releases lapsed soft locks |
 | `0 6 * * *` | `/api/jobs/daily-digest` | Custodial setup board email |
 | `0 7 * * 1` | `/api/jobs/weekly-digest` | AD summary |
-| `0 3 * * *` | `/api/jobs/nightly` | Completions, COI and waiver reminders, unresolved deposits |
-| `0 4 * * *` | `/api/jobs/refresh-calendar-channels` | Renews Google push subscriptions |
+| `0 3 * * *` | `/api/jobs/nightly` | Completions, COI and waiver reminders, session and token prune |
 
 The compose file runs the first two. The rest matter once real bookings exist.
 

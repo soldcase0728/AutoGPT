@@ -13,7 +13,7 @@ export interface LineItem {
   quantity: number;
   unitAmountCents: number;
   amountCents: number;
-  kind: "facility" | "surcharge" | "deposit" | "discount";
+  kind: "facility" | "surcharge" | "discount";
 }
 
 export interface SurchargeSpec {
@@ -31,15 +31,12 @@ export interface QuoteInput {
   startAt: Date;
   endAt: Date;
   surcharges?: readonly SurchargeSpec[];
-  /** Overrides the rate card's deposit, e.g. an admin waiving it. */
-  depositCentsOverride?: number | null;
   at?: Date;
 }
 
 export interface Quote {
   lineItems: LineItem[];
   subtotalCents: number;
-  depositCents: number;
   totalCents: number;
   billedHours: number;
   rateCardId: string | null;
@@ -84,7 +81,6 @@ export function quote(input: QuoteInput): Quote {
     return {
       lineItems,
       subtotalCents: 0,
-      depositCents: 0,
       totalCents: 0,
       billedHours: rawHours,
       rateCardId: null,
@@ -131,23 +127,10 @@ export function quote(input: QuoteInput): Quote {
   }
 
   const subtotalCents = lineItems.reduce((sum, li) => sum + li.amountCents, 0);
-  const depositCents = input.depositCentsOverride ?? card.depositCents;
-
-  if (depositCents > 0) {
-    lineItems.push({
-      label: "Refundable security deposit (authorized, not captured)",
-      quantity: 1,
-      unitAmountCents: depositCents,
-      amountCents: depositCents,
-      kind: "deposit",
-    });
-  }
 
   return {
     lineItems,
     subtotalCents,
-    depositCents,
-    // The deposit is authorized separately, so it is not part of the charge.
     totalCents: subtotalCents,
     billedHours,
     rateCardId: card.id,

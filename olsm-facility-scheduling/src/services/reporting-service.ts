@@ -182,7 +182,6 @@ export interface OperationsSummary {
   noShowLast30: number;
   expiringCoiCount: number;
   unsignedAgreementCount: number;
-  failedCalendarSyncs: number;
 }
 
 export async function operationsSummary(now: Date = new Date()): Promise<OperationsSummary> {
@@ -198,7 +197,6 @@ export async function operationsSummary(now: Date = new Date()): Promise<Operati
     bumpedLast30,
     noShowLast30,
     expiringCoiCount,
-    failedCalendarSyncs,
   ] = await Promise.all([
     prisma.booking.count({ where: { status: BookingStatus.PENDING_APPROVAL } }),
     prisma.booking.count({ where: { status: BookingStatus.AWAITING_DOCUMENTS } }),
@@ -223,7 +221,6 @@ export async function operationsSummary(now: Date = new Date()): Promise<Operati
         expiresAt: { not: null, lte: in30, gte: now },
       },
     }),
-    prisma.booking.count({ where: { calendarSyncStatus: "FAILED" } }),
   ]);
 
   const { staffMissingAgreements } = await import("./document-service");
@@ -239,7 +236,6 @@ export async function operationsSummary(now: Date = new Date()): Promise<Operati
     noShowLast30,
     expiringCoiCount,
     unsignedAgreementCount: missing.length,
-    failedCalendarSyncs,
   };
 }
 

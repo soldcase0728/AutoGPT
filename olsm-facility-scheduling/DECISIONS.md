@@ -9,7 +9,7 @@ money from, or accepting liability for, an outside organisation.
 
 ---
 
-## 1. Rate card — hourly rates, internal camp rates, deposits, surcharges
+## 1. Rate card — hourly rates, internal camp rates, surcharges
 
 **Hourly rate: decided.** A flat **$50.00 per hour**, every facility, every paid
 requester type. Full day caps at 6× hourly, so $300.
@@ -33,9 +33,16 @@ INTERNAL tier is therefore still free, so an OLSM-run camp carries no facility
 cost. If the school wants camps to carry it internally, set that rate; the
 plumbing already bills it.
 
-**Still placeholder:** external rental deposit $500; surcharges for lights
-$75/hr, custodial $50/hr, supervision $45/hr, athletic trainer $65/hr. These are
-add-on services, not the rental rate, and were not part of the $50 decision.
+**Still placeholder:** surcharges for lights $75/hr, custodial $50/hr,
+supervision $45/hr, athletic trainer $65/hr. These are add-on services, not the
+rental rate, and were not part of the $50 decision.
+
+**No security deposit is taken.** The card-authorisation mechanism was removed:
+a Stripe hold lapses after about a week, so on a rental booked two months out it
+had expired before the date it was meant to cover. If the school wants a deposit,
+collect it as a cheque held by the athletic office, or bill it as a surcharge and
+refund it — both are decisions to make with the business office, and neither
+needs software.
 
 **Careful — the seed overwrites rate cards on every boot.** `SEED_ON_BOOT`
 defaults to `1`, and the rate-card step updates existing rows rather than
@@ -126,8 +133,9 @@ Approval rules for a distinct path.
 - No refund inside 72 hours
 
 A booking **bumped** by higher-priority school activity is always refunded in
-full regardless of window — the bumped party did nothing wrong. Weather
-cancellations use the same waiver (admin ticks "refund in full regardless").
+full regardless of window — the bumped party did nothing wrong. The same waiver
+covers anything the school causes: a rained-out field, a closure, a schedule
+change. An admin ticks "refund in full regardless" when cancelling.
 
 **Change at:** Admin → Approval rules, per activity type. Every booking freezes
 the policy in force when it was created, so a change never alters an existing
@@ -187,11 +195,12 @@ the booking. Decide whether the athletic office wants a harder stop — for
 example, refusing check-in while anyone is unsigned. The data to enforce that is
 already there (`rosterStatus`), it is only the policy that is undecided.
 
-**Who may keep a security deposit, and on what evidence.** Any admin can
-currently capture part of a hold, with a mandatory written reason that is
-audited and emailed to the renter. If retaining money should need business-office
-sign-off or photographs, that is a workflow decision to make before the first
-external rental.
+**What happens when a renter damages something.** Nothing in the software: there
+is no deposit to capture and no damage record to write. Recovering a cost today
+means an invoice or a conversation, outside this system. If the athletic office
+wants damage tracked here — a post-event condition note, photographs, a charge
+raised against the booking — that is a feature to specify, and worth deciding
+before the first external rental rather than after one.
 
 **Agreement and waiver wording.** `src/app/sign/[token]/terms.ts` contains
 drafting scaffolding so the flow is testable end to end. It is not legal advice

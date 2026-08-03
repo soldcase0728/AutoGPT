@@ -32,6 +32,7 @@ import {
   reviewCertificateOfInsurance,
   uploadCertificateOfInsurance,
 } from "@/services/document-service";
+import { buildIcsFeed } from "@/services/ical-feed";
 import { ComplianceError, ConflictError } from "@/lib/errors";
 import { SOFT_LOCK_STATES } from "@/domain/booking-state";
 
@@ -80,12 +81,38 @@ describe("head coach books an in-season practice", () => {
     expect(await db.document.count({ where: { bookingId: result.booking.id } })).toBe(0);
     expect(await db.invoice.count({ where: { bookingId: result.booking.id } })).toBe(0);
 
-    // Confirmed is the only state that reaches Google Calendar: the sync job is
-    // queued as part of the same operation.
-    const job = await db.jobQueue.findFirst({
-      where: { kind: "calendar.upsert", payload: { path: ["bookingId"], equals: result.booking.id } },
-    });
-    expect(job).not.toBeNull();
+    // Confirmed is the only state that reaches a subscribed calendar. The feed
+    // is built on demand rather than pushed, so the practice is in it straight
+    // away -- and the test asserts the coach can actually see the booking,
+    // which is the thing that matters, rather than that a job was queued.
+    const feed = await buildIcsFeed("rakoczy-gymnasium");
+    expect(feed).toContain("Boys Basketball practice");
+    expect(feed).toContain(`UID:${result.booking.id}@olsm-facilities`);
+  });
+
+  it("keeps a booking that is not confirmed out of the public feed", async () => {
+    // The feed is unauthenticated, and a request still waiting on approval or
+    // payment is not a commitment the school has made.
+    const renter = await createExternalRequester("feed-visibility@example.test");
+    const court = await subSpace("rakoczy-gymnasium", "court-2");
+    const { startAt, endAt } = futureSlot(24, 120);
+
+    const result = await createBooking(
+      {
+        requesterId: renter.id,
+        subSpaceId: court.id,
+        activityType: ActivityType.EXTERNAL_RENTAL,
+        title: "Unconfirmed rental",
+        startAt,
+        endAt,
+      },
+      actorFor(renter),
+    );
+
+    expect(result.status).not.toBe(BookingStatus.CONFIRMED);
+
+    const feed = await buildIcsFeed("rakoczy-gymnasium");
+    expect(feed).not.toContain("Unconfirmed rental");
   });
 
   it("routes an assistant coach's practice request to the head coach, not the admin queue", async () => {

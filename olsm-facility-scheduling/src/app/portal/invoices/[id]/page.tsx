@@ -11,8 +11,6 @@ import { formatDateTime, formatRange } from "@/lib/time";
 import { formatMoney, type LineItem } from "@/domain/pricing";
 import { stripeConfigured } from "@/integrations/payments/stripe";
 import { recordOfflinePaymentAction, startCheckoutAction } from "@/app/actions/document-actions";
-import { depositStatus } from "@/services/deposit-service";
-import { DepositPanel } from "./deposit-panel";
 
 export const metadata: Metadata = { title: "Invoice" };
 
@@ -45,7 +43,6 @@ export default async function InvoicePage({
 
   const lineItems = (invoice.lineItems as unknown as LineItem[]) ?? [];
   const payable = invoice.status === InvoiceStatus.ISSUED;
-  const deposit = await depositStatus(invoice.id);
 
   return (
     <AppShell user={user}>
@@ -87,15 +84,7 @@ export default async function InvoicePage({
                 <tbody>
                   {lineItems.map((li, i) => (
                     <tr key={i}>
-                      <Td>
-                        {li.label}
-                        {li.kind === "deposit" && (
-                          <span className="block text-xs text-navy-600">
-                            Held as an authorization, not charged. Released after the rental unless
-                            there is damage or unreturned equipment.
-                          </span>
-                        )}
-                      </Td>
+                      <Td>{li.label}</Td>
                       <Td className="text-right font-mono">{formatMoney(li.amountCents)}</Td>
                     </tr>
                   ))}
@@ -149,31 +138,6 @@ export default async function InvoicePage({
             </dl>
           </Card>
 
-          {deposit.state !== "none" && (
-            <Card title="Security deposit">
-              {isAdmin(user.role) ? (
-                <DepositPanel
-                  invoiceId={invoice.id}
-                  deposit={{
-                    state: deposit.state,
-                    amountFormatted: formatMoney(deposit.amountCents),
-                    amountDollars: deposit.amountCents / 100,
-                    capturedFormatted: formatMoney(deposit.capturedCents),
-                    awaitingResolution: deposit.awaitingResolution,
-                    captureReason: invoice.depositCaptureReason,
-                  }}
-                />
-              ) : (
-                <p className="text-sm text-navy-700">
-                  {deposit.state === "released"
-                    ? `Your ${formatMoney(deposit.amountCents)} deposit was released without charge.`
-                    : deposit.state === "captured"
-                      ? `${formatMoney(deposit.capturedCents)} of your ${formatMoney(deposit.amountCents)} deposit was retained. ${invoice.depositCaptureReason ?? ""}`
-                      : `A ${formatMoney(deposit.amountCents)} refundable deposit is held as an authorization on your card. It is not charged, and is released after the rental unless there is damage.`}
-                </p>
-              )}
-            </Card>
-          )}
 
           {payable && (
             <Card title="Pay">

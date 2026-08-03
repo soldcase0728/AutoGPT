@@ -248,9 +248,9 @@ export default async function FacilityPage({ params }: { params: Promise<{ slug:
 
             {publishedRates.length > 0 && (
               <p className="mt-3 text-xs text-navy-600">
-                Lights, custodial setup, supervision and athletic trainer coverage may be charged in
-                addition, and external rentals require a refundable security deposit. The athletic
-                office confirms the full amount when it reviews your request.
+                Lights, custodial setup, supervision and athletic trainer coverage may be charged
+                in addition. The athletic office confirms the full amount when it reviews your
+                request.
               </p>
             )}
           </Card>

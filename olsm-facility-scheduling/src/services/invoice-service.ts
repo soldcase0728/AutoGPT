@@ -76,7 +76,6 @@ export async function createInvoiceForBooking(
       number,
       lineItems: result.lineItems as unknown as Prisma.InputJsonValue,
       subtotalCents: result.subtotalCents,
-      depositCents: result.depositCents,
       totalCents: result.totalCents,
       status: result.totalCents === 0 ? InvoiceStatus.PAID : InvoiceStatus.ISSUED,
       issuedAt: new Date(),
@@ -120,7 +119,6 @@ export async function startCheckout(invoiceId: string, actor: Actor): Promise<Ch
   if (!stripeConfigured()) throw new StripeNotConfiguredError();
 
   const lineItems = (invoice.lineItems as unknown as LineItem[])
-    .filter((li) => li.kind !== "deposit")
     .map((li) => ({
       label: li.label,
       amountCents: li.kind === "facility" && li.quantity !== 1 ? li.amountCents : li.unitAmountCents,

@@ -14,7 +14,7 @@
  *   4. Rule selection            -- activity type first, role second
  *   5. Conflict + bump           -- who is in the way, can this request bump them
  *   6. Persist                   -- booking, occupancy, gates, approvals, invoice
- *   7. Advance                   -- land on the correct state, sync if CONFIRMED
+ *   7. Advance                   -- land on the correct state
  */
 
 import {
@@ -553,7 +553,6 @@ export async function advanceBooking(bookingId: string, actor: Actor): Promise<A
     data: {
       status: target,
       holdExpiresAt,
-      calendarSyncStatus: target === BookingStatus.CONFIRMED ? "PENDING" : booking.calendarSyncStatus,
     },
   });
 
@@ -569,14 +568,6 @@ export async function advanceBooking(bookingId: string, actor: Actor): Promise<A
     ipAddress: actor.ipAddress,
   });
 
-  if (target === BookingStatus.CONFIRMED) {
-    // Only CONFIRMED reaches Google Calendar.
-    await enqueue({
-      kind: "calendar.upsert",
-      payload: { bookingId: booking.id },
-      idempotencyKey: `calendar:upsert:${booking.id}:${booking.calendarSyncVersion + 1}`,
-    });
-  }
 
   await notifyBookingStateChange(booking.id, booking.status, target);
 
@@ -953,26 +944,11 @@ async function releaseBooking(
       holdExpiresAt: null,
       cancelledAt: new Date(),
       cancelReason: context.reason,
-      calendarSyncStatus: existing.googleEventId ? "PENDING" : existing.calendarSyncStatus,
     },
   });
 
   await tx.bookingOccupancy.deleteMany({ where: { bookingId } });
 
-  if (existing.googleEventId) {
-    await enqueue(
-      {
-        kind: "calendar.delete",
-        payload: {
-          calendarId: existing.googleCalendarId,
-          eventId: existing.googleEventId,
-          bookingId,
-        },
-        idempotencyKey: `calendar:delete:${bookingId}`,
-      },
-      tx,
-    );
-  }
 
   await recordAudit(
     {

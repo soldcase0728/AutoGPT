@@ -1,13 +1,11 @@
 /**
- * Google Workspace SSO for internal staff, and service-account token minting
- * for Calendar writes.
+ * Google Workspace SSO for internal staff.
  *
- * Implemented against the REST endpoints with `jose` rather than pulling in
- * googleapis: the surface we need is two endpoints, and this keeps the
- * dependency footprint (and the audit surface) small.
+ * Implemented against the REST endpoints rather than pulling in googleapis: the
+ * surface we need is two endpoints, and this keeps the dependency footprint
+ * (and the audit surface) small.
  */
 
-import { SignJWT, importPKCS8 } from "jose";
 import { env } from "../env";
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -89,71 +87,3 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
 }
 
-// ---------------------------------------------------------------------------
-// Service account (domain-wide delegation) for Calendar
-// ---------------------------------------------------------------------------
-
-let cachedToken: { token: string; expiresAt: number } | null = null;
-
-export function serviceAccountConfigured(): boolean {
-  return Boolean(
-    env.google.serviceAccountEmail &&
-      env.google.serviceAccountKey &&
-      env.google.impersonateUser,
-  );
-}
-
-/**
- * Mint an access token for the Calendar API, impersonating the Workspace user
- * that owns the facility calendars.
- */
-export async function getCalendarAccessToken(): Promise<string> {
-  if (!serviceAccountConfigured()) {
-    throw new Error(
-      "Google service account is not configured. Set GOOGLE_SERVICE_ACCOUNT_EMAIL, " +
-        "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY and GOOGLE_CALENDAR_IMPERSONATE_USER.",
-    );
-  }
-
-  // 60s of slack so a token never expires mid-request.
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.token;
-
-  const key = await importPKCS8(env.google.serviceAccountKey, "RS256");
-  const now = Math.floor(Date.now() / 1000);
-
-  const assertion = await new SignJWT({
-    scope: "https://www.googleapis.com/auth/calendar",
-    sub: env.google.impersonateUser,
-  })
-    .setProtectedHeader({ alg: "RS256" })
-    .setIssuer(env.google.serviceAccountEmail)
-    .setAudience(TOKEN_ENDPOINT)
-    .setIssuedAt(now)
-    .setExpirationTime(now + 3600)
-    .sign(key);
-
-  const res = await fetch(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Google service-account token request failed (${res.status}): ${await res.text()}`);
-  }
-
-  const body = (await res.json()) as { access_token: string; expires_in: number };
-  cachedToken = {
-    token: body.access_token,
-    expiresAt: Date.now() + body.expires_in * 1000,
-  };
-  return body.access_token;
-}
-
-/** Test seam: forget the cached service-account token. */
-export function resetCalendarTokenCache(): void {
-  cachedToken = null;
-}

@@ -123,7 +123,6 @@ const rateSchema = z.object({
   rateCardId: z.string().min(1),
   hourlyDollars: z.coerce.number().min(0).max(100_000),
   flatDayDollars: z.coerce.number().min(0).max(1_000_000).optional(),
-  depositDollars: z.coerce.number().min(0).max(1_000_000).optional(),
   minHours: z.coerce.number().min(0.5).max(24),
 });
 
@@ -137,7 +136,7 @@ export async function updateRateAction(
     return { error: parsed.error.issues[0]?.message ?? "Check the values and try again." };
   }
 
-  const { rateCardId, hourlyDollars, flatDayDollars, depositDollars, minHours } = parsed.data;
+  const { rateCardId, hourlyDollars, flatDayDollars, minHours } = parsed.data;
   const before = await prisma.rateCard.findUnique({ where: { id: rateCardId } });
   if (!before) return { error: "That rate card no longer exists." };
 
@@ -146,7 +145,6 @@ export async function updateRateAction(
     data: {
       hourlyCents: Math.round(hourlyDollars * 100),
       flatDayCents: flatDayDollars ? Math.round(flatDayDollars * 100) : null,
-      depositCents: depositDollars ? Math.round(depositDollars * 100) : 0,
       minHours,
     },
   });
@@ -198,7 +196,6 @@ export async function updateFacilityAction(
       bufferMinutes,
       externallyBookable: formData.get("externallyBookable") === "on",
       requiresSupervision: formData.get("requiresSupervision") === "on",
-      googleCalendarId: String(formData.get("googleCalendarId") ?? "").trim() || null,
       description: String(formData.get("description") ?? "").trim() || null,
       active: formData.get("active") === "on",
     },
@@ -648,86 +645,4 @@ export async function updateUserRoleAction(
 
   revalidatePath("/admin/users");
   return { notice: `${before.name} is now ${role.replace("_", " ").toLowerCase()}.` };
-}
-
-
-// ---------------------------------------------------------------------------
-// Weather
-// ---------------------------------------------------------------------------
-
-export async function cancelForWeatherAction(
-  _prev: AdminFormState,
-  formData: FormData,
-): Promise<AdminFormState> {
-  const actor = await adminActor();
-  const facilityId = String(formData.get("facilityId") ?? "");
-  const date = String(formData.get("date") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim();
-
-  try {
-    const { cancelForWeather } = await import("@/services/weather-service");
-    const result = await cancelForWeather(facilityId, date, reason, actor);
-
-    revalidatePath("/admin/weather");
-    revalidatePath("/calendar");
-    revalidatePath("/custodial");
-
-    const parts = [`${result.cancelled} booking(s) cancelled`];
-    if (result.refundedCents > 0) parts.push(`${(result.refundedCents / 100).toFixed(2)} USD refunded`);
-    parts.push(`${result.emailsSent} emailed`);
-    if (result.smsSent > 0) parts.push(`${result.smsSent} texted`);
-    if (result.failed.length > 0) {
-      parts.push(
-        `${result.failed.length} could not be cancelled (${result.failed.map((f) => f.reference).join(", ")}) — handle these by hand`,
-      );
-    }
-
-    return { notice: `${parts.join(", ")}.` };
-  } catch (error) {
-    return { error: errorMessage(error) };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Deposits
-// ---------------------------------------------------------------------------
-
-export async function releaseDepositAction(
-  _prev: AdminFormState,
-  formData: FormData,
-): Promise<AdminFormState> {
-  const actor = await requirePermission("invoice:refund");
-  const invoiceId = String(formData.get("invoiceId") ?? "");
-
-  try {
-    const { releaseHeldDeposit } = await import("@/services/deposit-service");
-    await releaseHeldDeposit(invoiceId, actor);
-    revalidatePath(`/portal/invoices/${invoiceId}`);
-    return { notice: "Deposit released in full. The renter has been told." };
-  } catch (error) {
-    return { error: errorMessage(error) };
-  }
-}
-
-export async function captureDepositAction(
-  _prev: AdminFormState,
-  formData: FormData,
-): Promise<AdminFormState> {
-  const actor = await requirePermission("invoice:refund");
-  const invoiceId = String(formData.get("invoiceId") ?? "");
-  const dollars = Number(formData.get("amountDollars") ?? 0);
-  const reason = String(formData.get("reason") ?? "").trim();
-
-  if (!Number.isFinite(dollars) || dollars <= 0) {
-    return { error: "Enter the amount to keep." };
-  }
-
-  try {
-    const { captureHeldDeposit } = await import("@/services/deposit-service");
-    await captureHeldDeposit(invoiceId, Math.round(dollars * 100), reason, actor);
-    revalidatePath(`/portal/invoices/${invoiceId}`);
-    return { notice: "Deposit captured and the balance released. The renter has been told why." };
-  } catch (error) {
-    return { error: errorMessage(error) };
-  }
 }

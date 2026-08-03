@@ -141,13 +141,6 @@ enum InvoiceStatus {
   UNCOLLECTIBLE
 }
 
-enum CalendarSyncStatus {
-  PENDING
-  SYNCED
-  FAILED
-  DELETED
-}
-
 enum SeasonCode {
   FALL
   WINTER
@@ -268,11 +261,6 @@ model Facility {
   description         String?
   photoUrl            String?  @map("photo_url")
   amenities           String[] @default([])
-  googleCalendarId    String?  @map("google_calendar_id")
-  /// Opaque token for the active Google push-notification channel.
-  googleChannelId     String?  @map("google_channel_id")
-  googleResourceId    String?  @map("google_resource_id")
-  googleChannelExpiry DateTime? @map("google_channel_expiry") @db.Timestamptz(3)
   active              Boolean  @default(true)
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -391,14 +379,6 @@ model Booking {
   /// Soft lock: the slot is held until this instant while approval, documents
   /// and payment are outstanding. Null once CONFIRMED or terminal.
   holdExpiresAt   DateTime?     @map("hold_expires_at") @db.Timestamptz(3)
-
-  googleEventId   String?            @map("google_event_id")
-  googleCalendarId String?           @map("google_calendar_id")
-  calendarSyncStatus CalendarSyncStatus? @map("calendar_sync_status")
-  calendarSyncError String?           @map("calendar_sync_error")
-  /// Bumped 1:1 with each write we push, so a webhook echo of our own change
-  /// can be told apart from a human editing the event in Google Calendar.
-  calendarSyncVersion Int             @default(0) @map("calendar_sync_version")
 
   /// Unguessable token for the public participant-waiver link. Minted on
   /// demand so a booking that never needs one never has one.
@@ -559,21 +539,12 @@ model Invoice {
   lineItems       Json          @map("line_items")
   subtotalCents   Int           @map("subtotal_cents")
   taxCents        Int           @default(0) @map("tax_cents")
-  depositCents    Int           @default(0) @map("deposit_cents")
   totalCents      Int           @map("total_cents")
   refundedCents   Int           @default(0) @map("refunded_cents")
   currency        String        @default("usd")
   status          InvoiceStatus @default(DRAFT)
   stripeSessionId String?       @map("stripe_session_id")
   stripePaymentIntentId String?  @map("stripe_payment_intent_id")
-  /// Manual-capture authorisation for refundable security deposits.
-  depositIntentId String?       @map("deposit_intent_id")
-  /// Amount actually taken from the deposit hold. 0 means released untouched.
-  depositCapturedCents Int      @default(0) @map("deposit_captured_cents")
-  /// Set once the hold is resolved either way; a null value on a finished
-  /// rental is what the "deposits awaiting resolution" sweep looks for.
-  depositResolvedAt DateTime?   @map("deposit_resolved_at") @db.Timestamptz(3)
-  depositCaptureReason String?  @map("deposit_capture_reason")
   dueAt           DateTime?     @map("due_at") @db.Timestamptz(3)
   issuedAt        DateTime?     @map("issued_at") @db.Timestamptz(3)
   paidAt          DateTime?     @map("paid_at") @db.Timestamptz(3)
@@ -594,7 +565,6 @@ model RateCard {
   hourlyCents   Int          @map("hourly_cents")
   flatDayCents  Int?         @map("flat_day_cents")
   minHours      Float        @default(1) @map("min_hours")
-  depositCents  Int          @default(0) @map("deposit_cents")
   effectiveFrom DateTime     @map("effective_from") @db.Timestamptz(3)
   effectiveTo   DateTime?    @map("effective_to") @db.Timestamptz(3)
 

@@ -135,13 +135,6 @@ export default async function BookingDetailPage({
               </div>
             )}
 
-            {booking.calendarSyncStatus === "FAILED" && isAdmin(user.role) && (
-              <div className="mt-4">
-                <Alert tone="danger" title="Calendar sync failed">
-                  {booking.calendarSyncError}
-                </Alert>
-              </div>
-            )}
           </Card>
 
           <Card title="Documents">
@@ -312,14 +305,7 @@ export default async function BookingDetailPage({
                   <tbody>
                     {lineItems.map((li, i) => (
                       <tr key={i}>
-                        <Td>
-                          {li.label}
-                          {li.kind === "deposit" && (
-                            <span className="block text-xs text-navy-600">
-                              Authorized only; released after the rental unless there is damage.
-                            </span>
-                          )}
-                        </Td>
+                        <Td>{li.label}</Td>
                         <Td className="text-right font-mono">{formatMoney(li.amountCents)}</Td>
                       </tr>
                     ))}

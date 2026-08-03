@@ -32,7 +32,6 @@ export function e2eEnv(extra = {}) {
     ESIGN_PROVIDER: "manual",
     STORAGE_PROVIDER: "local",
     STRIPE_SECRET_KEY: "",
-    GOOGLE_SERVICE_ACCOUNT_EMAIL: "",
     ...extra,
   };
 }

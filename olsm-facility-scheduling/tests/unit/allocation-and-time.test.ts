@@ -203,7 +203,6 @@ describe("pricing", () => {
       hourlyCents: 18000,
       flatDayCents: 108000,
       minHours: 2,
-      depositCents: 50000,
       effectiveFrom: new Date("2020-01-01T00:00:00Z"),
       effectiveTo: null,
       ...overrides,
@@ -235,7 +234,7 @@ describe("pricing", () => {
     expect(result.subtotalCents).toBe(108000);
   });
 
-  it("keeps the deposit out of the charged total", () => {
+  it("charges exactly the subtotal, with nothing held back or added", () => {
     const result = quote({
       rateCards: [card({})],
       facilityId: "gym",
@@ -244,13 +243,13 @@ describe("pricing", () => {
       startAt: new Date("2026-06-01T18:00:00Z"),
       endAt: new Date("2026-06-01T20:00:00Z"),
     });
-    expect(result.depositCents).toBe(50000);
     expect(result.totalCents).toBe(36000);
+    expect(result.totalCents).toBe(result.subtotalCents);
   });
 
   it("adds hourly surcharges", () => {
     const result = quote({
-      rateCards: [card({ depositCents: 0 })],
+      rateCards: [card({})],
       facilityId: "gym",
       activityType: "EXTERNAL_RENTAL",
       rateTier: "COMMERCIAL",

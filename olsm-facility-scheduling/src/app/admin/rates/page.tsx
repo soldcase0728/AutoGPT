@@ -81,7 +81,6 @@ export default async function RatesPage({
                 id: card.id,
                 hourlyCents: card.hourlyCents,
                 flatDayCents: card.flatDayCents,
-                depositCents: card.depositCents,
                 minHours: card.minHours,
               }}
             />
