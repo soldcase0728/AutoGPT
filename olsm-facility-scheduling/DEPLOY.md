@@ -200,6 +200,25 @@ The compose file runs the first two. The rest matter once real bookings exist.
 **Change those passwords** before the instance is reachable by anyone outside
 your network. They are published in this file and in the repository.
 
+**Add the real people.** Sign in as the Athletic Director and go to
+**Admin → People → Add a person**. This is the only way an account comes into
+existence: signing in with Microsoft or Google links to an account that already
+exists and never creates one, so anybody not on that list cannot get in.
+
+Everybody you add — coaches, office staff, and the outside clubs you rent to —
+gets one emailed link to choose a password. The link works once and expires in
+seven days; if it lapses, use **Resend sign-in link** on their card. That button
+is also the password reset: there is no self-service reset, on purpose, because
+for fifty known people "ask the athletic office" is a smaller and safer system
+than an unauthenticated endpoint that emails whoever types an address into it.
+
+The athletic office (facility admin) can add people and send links. Changing
+somebody's role or switching an account off stays with the Athletic Director,
+and nobody can create an account that outranks their own.
+
+If no email provider is configured yet, adding somebody still works — the page
+shows you the link to pass on by hand, and warns you that nothing was sent.
+
 **Turn off the demo data** once real bookings go in: set `LOAD_DEMO_DATA=0` and
 delete the sample bookings from the admin calendar.
 

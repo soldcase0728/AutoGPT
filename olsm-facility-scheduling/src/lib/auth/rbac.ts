@@ -2,7 +2,12 @@
  * Role capabilities.
  *
  * Role assignment is always admin-controlled; nothing here lets a user pick
- * their own role. External requesters self-register and are pinned to EXTERNAL.
+ * their own role, and nobody can create an account that outranks their own.
+ *
+ * Note the split between `user:invite` and `user:manage`. Adding a person and
+ * sending them a sign-in link is daily athletic-office work, so the athletic
+ * office can do it. Changing somebody's role or switching an account off is how
+ * authority moves around the system, so that stays with the director.
  */
 
 import { ActivityType, Role } from "@prisma/client";
@@ -21,6 +26,7 @@ export type Permission =
   | "rules:manage"
   | "rates:manage"
   | "season:manage"
+  | "user:invite"
   | "user:manage"
   | "invoice:view"
   | "invoice:refund"
@@ -49,6 +55,7 @@ const ADMIN_BASE: Permission[] = [
   "audit:view",
   "calendar:view-all",
   "setup-board:view",
+  "user:invite",
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -74,6 +81,43 @@ export function can(role: Role, permission: Permission): boolean {
 
 export function isAdmin(role: Role): boolean {
   return role === Role.SUPER_ADMIN || role === Role.FACILITY_ADMIN;
+}
+
+/**
+ * How much authority each role carries.
+ *
+ * Used to pick the strongest of several claims on a sign-in token, and to stop
+ * anybody creating an account that outranks their own. Not a permission check --
+ * `can()` is still the authority on what a role may do. This only orders them.
+ */
+export const ROLE_RANK: Record<Role, number> = {
+  [Role.SUPER_ADMIN]: 70,
+  [Role.FACILITY_ADMIN]: 60,
+  [Role.HEAD_COACH]: 50,
+  [Role.ASSISTANT_COACH]: 40,
+  [Role.STRENGTH_COACH]: 30,
+  [Role.TRAINER]: 30,
+  [Role.FACILITIES]: 20,
+  [Role.FINANCE]: 20,
+  [Role.EXTERNAL]: 0,
+};
+
+/**
+ * Roles this user may hand out.
+ *
+ * Equal rank is allowed -- one director appoints another -- but nothing above
+ * it, so the athletic office cannot mint a director and a director cannot be
+ * bootstrapped into existence from below. EXTERNAL is always offerable: setting
+ * up an outside group is the ordinary case, and it carries no authority.
+ */
+export function assignableRoles(actorRole: Role): Role[] {
+  return Object.values(Role).filter(
+    (role) => role === Role.EXTERNAL || ROLE_RANK[role] <= ROLE_RANK[actorRole],
+  );
+}
+
+export function canAssignRole(actorRole: Role, target: Role): boolean {
+  return assignableRoles(actorRole).includes(target);
 }
 
 export function isInternal(role: Role): boolean {

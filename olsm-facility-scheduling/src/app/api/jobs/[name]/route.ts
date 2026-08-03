@@ -17,6 +17,7 @@ import { sendEmail, sendSms } from "@/integrations/notifications";
 import { sendWaiverReminders } from "@/services/participant-service";
 import { depositsAwaitingResolution } from "@/services/deposit-service";
 import { pruneSessions } from "@/lib/auth/session";
+import { pruneAccessTokens } from "@/lib/auth/access-token";
 import { enqueue } from "@/services/job-queue";
 
 /**
@@ -72,10 +73,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ na
       const completed = await completePastBookings();
       const warned = await warnExpiringCertificates();
       const sessions = await pruneSessions();
+      const accessTokens = await pruneAccessTokens();
       const reminders = await sendPaymentReminders();
       const waivers = await sendWaiverReminders();
       const deposits = await nudgeUnresolvedDeposits();
-      return NextResponse.json({ completed, warned, sessions, reminders, waivers, deposits });
+      return NextResponse.json({
+        completed,
+        warned,
+        sessions,
+        accessTokens,
+        reminders,
+        waivers,
+        deposits,
+      });
     }
 
     case "refresh-calendar-channels": {

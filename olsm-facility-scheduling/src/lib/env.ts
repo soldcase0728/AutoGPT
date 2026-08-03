@@ -127,12 +127,39 @@ export const env = {
 };
 
 /**
+ * The database name from a connection URL.
+ *
+ * Used by the guards that refuse to touch anything but a disposable database.
+ * Parsed properly rather than by splitting on "/", because a connection string
+ * carrying a socket directory -- `?host=/var/run/postgresql`, which is how
+ * Postgres is commonly reached on a Unix socket -- ends in a path segment that
+ * is not the database at all. Both guards previously read "postgresql" or "tmp"
+ * as the database name and refused to run. They failed safe, but a guard that
+ * reads the wrong field is not a guard, and it is one URL shape away from
+ * failing the other way.
+ *
+ * Returns "" for anything unparseable, which no guard treats as disposable.
+ */
+export function databaseNameFromUrl(url: string): string {
+  try {
+    return new URL(url).pathname.replace(/^\//, "");
+  } catch {
+    return "";
+  }
+}
+
+/** True only for a database whose name marks it as safe to wipe. */
+export function isDisposableDatabase(url: string): boolean {
+  return /_e2e$|_test$/.test(databaseNameFromUrl(url));
+}
+
+/**
  * Whether real email can leave this instance.
  *
  * The "console" provider writes to stdout, which is right for development and
- * useless to a renter waiting on a verification link. Anything that depends on
- * a person receiving mail -- verifying an address, claiming a request, being
- * told a document was rejected -- must check this rather than assume delivery.
+ * useless to a renter waiting on a sign-in link. Anything that depends on a
+ * person receiving mail -- an invitation, a claimed request, a rejected
+ * document -- must check this rather than assume delivery.
  */
 export function emailIsDeliverable(): boolean {
   if (env.email.provider === "graph") {

@@ -7,9 +7,13 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { errorMessage } from "@/lib/errors";
+import { env, emailIsDeliverable } from "@/lib/env";
 import { localToInstant } from "@/lib/time";
 import { requireAdmin, requirePermission, requireUser } from "@/lib/auth/current-user";
+import { canAssignRole } from "@/lib/auth/rbac";
+import { hashAccessToken, issueAccessToken } from "@/lib/auth/access-token";
 import { createStandingBlock, publishSeasonAllocation } from "@/services/allocation-service";
+import { enqueue } from "@/services/job-queue";
 import type { Actor } from "@/services/booking-service";
 
 export interface AdminFormState {
@@ -424,6 +428,192 @@ export async function publishSeasonAction(
 // Users
 // ---------------------------------------------------------------------------
 
+/**
+ * Add a person and email them a link to set a password.
+ *
+ * This is the only way an account comes into existence at runtime. Sign-in
+ * through Entra or Google deliberately refuses to provision an unknown address
+ * -- proving who you are in the tenant is not the same as being entitled to
+ * book a gym -- so somebody has to do this deliberately, and it is recorded.
+ */
+const newUserSchema = z.object({
+  name: z.string().trim().min(2, "Enter the person's name."),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+  phone: z.string().trim().max(40).optional(),
+  role: z.nativeEnum(Role),
+  organization: z.string().trim().max(120).optional(),
+});
+
+export async function createUserAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const actor = await requirePermission("user:invite");
+
+  const parsed = newUserSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    phone: formData.get("phone") || undefined,
+    role: formData.get("role"),
+    organization: formData.get("organization") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the details and try again." };
+  }
+
+  const input = parsed.data;
+
+  // Nobody hands out authority they do not hold. The form only offers roles
+  // this actor may assign, so reaching here means the request was forged.
+  if (!canAssignRole(actor.role, input.role)) {
+    return { error: "You cannot create an account with that role." };
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email: input.email } });
+  if (existing) {
+    // Say so plainly. This screen is behind an administrator's sign-in, so
+    // there is no address to protect from an outsider here, and "that person is
+    // already set up" is what the reader needs to know.
+    return {
+      error: existing.active
+        ? `${existing.name} already has an account with that address.`
+        : `That address belongs to a deactivated account (${existing.name}). Reactivate it instead of creating a second one.`,
+    };
+  }
+
+  // Reuse an organization of the same name rather than making a second one --
+  // duplicates split a club's bookings, insurance and invoices across two
+  // records, which is exactly the mess the COI expiry sweep cannot see through.
+  let organizationId: string | null = null;
+  if (input.organization) {
+    const org =
+      (await prisma.organization.findFirst({
+        where: { name: { equals: input.organization, mode: "insensitive" } },
+      })) ??
+      (await prisma.organization.create({
+        data: { name: input.organization, type: "COMMERCIAL", rateTier: "COMMERCIAL" },
+      }));
+    organizationId = org.id;
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      name: input.name,
+      email: input.email,
+      phone: input.phone || null,
+      role: input.role,
+      organizationId,
+      // No password and no verified address until they use the link.
+      passwordHash: null,
+      emailVerifiedAt: null,
+    },
+  });
+
+  await recordAudit({
+    entityType: "user",
+    entityId: user.id,
+    action: "user.invited",
+    actorId: actor.id,
+    actorLabel: actor.name,
+    toState: input.role,
+    payload: { email: input.email, organization: input.organization ?? null },
+  });
+
+  const delivery = await sendSignInLink(user, actor.id);
+
+  revalidatePath("/admin/users");
+  return delivery.emailed
+    ? { notice: `${user.name} has been added. A link to set a password is on its way to ${user.email}.` }
+    : {
+        notice:
+          `${user.name} has been added, but no email provider is configured, so nothing was sent. ` +
+          `Give them this link yourself — it works once and expires in seven days: ${delivery.url}`,
+      };
+}
+
+/**
+ * Send a fresh link to somebody who never used theirs, or who is locked out.
+ *
+ * This is the password reset. There is no self-service version: for fifty known
+ * people, asking the athletic office is a smaller and safer system than an
+ * unauthenticated endpoint that emails whoever types an address into it.
+ */
+export async function sendSignInLinkAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const actor = await requirePermission("user:invite");
+  const userId = String(formData.get("userId") ?? "");
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { error: "That person no longer exists." };
+  if (!user.active) return { error: "Reactivate the account before sending a sign-in link." };
+
+  const delivery = await sendSignInLink(user, actor.id);
+
+  await recordAudit({
+    entityType: "user",
+    entityId: user.id,
+    action: "user.sign_in_link_sent",
+    actorId: actor.id,
+    actorLabel: actor.name,
+    payload: { email: user.email, emailed: delivery.emailed },
+  });
+
+  revalidatePath("/admin/users");
+  return delivery.emailed
+    ? { notice: `A new link is on its way to ${user.email}. Any earlier link has stopped working.` }
+    : {
+        notice:
+          `No email provider is configured, so nothing was sent. Give them this link yourself — ` +
+          `it works once and expires in seven days: ${delivery.url}`,
+      };
+}
+
+/**
+ * Issue the link and try to mail it.
+ *
+ * When no provider is configured the URL comes back for the administrator to
+ * pass on by hand. That does put a credential on screen, so it is deliberately
+ * narrow: it happens only when email cannot work at all, only for somebody who
+ * already holds `user:invite`, and it is the alternative to the invitation
+ * failing silently -- which is how a pilot ends up with accounts nobody can
+ * reach and no sign that anything went wrong.
+ */
+async function sendSignInLink(
+  user: { id: string; name: string; email: string; passwordHash: string | null },
+  issuedById: string,
+): Promise<{ emailed: boolean; url: string }> {
+  const token = await issueAccessToken({ userId: user.id, issuedById });
+  const url = `${env.appUrl}/set-password/${token}`;
+  const returning = Boolean(user.passwordHash);
+
+  if (!emailIsDeliverable()) return { emailed: false, url };
+
+  await enqueue({
+    kind: "notify.email",
+    payload: {
+      to: user.email,
+      subject: returning
+        ? "Set a new password for OLSM facility scheduling"
+        : "Your OLSM facility scheduling account",
+      text: returning
+        ? `${user.name},\n\nSomeone at the OLSM athletic office sent you a link to set a new ` +
+          `password:\n${url}\n\nIt works once and expires in seven days. If you did not ask for ` +
+          `it, you can ignore this — your current password still works until the link is used.\n`
+        : `${user.name},\n\nAn account has been set up for you to reserve OLSM facilities. ` +
+          `Choose a password here:\n${url}\n\nIt works once and expires in seven days. If it has ` +
+          `expired by the time you get to it, ask the athletic office to send another.\n`,
+    },
+    // Unique per issuance. Keying on the user would let the queue treat a
+    // resend as a duplicate of the link they told us never arrived.
+    idempotencyKey: `signin-link:${hashAccessToken(token).slice(0, 24)}`,
+  });
+
+  return { emailed: true, url };
+}
+
 export async function updateUserRoleAction(
   _prev: AdminFormState,
   formData: FormData,
@@ -434,6 +624,9 @@ export async function updateUserRoleAction(
 
   if (!Object.values(Role).includes(role)) return { error: "Choose a valid role." };
   if (userId === actor.id) return { error: "You cannot change your own role." };
+  if (!canAssignRole(actor.role, role)) {
+    return { error: "You cannot give somebody a role above your own." };
+  }
 
   const before = await prisma.user.findUnique({ where: { id: userId } });
   if (!before) return { error: "That user no longer exists." };

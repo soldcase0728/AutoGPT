@@ -188,6 +188,7 @@ model User {
   documents             Document[]
   waitlistEntries       WaitlistEntry[]
   standingBlocks        StandingBlock[]
+  accessTokens          AccessToken[]
 
   @@index([role, active])
   @@map("users")
@@ -736,4 +737,29 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+/// A one-time link emailed to somebody so they can set a password: the
+/// invitation an administrator sends, and the replacement they send when
+/// somebody is locked out.
+///
+/// Only the SHA-256 of the emailed token is stored. Reading this table -- from a
+/// backup, a support query, a log -- therefore yields nothing usable, which is
+/// the whole reason it exists instead of the sessions table it replaces.
+model AccessToken {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique @map("token_hash")
+  userId     String    @map("user_id")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  /// Set when the link is used. Kept rather than deleted so an administrator
+  /// can see at a glance who was invited and has not signed in yet.
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  /// Who sent it. Null when the system issued it without an administrator.
+  issuedById String?   @map("issued_by_id")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, consumedAt])
+  @@map("access_tokens")
 }

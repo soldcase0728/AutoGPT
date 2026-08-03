@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { env } from "@/lib/env";
 import { PublicShell } from "@/components/app-shell";
 import { Card } from "@/components/ui";
 
@@ -24,36 +25,40 @@ export const metadata: Metadata = {
  * directory, which answers "what spaces exist" when the question is usually
  * "how do I book one" or "where has my request got to".
  */
-const PATHS = [
-  {
-    href: "/sign-in",
-    title: "Schedule a team practice",
-    audience: "OLSM coaches and staff",
-    body: "Sign in with your school account. In-season practice by a head coach is confirmed on the spot — no approval, no paperwork, no payment.",
-    primary: true,
-  },
-  {
-    href: "/request",
-    title: "Rent a facility",
-    audience: "Clubs, travel teams, camps and community groups",
-    body: "Start a request without an account. Tell us when and where, and the slot is held while the athletic office reviews it.",
-    primary: true,
-  },
-  {
-    href: "/portal",
-    title: "My reservations",
-    audience: "Anyone with a request in progress",
-    body: "Check where a request stands, sign an agreement or waiver, upload a certificate of insurance, and pay an invoice.",
-    primary: false,
-  },
-  {
-    href: "/sign-in",
-    title: "Administration",
-    audience: "Athletic office, finance, facilities and security",
-    body: "Approvals, the master calendar, setup boards, documents, payments and reports.",
-    primary: false,
-  },
-] as const;
+function paths(anonymousRequestsOpen: boolean) {
+  return [
+    {
+      href: "/sign-in",
+      title: "Schedule a team practice",
+      audience: "OLSM coaches and staff",
+      body: "Sign in with your school account. In-season practice by a head coach is confirmed on the spot — no approval, no paperwork, no payment.",
+    },
+    {
+      // What this door promises depends on how the site is configured, and
+      // getting it wrong is worse than saying less: a renter told to "start a
+      // request" who lands on "sign in, and you have no account" has been sent
+      // somewhere they cannot go.
+      href: anonymousRequestsOpen ? "/request" : "/sign-in",
+      title: "Rent a facility",
+      audience: "Clubs, travel teams, camps and community groups",
+      body: anonymousRequestsOpen
+        ? "Start a request without an account. Tell us when and where, and the slot is held while the athletic office reviews it."
+        : "Outside groups book with an account the athletic office sets up for you. Ask them to add you and you can request time, sign documents and pay here.",
+    },
+    {
+      href: "/portal",
+      title: "My reservations",
+      audience: "Anyone with a request in progress",
+      body: "Check where a request stands, sign an agreement or waiver, upload a certificate of insurance, and pay an invoice.",
+    },
+    {
+      href: "/sign-in",
+      title: "Administration",
+      audience: "Athletic office, finance, facilities and security",
+      body: "Approvals, the master calendar, setup boards, documents, payments and reports.",
+    },
+  ];
+}
 
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -83,7 +88,7 @@ export default async function HomePage() {
 
       <h2 className="sr-only">What would you like to do?</h2>
       <ul className="grid gap-4 sm:grid-cols-2">
-        {PATHS.map((path) => (
+        {paths(env.allowAnonymousRequests).map((path) => (
           <li key={path.title}>
             <Link
               href={path.href}
@@ -120,10 +125,10 @@ export default async function HomePage() {
             and payment are complete.
           </p>
           <Link
-            href="/request"
+            href={env.allowAnonymousRequests ? "/request" : "/sign-in"}
             className="mt-2 inline-block text-sm font-medium text-navy-800 underline"
           >
-            Start a request
+            {env.allowAnonymousRequests ? "Start a request" : "Sign in to request time"}
           </Link>
         </Card>
       </div>

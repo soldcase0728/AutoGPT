@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { errorMessage, isDomainError } from "@/lib/errors";
 import { localToInstant } from "@/lib/time";
-import { randomToken } from "@/lib/auth/password";
+import { hashAccessToken, issueAccessToken } from "@/lib/auth/access-token";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { EXTERNAL_ACTIVITY_TYPES } from "@/domain/rules-engine";
 import { createBooking } from "@/services/booking-service";
@@ -134,21 +134,21 @@ export async function submitExternalRequestAction(
         payload: { email: input.email, organization: input.organization ?? null },
       });
 
-      // Give them a way in without a password: a one-time sign-in link.
-      const token = randomToken(24);
-      await prisma.session.create({
-        data: { id: token, userId: created.id, expiresAt: new Date(Date.now() + 7 * 86_400_000) },
-      });
+      // Give them a way in: a one-time link to choose a password. The same
+      // mechanism the athletic office uses to invite somebody, so there is one
+      // kind of token in the system and it is stored hashed.
+      const token = await issueAccessToken({ userId: created.id });
       await enqueue({
         kind: "notify.email",
         payload: {
           to: created.email,
           subject: "Your OLSM facility request",
           text:
-            `${created.name},\n\nWe have received your facility request. Track it, sign documents ` +
-            `and pay here:\n${env.appUrl}/verify/${token}\n\nThis link is good for 7 days.`,
+            `${created.name},\n\nWe have received your facility request. Choose a password here ` +
+            `and you can track it, sign documents and pay:\n${env.appUrl}/set-password/${token}\n\n` +
+            `This link is good for 7 days.`,
         },
-        idempotencyKey: `request-link:${created.id}:${token}`,
+        idempotencyKey: `request-link:${created.id}:${hashAccessToken(token).slice(0, 24)}`,
       });
 
       requester = await prisma.user.findUniqueOrThrow({

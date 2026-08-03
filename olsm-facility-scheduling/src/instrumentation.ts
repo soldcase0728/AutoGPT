@@ -15,17 +15,20 @@ export async function register() {
 
   assertProductionConfig();
 
-  // Not fatal: an internal pilot runs perfectly well with mail going to the
-  // log, and the public request path refuses to create a hold on its own when
-  // it cannot send a verification link. Worth saying loudly all the same.
+  // Not fatal: a pilot runs perfectly well with mail going to the log, and
+  // adding people still works because the invitation link is shown on screen
+  // for the administrator to pass on. Worth saying loudly all the same, and
+  // worth saying accurately -- this warning used to claim it disabled public
+  // requests, which nothing in the code actually did.
   if (env.isProduction && !emailIsDeliverable()) {
     console.warn(
       [
         "WARNING: no real email provider is configured.",
         `  EMAIL_PROVIDER=${env.email.provider}, so mail is written to this log and nobody receives it.`,
-        "  Public facility requests are disabled while this is the case, because a",
-        "  verification link that cannot be delivered cannot be completed.",
-        "  Set EMAIL_PROVIDER to sendgrid or postmark, with the matching API key.",
+        "  Nothing reaches a coach or a renter: no invitations, no approval notices,",
+        "  no document reminders, no invoices. Admin > People still works -- it shows",
+        "  you each sign-in link to pass on by hand -- but everything else is silent.",
+        "  Set EMAIL_PROVIDER to graph, sendgrid or postmark, with matching credentials.",
       ].join("\n"),
     );
   }

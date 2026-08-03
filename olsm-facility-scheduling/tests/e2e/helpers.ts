@@ -4,6 +4,7 @@ export const SEED_PASSWORD = "ChangeMe123456";
 
 export const USERS = {
   ad: "ad@olsm.edu",
+  athleticOffice: "athleticoffice@olsm.edu",
   headCoach: "bball.head@olsm.edu",
   assistant: "bball.assistant@olsm.edu",
   otherCoach: "gbball.head@olsm.edu",

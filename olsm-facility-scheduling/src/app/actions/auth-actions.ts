@@ -6,6 +6,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { createSession, destroySession } from "@/lib/auth/session";
+import { accessTokenMessage, consumeAccessToken } from "@/lib/auth/access-token";
 import { checkPasswordPolicy, hashPassword, verifyPassword } from "@/lib/auth/password";
 
 export interface FormState {
@@ -42,8 +43,11 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
     return failure;
   }
 
+  // Belt and braces. Setting a password is the only way to get one, and that
+  // path marks the address verified in the same write, so this should not be
+  // reachable -- but if it ever is, the office can send a fresh link.
   if (user.role === Role.EXTERNAL && !user.emailVerifiedAt) {
-    return { error: "Confirm your email address first. Check your inbox for the verification link." };
+    return { error: "That account is not set up yet. Ask the athletic office to send you a sign-in link." };
   }
 
   await createSession(user);
@@ -59,85 +63,60 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   redirect(user.role === Role.EXTERNAL ? "/portal" : "/calendar");
 }
 
-export async function registerExternalAction(
+/**
+ * Finish an invitation, or a reset, by choosing a password.
+ *
+ * The token is spent here, on submit -- never while rendering the page that
+ * offers this form. Link scanners fetch every URL in inbound mail, and this
+ * school runs Microsoft 365, so a link consumed on GET is a link the recipient
+ * always finds already used.
+ */
+export async function setPasswordAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const phone = String(formData.get("phone") ?? "").trim();
+  const token = String(formData.get("token") ?? "");
   const password = String(formData.get("password") ?? "");
-  const organizationName = String(formData.get("organization") ?? "").trim();
+  const confirm = String(formData.get("confirm") ?? "");
 
-  if (!name || !email || !password) return { error: "Name, email and password are required." };
+  if (!token) return { error: "That link is missing part of its address. Open it again from the email." };
+  if (password !== confirm) return { error: "The two passwords do not match." };
 
   const policy = checkPasswordPolicy(password);
   if (!policy.ok) return { error: policy.message };
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    // Do not confirm the address exists; tell them to sign in either way.
-    return {
-      notice: "If that address can be registered, you can now sign in. Otherwise, use sign in or password reset.",
-    };
+  // Hash before spending the token. bcrypt takes a moment, and a token spent on
+  // a request that then fails is a person locked out of their own invitation.
+  const passwordHash = await hashPassword(password);
+
+  const claim = await consumeAccessToken(token);
+  if (!claim.ok) {
+    return { error: accessTokenMessage(claim.reason) };
   }
 
-  // Role is never taken from the form. Self-registration always lands on
-  // EXTERNAL; an admin promotes from there.
-  const organization = organizationName
-    ? await prisma.organization.create({
-        data: { name: organizationName, type: "COMMERCIAL", rateTier: "COMMERCIAL" },
-      })
-    : null;
-
-  const user = await prisma.user.create({
+  const user = await prisma.user.update({
+    where: { id: claim.user.id },
     data: {
-      name,
-      email,
-      phone: phone || null,
-      role: Role.EXTERNAL,
-      passwordHash: await hashPassword(password),
-      organizationId: organization?.id ?? null,
-      // Email verification is sent below; the account cannot sign in until then.
-      emailVerifiedAt: null,
+      passwordHash,
+      // Using the link is the proof that the address reaches them, which is the
+      // only thing verification ever established.
+      emailVerifiedAt: claim.user.emailVerifiedAt ?? new Date(),
     },
   });
 
+  await createSession(user);
   await recordAudit({
     entityType: "user",
     entityId: user.id,
-    action: "user.self_registered",
-    actorLabel: name,
+    action: claim.user.passwordHash ? "auth.password_reset" : "auth.account_activated",
+    actorId: user.id,
+    actorLabel: user.name,
     ipAddress: await clientIp(),
-    payload: { email, organizationName: organizationName || null },
   });
 
-  const { enqueue } = await import("@/services/job-queue");
-  const { env } = await import("@/lib/env");
-  const { randomToken } = await import("@/lib/auth/password");
-  const token = randomToken(24);
-
-  await prisma.session.create({
-    // Reuse the session table as a short-lived verification token store.
-    data: { id: token, userId: user.id, expiresAt: new Date(Date.now() + 2 * 86_400_000) },
-  });
-
-  await enqueue({
-    kind: "notify.email",
-    payload: {
-      to: email,
-      subject: "Confirm your OLSM facility request account",
-      text:
-        `${name},\n\nConfirm your email address to finish setting up your account:\n` +
-        `${env.appUrl}/verify/${token}\n\nThis link expires in 48 hours.`,
-    },
-    idempotencyKey: `verify:${user.id}`,
-  });
-
-  return {
-    notice: "Account created. Check your email for a confirmation link, then sign in.",
-  };
+  redirect(user.role === Role.EXTERNAL ? "/portal" : "/calendar");
 }
+
 
 export async function signOutAction(): Promise<void> {
   await destroySession();

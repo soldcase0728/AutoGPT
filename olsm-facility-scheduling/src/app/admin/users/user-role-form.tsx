@@ -12,10 +12,13 @@ export function UserRoleForm({
   userId,
   currentRole,
   active,
+  assignableRoles,
 }: {
   userId: string;
   currentRole: Role;
   active: boolean;
+  /** Roles the signed-in administrator may hand out. Never above their own. */
+  assignableRoles: Role[];
 }) {
   const [state, action, pending] = useActionState(updateUserRoleAction, initial);
 
@@ -36,8 +39,18 @@ export function UserRoleForm({
 
       <label className="text-sm">
         <span className="mb-1 block font-medium text-navy-800">Role</span>
+        {/*
+          The current role is always listed, even when it outranks the person
+          looking at it -- otherwise the select would silently display somebody
+          else's role. It is offered as an option so leaving it alone works;
+          the server refuses any change that would raise somebody above the
+          actor, so listing it grants nothing.
+        */}
         <select name="role" defaultValue={currentRole} className={inputClass}>
-          {Object.values(Role).map((role) => (
+          {(assignableRoles.includes(currentRole)
+            ? assignableRoles
+            : [currentRole, ...assignableRoles]
+          ).map((role) => (
             <option key={role} value={role}>
               {ROLE_LABELS[role]}
             </option>

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { isDisposableDatabase } from "@/lib/env";
 import { randomToken } from "@/lib/auth/password";
 
 /**
@@ -31,9 +32,7 @@ function enabled(): boolean {
   if (process.env.E2E_FIXTURES !== "1") return false;
 
   // Never mutate anything but a disposable database.
-  const url = process.env.DATABASE_URL ?? "";
-  const database = url.split("/").pop()?.split("?")[0] ?? "";
-  return /_e2e$|_test$/.test(database);
+  return isDisposableDatabase(process.env.DATABASE_URL ?? "");
 }
 
 function authorized(request: NextRequest): boolean {

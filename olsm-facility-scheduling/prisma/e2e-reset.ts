@@ -11,15 +11,16 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import { databaseNameFromUrl, isDisposableDatabase } from "../src/lib/env";
 
 const prisma = new PrismaClient();
 
-const DATABASE = (process.env.DATABASE_URL ?? "").split("/").pop()?.split("?")[0] ?? "";
+const DATABASE = databaseNameFromUrl(process.env.DATABASE_URL ?? "");
 
 async function main() {
-  // Same guard as the fixture endpoints: never truncate a database that is not
-  // obviously disposable.
-  if (!/_e2e$|_test$/.test(DATABASE)) {
+  // Same guard as the fixture endpoints, and now literally the same function:
+  // never truncate a database that is not obviously disposable.
+  if (!isDisposableDatabase(process.env.DATABASE_URL ?? "")) {
     throw new Error(
       `Refusing to reset "${DATABASE}". This script only runs against a database ` +
         `whose name ends in _e2e or _test.`,

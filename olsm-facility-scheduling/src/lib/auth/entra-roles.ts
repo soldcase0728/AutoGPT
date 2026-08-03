@@ -1,5 +1,6 @@
 import { Role } from "@prisma/client";
 import { env } from "../env";
+import { ROLE_RANK as RANK } from "./rbac";
 import type { EntraIdentity } from "./entra";
 
 /**
@@ -48,19 +49,6 @@ const APP_ROLE_TO_ROLE: Record<string, Role> = {
   maintenance: Role.FACILITIES,
   finance: Role.FINANCE,
   businessoffice: Role.FINANCE,
-};
-
-/** How much authority each role carries, for picking the best of several. */
-const RANK: Record<Role, number> = {
-  [Role.SUPER_ADMIN]: 70,
-  [Role.FACILITY_ADMIN]: 60,
-  [Role.HEAD_COACH]: 50,
-  [Role.ASSISTANT_COACH]: 40,
-  [Role.STRENGTH_COACH]: 30,
-  [Role.TRAINER]: 30,
-  [Role.FACILITIES]: 20,
-  [Role.FINANCE]: 20,
-  [Role.EXTERNAL]: 0,
 };
 
 function normalise(value: string): string {
