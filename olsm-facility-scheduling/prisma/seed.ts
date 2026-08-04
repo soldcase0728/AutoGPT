@@ -609,18 +609,26 @@ async function main() {
   console.log(`  surcharges: ${surcharges.length} (PLACEHOLDER pricing)`);
 
   // --- Sports --------------------------------------------------------------
-  const SPORTS: { name: string; seasonCode: SeasonCode }[] = [
-    { name: "Football", seasonCode: SeasonCode.FALL },
-    { name: "Boys Soccer", seasonCode: SeasonCode.FALL },
-    { name: "Cross Country", seasonCode: SeasonCode.FALL },
-    { name: "Boys Basketball", seasonCode: SeasonCode.WINTER },
-    { name: "Girls Basketball", seasonCode: SeasonCode.WINTER },
-    { name: "Wrestling", seasonCode: SeasonCode.WINTER },
-    { name: "Hockey", seasonCode: SeasonCode.WINTER },
-    { name: "Baseball", seasonCode: SeasonCode.SPRING },
-    { name: "Track & Field", seasonCode: SeasonCode.SPRING },
-    { name: "Rowing", seasonCode: SeasonCode.SPRING },
-    { name: "Lacrosse", seasonCode: SeasonCode.SPRING },
+  // Calendar colours, 1-6, matching SPORT_PALETTE in src/domain/sport-colors.ts.
+  //
+  // Assigned so that no two sports sharing a season share a hue -- that is the
+  // case a coach actually sees, and the school never runs more than four sports
+  // at once. Six slots cannot also keep neighbouring seasons apart (fall and
+  // winter alone hold seven sports), so where a reuse was forced it went to the
+  // pair whose seasons barely touch: cross country has finished by the time
+  // hockey starts, wrestling by the time lacrosse does.
+  const SPORTS: { name: string; seasonCode: SeasonCode; colorSlot: number }[] = [
+    { name: "Football", seasonCode: SeasonCode.FALL, colorSlot: 1 },
+    { name: "Boys Soccer", seasonCode: SeasonCode.FALL, colorSlot: 2 },
+    { name: "Cross Country", seasonCode: SeasonCode.FALL, colorSlot: 3 },
+    { name: "Boys Basketball", seasonCode: SeasonCode.WINTER, colorSlot: 4 },
+    { name: "Girls Basketball", seasonCode: SeasonCode.WINTER, colorSlot: 5 },
+    { name: "Wrestling", seasonCode: SeasonCode.WINTER, colorSlot: 6 },
+    { name: "Hockey", seasonCode: SeasonCode.WINTER, colorSlot: 3 },
+    { name: "Baseball", seasonCode: SeasonCode.SPRING, colorSlot: 1 },
+    { name: "Track & Field", seasonCode: SeasonCode.SPRING, colorSlot: 2 },
+    { name: "Rowing", seasonCode: SeasonCode.SPRING, colorSlot: 5 },
+    { name: "Lacrosse", seasonCode: SeasonCode.SPRING, colorSlot: 6 },
   ];
   for (const sport of SPORTS) {
     await prisma.sport.upsert({ where: { name: sport.name }, update: sport, create: sport });

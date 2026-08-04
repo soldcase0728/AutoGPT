@@ -21,6 +21,9 @@ export interface GridEvent extends TimeSpan {
   href: string;
   /** True for holds that are not yet confirmed; drawn hatched. */
   provisional: boolean;
+  /** Fill and ink for this event's sport, or the non-team slate. */
+  fill: string;
+  ink: string;
 }
 
 export interface GridColumn {
@@ -32,18 +35,6 @@ export interface GridColumn {
   /** Present in week view; lets drag-to-create prefill the date. */
   dateISO?: string;
 }
-
-const ACTIVITY_TONE: Record<string, string> = {
-  CONTEST: "bg-navy-800 text-white",
-  TEAM_PRACTICE: "bg-navy-600 text-white",
-  TEAM_OFFSEASON: "bg-navy-400 text-navy-950",
-  SCHOOL_EVENT: "bg-navy-300 text-navy-950",
-  SCHOOL_CAMP: "bg-gold-500 text-navy-950",
-  PRIVATE_INSTRUCTION: "bg-gold-600 text-white",
-  CLUB_TRAVEL: "bg-gold-400 text-navy-950",
-  EXTERNAL_RENTAL: "bg-gold-700 text-white",
-  MAINTENANCE: "bg-navy-200 text-navy-800",
-};
 
 interface Selection {
   columnKey: string;
@@ -249,14 +240,18 @@ export function CalendarGrid({
                   title={`${event.title} — ${event.subtitle} (${event.status})`}
                   className={clsx(
                     "absolute overflow-hidden rounded px-1.5 py-0.5 text-[11px] leading-tight shadow-sm",
-                    ACTIVITY_TONE[event.activityType] ?? "bg-navy-600 text-white",
-                    event.provisional && "opacity-70 ring-2 ring-inset ring-white/60",
+                    // A held slot is drawn lighter and ringed. Opacity alone
+                    // would read as "further away" rather than "not yours yet",
+                    // so the word "held" is printed in the block as well.
+                    event.provisional && "opacity-75 ring-2 ring-inset ring-white/70",
                   )}
                   style={{
                     top: `${top}%`,
                     height: `${height}%`,
                     left: `calc(${left}% + 2px)`,
                     width: `calc(${width}% - 4px)`,
+                    backgroundColor: event.fill,
+                    color: event.ink,
                   }}
                 >
                   <span className="block truncate font-semibold">{event.title}</span>

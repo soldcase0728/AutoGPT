@@ -26,7 +26,7 @@ export default async function AdminFacilitiesPage() {
     <AppShell user={user}>
       <PageHeader
         title="Facilities and spaces"
-        description="Names, capacity, buffers, Google calendars and the conflict rules between spaces."
+        description="Names, capacity, buffers and the conflict rules between spaces."
       />
 
       <div className="mb-5">

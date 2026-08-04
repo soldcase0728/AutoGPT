@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/current-user";
 import { canBookFacility } from "@/lib/auth/rbac";
 import { AppShell } from "@/components/app-shell";
+import { colorForSport, legendFor } from "@/domain/sport-colors";
+import { SportLegend } from "./sport-legend";
 import { Badge, Card, EmptyState, LinkButton, PageHeader, StatusBadge } from "@/components/ui";
 import {
   instantToLocalDate,
@@ -156,7 +158,7 @@ export default async function CalendarPage({
     <AppShell user={user}>
       <PageHeader
         title="Facility calendar"
-        description="Everything holding a space. Hatched blocks are held but not yet confirmed; only confirmed bookings reach the Google calendars."
+        description="Everything holding a space. Lighter, ringed blocks are held but not yet confirmed. Colour shows the sport; the key is next to the grid, or below it on a phone."
         action={<LinkButton href="/book">Book a space</LinkButton>}
       />
 
@@ -181,11 +183,20 @@ export default async function CalendarPage({
               Nothing booked in this range — the whole grid is open inventory.
             </p>
           )}
-          <CalendarGrid
-            {...buildGrid(view, bookings, facility, rangeStartISO, days)}
-            canCreate={canCreate}
-            dateISO={rangeStartISO}
-          />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_13rem]">
+            <div className="min-w-0">
+              <CalendarGrid
+                {...buildGrid(view, bookings, facility, rangeStartISO, days)}
+                canCreate={canCreate}
+                dateISO={rangeStartISO}
+              />
+            </div>
+            {/*
+              Below the grid on a phone rather than beside it. A 13rem column
+              next to a time grid on a 412px screen leaves neither readable.
+            */}
+            <SportLegend entries={legendFor(bookings)} />
+          </div>
         </Card>
       )}
     </AppShell>
@@ -245,6 +256,7 @@ function buildGrid(
       view === "day" ? booking.subSpaceId : instantToLocalDate(booking.startAt, SCHOOL_TZ),
     href: `/portal/bookings/${booking.id}`,
     provisional: PROVISIONAL.includes(booking.status),
+    ...(({ fill, ink }) => ({ fill, ink }))(colorForSport(booking.sport)),
     startMinutes: minutesOfDay(booking.startAt, SCHOOL_TZ),
     endMinutes: endMinutesFor(booking),
   }));

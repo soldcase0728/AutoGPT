@@ -215,6 +215,10 @@ model Sport {
   id         String     @id @default(uuid())
   name       String     @unique
   seasonCode SeasonCode @map("season_code")
+  /// Which calendar colour this sport uses, 1-6, matching SPORT_PALETTE.
+  /// Assigned so no two sports in the same season share one. Null falls back to
+  /// a stable hash of the name, so a sport added later still gets a fixed hue.
+  colorSlot  Int?       @map("color_slot")
   active     Boolean    @default(true)
 
   coaches        CoachAssignment[]

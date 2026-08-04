@@ -136,6 +136,26 @@ async function main() {
         status = `navigation failed: ${String(error).slice(0, 120)}`;
       }
 
+      // Refuse to measure an unstyled page.
+      //
+      // A standalone build serves nothing from .next/static unless it was
+      // copied in, and a run against a server missing its stylesheet reports
+      // hundreds of target-size violations and phantom horizontal overflow --
+      // every element collapsed to its intrinsic size. That is a broken
+      // harness describing itself, and it reads exactly like a finding.
+      const styled = await page.evaluate(() => {
+        const sheets = [...document.styleSheets].length > 0;
+        const body = getComputedStyle(document.body);
+        return sheets && body.margin !== "8px";
+      });
+      if (!styled) {
+        throw new Error(
+          `${url} rendered without a stylesheet. The server is serving an ` +
+            "incomplete build — copy .next/static and public/ into the standalone " +
+            "output before auditing. Refusing to report measurements from it.",
+        );
+      }
+
       const shot = `${OUT}/${surface.name}-${vp.key}.png`;
       await page.screenshot({ path: shot, fullPage: true });
 
