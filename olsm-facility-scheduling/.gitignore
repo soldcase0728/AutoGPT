@@ -33,3 +33,6 @@ blob-report/
 screenshots/
 walkthrough.html
 dist-scripts/
+
+# UI audit output — screenshots and findings are regenerated, never reviewed in a diff.
+ui-audit/
