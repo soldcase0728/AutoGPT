@@ -93,6 +93,26 @@ function parseRule(rruleText: string, dtstart: Date, until: Date): RRule {
   });
 }
 
+/**
+ * The date window a block actually expands over: its own bounds, clamped to
+ * the season's. A block may narrow its season -- basketball ending in February
+ * inside a November-to-March winter -- but never widen it, so the season's
+ * dates always win at the edges. Null when the two windows do not meet at
+ * all, which callers treat as "expands to nothing" rather than an error: the
+ * season's dates may have been edited after the block was created.
+ *
+ * All parameters are local "YYYY-MM-DD" dates, which compare correctly as
+ * strings.
+ */
+export function expansionWindow(
+  season: { fromDate: string; toDate: string },
+  block: { fromDate?: string | null; toDate?: string | null },
+): { fromDate: string; toDate: string } | null {
+  const fromDate = block.fromDate && block.fromDate > season.fromDate ? block.fromDate : season.fromDate;
+  const toDate = block.toDate && block.toDate < season.toDate ? block.toDate : season.toDate;
+  return fromDate <= toDate ? { fromDate, toDate } : null;
+}
+
 /** Human summary of an RRULE for the allocation UI. */
 export function describeRecurrence(rruleText: string): string {
   try {

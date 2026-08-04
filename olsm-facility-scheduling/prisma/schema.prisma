@@ -186,6 +186,7 @@ model User {
   @@index([role, active])
   @@map("users")
   reviewedDocuments Document[] @relation("DocumentReviewer")
+  standingBlockDecisions StandingBlock[] @relation("StandingBlockDecider")
 
 }
 
@@ -335,8 +336,26 @@ model StandingBlock {
   /// Local wall-clock times, "15:30" / "17:30".
   startTime  String    @map("start_time")
   endTime    String    @map("end_time")
+  /// Optional bounds *within* the season, for a team whose competition
+  /// calendar is shorter than the season that hosts it ("November to
+  /// February" inside a November-to-March winter). Null means the season's
+  /// own dates; expansion clamps to the season either way.
+  startDate  DateTime? @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
   priority   Int
   published  Boolean   @default(false)
+  /// Blocks an administrator lays down are APPROVED from birth; a block a
+  /// coach requests starts PENDING and only joins the allocation once the
+  /// athletic office approves it. DENIED blocks are kept, not deleted --
+  /// the request and the reason it was refused are the record.
+  status     ApprovalStatus @default(APPROVED)
+  /// The coach's case for the time, shown to the reviewer.
+  requestNote String?  @map("request_note")
+  /// Review trail. Set together by decideStandingBlockRequest; the note is
+  /// shown to the coach verbatim, so on a denial it has to say what to fix.
+  decidedById  String?   @map("decided_by_id")
+  decidedAt    DateTime? @map("decided_at") @db.Timestamptz(3)
+  decisionNote String?   @map("decision_note")
   createdById String   @map("created_by_id")
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -344,9 +363,11 @@ model StandingBlock {
   sport     Sport    @relation(fields: [sportId], references: [id])
   subSpace  SubSpace @relation(fields: [subSpaceId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
+  decidedBy User?    @relation("StandingBlockDecider", fields: [decidedById], references: [id], onDelete: SetNull)
   bookings  Booking[]
 
   @@index([seasonId, published])
+  @@index([status])
   @@map("standing_blocks")
 }
 

@@ -18,6 +18,11 @@ import {
   type Actor,
   type Alternative,
 } from "@/services/booking-service";
+import {
+  decideStandingBlockRequest,
+  requestStandingBlock,
+  withdrawStandingBlockRequest,
+} from "@/services/allocation-service";
 import { joinWaitlist } from "@/services/waitlist-service";
 
 export interface BookingFormState {
@@ -172,6 +177,108 @@ export async function createBookingAction(
     console.error("createBookingAction", error);
     return { error: "Something went wrong creating that booking." };
   }
+}
+
+export interface StandingBlockFormState {
+  error?: string;
+  /** Rendered as a link when the block is a compliance gate. */
+  action?: { label: string; href: string };
+  notice?: string;
+}
+
+const standingBlockRequestSchema = z.object({
+  seasonId: z.string().min(1, "Choose a season."),
+  sportId: z.string().min(1, "Choose a sport."),
+  subSpaceId: z.string().min(1, "Choose a space."),
+  teamLevel: z.nativeEnum(TeamLevel).optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Choose a start time."),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Choose an end time."),
+  startDate: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")]).optional(),
+  endDate: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")]).optional(),
+  note: z.string().max(2000, "Keep the note under 2,000 characters.").optional(),
+});
+
+/** A head coach asks for their team's recurring practice time for a season. */
+export async function requestStandingBlockAction(
+  _prev: StandingBlockFormState,
+  formData: FormData,
+): Promise<StandingBlockFormState> {
+  const actor = await actorFromSession();
+
+  const days = formData.getAll("days").map(String).filter(Boolean);
+  if (days.length === 0) return { error: "Choose at least one day of the week." };
+
+  const parsed = standingBlockRequestSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the form and try again." };
+  }
+  const input = parsed.data;
+
+  try {
+    await requestStandingBlock(
+      {
+        seasonId: input.seasonId,
+        sportId: input.sportId,
+        subSpaceId: input.subSpaceId,
+        teamLevel: input.teamLevel ?? TeamLevel.VARSITY,
+        // Built here rather than accepted from the form: a free-text RRULE is
+        // an availability query nobody reviewed.
+        rrule: `FREQ=WEEKLY;BYDAY=${days.join(",")}`,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        startDate: input.startDate || null,
+        endDate: input.endDate || null,
+        requestNote: input.note || null,
+      },
+      actor,
+    );
+  } catch (error) {
+    if (error instanceof ComplianceError) {
+      return {
+        error: error.message,
+        action:
+          error.actionLabel && error.actionHref
+            ? { label: error.actionLabel, href: error.actionHref }
+            : undefined,
+      };
+    }
+    if (isDomainError(error)) return { error: error.message };
+    console.error("requestStandingBlockAction", error);
+    return { error: "Something went wrong submitting that request." };
+  }
+
+  revalidatePath("/my-team");
+  revalidatePath("/admin/approvals");
+  revalidatePath("/admin/allocation");
+
+  return {
+    notice:
+      "Requested. The athletic office reviews standing time before it goes on the calendar; " +
+      "you can follow the status on this page.",
+  };
+}
+
+export async function decideStandingBlockAction(formData: FormData): Promise<void> {
+  const actor = await actorFromSession();
+  const blockId = String(formData.get("blockId") ?? "");
+  const decision = String(formData.get("decision") ?? "") === "DENIED" ? "DENIED" : "APPROVED";
+  const note = String(formData.get("note") ?? "").trim() || undefined;
+
+  await decideStandingBlockRequest(blockId, decision, actor, note);
+
+  revalidatePath("/admin/approvals");
+  revalidatePath("/admin/allocation");
+  revalidatePath("/calendar");
+  revalidatePath("/my-team");
+}
+
+export async function withdrawStandingBlockAction(formData: FormData): Promise<void> {
+  const actor = await actorFromSession();
+  await withdrawStandingBlockRequest(String(formData.get("blockId") ?? ""), actor);
+
+  revalidatePath("/my-team");
+  revalidatePath("/admin/approvals");
+  revalidatePath("/admin/allocation");
 }
 
 export async function approveAction(formData: FormData): Promise<void> {

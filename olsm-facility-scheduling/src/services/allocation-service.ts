@@ -6,14 +6,32 @@
  * collision, and refuses to publish until each one is resolved. Publishing then
  * writes real bookings, which means the exclusion constraint is the final
  * arbiter -- the collision screen is a courtesy, not the enforcement.
+ *
+ * Coaches feed the same machinery from the other end: a head coach requests a
+ * standing block for their own sport, the request waits in the approval queue,
+ * and an approval turns it into an ordinary APPROVED block. Only APPROVED
+ * blocks expand, collide and publish -- a request nobody has looked at cannot
+ * hold the season hostage, and a denied one leaves nothing behind but its
+ * record.
  */
 
-import { ActivityType, BookingStatus, TeamLevel, type StandingBlock } from "@prisma/client";
+import {
+  ActivityType,
+  ApprovalStatus,
+  BookingStatus,
+  TeamLevel,
+  type Facility,
+  type Sport,
+  type StandingBlock,
+  type SubSpace,
+} from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { ComplianceError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit";
-import { dateColumnToISO } from "@/lib/time";
-import { expandRecurrence } from "@/domain/recurrence";
+import { dateColumnToISO, instantToLocalDate } from "@/lib/time";
+import { canBookFacility, isAdmin } from "@/lib/auth/rbac";
+import { checkAnnualAgreement } from "@/domain/compliance";
+import { expandRecurrence, expansionWindow } from "@/domain/recurrence";
 import {
   detectCollisions,
   type AllocationOccurrence,
@@ -24,6 +42,7 @@ import { indexSubSpaces, type SubSpaceNode } from "@/domain/conflict-graph";
 import { computePriority } from "@/domain/priority";
 import { selectRule } from "@/domain/rules-engine";
 import { createBooking, type Actor } from "./booking-service";
+import { notifyAdmins, notifyStandingBlockDecision, notifyStandingBlockRequested } from "./notification-service";
 
 export interface AllocationPreview {
   report: CollisionReport;
@@ -31,8 +50,48 @@ export interface AllocationPreview {
   seasonName: string;
 }
 
+type ExpandableBlock = StandingBlock & {
+  sport: Sport;
+  subSpace: SubSpace & { facility: Facility };
+};
+
 /**
- * Expand every unpublished standing block in a season and report collisions,
+ * Every calendar slot one block claims, labelled for the collision report.
+ * Empty when the block's own dates miss the season entirely, which is not an
+ * error -- the season's dates may have been edited after the block was made.
+ */
+function occurrencesForBlock(
+  block: ExpandableBlock,
+  season: { fromDate: string; toDate: string },
+): AllocationOccurrence[] {
+  const window = expansionWindow(season, {
+    fromDate: block.startDate ? dateColumnToISO(block.startDate) : null,
+    toDate: block.endDate ? dateColumnToISO(block.endDate) : null,
+  });
+  if (!window) return [];
+
+  return expandRecurrence({
+    rrule: block.rrule,
+    startTime: block.startTime,
+    endTime: block.endTime,
+    fromDate: window.fromDate,
+    toDate: window.toDate,
+  }).map((occ) => ({
+    blockId: block.id,
+    blockLabel: `${block.sport.name} ${block.teamLevel} — ${block.subSpace.name} ${block.startTime}-${block.endTime}`,
+    sportName: block.sport.name,
+    teamLevel: block.teamLevel,
+    subSpaceId: block.subSpaceId,
+    subSpaceName: `${block.subSpace.facility.name} — ${block.subSpace.name}`,
+    priority: block.priority,
+    date: occ.date,
+    startAt: occ.startAt,
+    endAt: occ.endAt,
+  }));
+}
+
+/**
+ * Expand every approved standing block in a season and report collisions,
  * both against each other and against bookings already on the calendar.
  */
 export async function previewSeasonAllocation(seasonId: string): Promise<AllocationPreview> {
@@ -40,6 +99,10 @@ export async function previewSeasonAllocation(seasonId: string): Promise<Allocat
     where: { id: seasonId },
     include: {
       standingBlocks: {
+        // Only approved blocks shape the season. A coach request nobody has
+        // decided must not stop the rest from publishing, and a denied one
+        // must not keep colliding from beyond the grave.
+        where: { status: ApprovalStatus.APPROVED },
         include: { sport: true, subSpace: { include: { facility: true } } },
       },
     },
@@ -50,30 +113,8 @@ export async function previewSeasonAllocation(seasonId: string): Promise<Allocat
   const toDate = dateColumnToISO(season.endDate);
 
   const occurrences: AllocationOccurrence[] = [];
-
   for (const block of season.standingBlocks) {
-    const expanded = expandRecurrence({
-      rrule: block.rrule,
-      startTime: block.startTime,
-      endTime: block.endTime,
-      fromDate,
-      toDate,
-    });
-
-    for (const occ of expanded) {
-      occurrences.push({
-        blockId: block.id,
-        blockLabel: `${block.sport.name} ${block.teamLevel} — ${block.subSpace.name} ${block.startTime}-${block.endTime}`,
-        sportName: block.sport.name,
-        teamLevel: block.teamLevel,
-        subSpaceId: block.subSpaceId,
-        subSpaceName: `${block.subSpace.facility.name} — ${block.subSpace.name}`,
-        priority: block.priority,
-        date: occ.date,
-        startAt: occ.startAt,
-        endAt: occ.endAt,
-      });
-    }
+    occurrences.push(...occurrencesForBlock(block, { fromDate, toDate }));
   }
 
   // Anything already holding a slot in the season window.
@@ -125,36 +166,21 @@ export interface PublishResult {
 }
 
 /**
- * Publish a season's allocation: turn every occurrence into a real booking.
- *
- * Refuses to run while collisions remain. Acceptance criterion 6.
+ * Turn occurrences into real bookings through the one createBooking path, so
+ * a standing block clears exactly the gates a hand-made booking would. Shared
+ * by season publishing and by approving a request into an already-published
+ * season -- the two must not drift apart.
  */
-export async function publishSeasonAllocation(
+async function bookOccurrences(
+  occurrences: readonly AllocationOccurrence[],
+  blocksById: Map<string, { id: string; createdById: string; sportId: string; teamLevel: TeamLevel; sport: Sport }>,
   seasonId: string,
   actor: Actor,
-  options: { force?: boolean } = {},
-): Promise<PublishResult> {
-  const preview = await previewSeasonAllocation(seasonId);
-
-  if (!preview.report.publishable && !options.force) {
-    throw new ValidationError(
-      `${preview.report.collisions.length} unresolved collision(s) remain. ` +
-        "Resolve every collision before publishing.",
-      { collisions: preview.report.collisions.slice(0, 20) },
-    );
-  }
-
-  const season = await prisma.season.findUnique({
-    where: { id: seasonId },
-    include: { standingBlocks: { include: { createdBy: true, sport: true } } },
-  });
-  if (!season) throw new NotFoundError("Season");
-
-  const blocksById = new Map(season.standingBlocks.map((b) => [b.id, b]));
+): Promise<{ created: number; skipped: PublishResult["skipped"] }> {
   const skipped: PublishResult["skipped"] = [];
   let created = 0;
 
-  for (const occ of preview.occurrences) {
+  for (const occ of occurrences) {
     const block = blocksById.get(occ.blockId);
     if (!block) continue;
 
@@ -187,8 +213,47 @@ export async function publishSeasonAllocation(
     }
   }
 
+  return { created, skipped };
+}
+
+/**
+ * Publish a season's allocation: turn every occurrence into a real booking.
+ *
+ * Refuses to run while collisions remain. Acceptance criterion 6.
+ */
+export async function publishSeasonAllocation(
+  seasonId: string,
+  actor: Actor,
+  options: { force?: boolean } = {},
+): Promise<PublishResult> {
+  const preview = await previewSeasonAllocation(seasonId);
+
+  if (!preview.report.publishable && !options.force) {
+    throw new ValidationError(
+      `${preview.report.collisions.length} unresolved collision(s) remain. ` +
+        "Resolve every collision before publishing.",
+      { collisions: preview.report.collisions.slice(0, 20) },
+    );
+  }
+
+  const season = await prisma.season.findUnique({
+    where: { id: seasonId },
+    include: {
+      standingBlocks: {
+        where: { status: ApprovalStatus.APPROVED },
+        include: { createdBy: true, sport: true },
+      },
+    },
+  });
+  if (!season) throw new NotFoundError("Season");
+
+  const blocksById = new Map(season.standingBlocks.map((b) => [b.id, b]));
+  const { created, skipped } = await bookOccurrences(preview.occurrences, blocksById, seasonId, actor);
+
+  // Only what was actually published. A request still waiting in the queue
+  // stays unpublished and undecided.
   await prisma.standingBlock.updateMany({
-    where: { seasonId },
+    where: { seasonId, status: ApprovalStatus.APPROVED },
     data: { published: true },
   });
   await prisma.season.update({ where: { id: seasonId }, data: { published: true } });
@@ -268,6 +333,399 @@ export async function deleteStandingBlock(blockId: string, actor: Actor): Promis
     actorId: actor.id,
     actorLabel: actor.name,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Coach-requested standing blocks
+// ---------------------------------------------------------------------------
+
+export interface StandingBlockRequestInput {
+  seasonId: string;
+  sportId: string;
+  subSpaceId: string;
+  teamLevel: TeamLevel;
+  rrule: string;
+  startTime: string;
+  endTime: string;
+  /** Optional bounds within the season, local "YYYY-MM-DD". */
+  startDate?: string | null;
+  endDate?: string | null;
+  /** The coach's case for the time, shown to the reviewer. */
+  requestNote?: string | null;
+}
+
+/**
+ * A head coach asks for their team's recurring practice time. Nothing is
+ * reserved here: the request waits as a PENDING block until the athletic
+ * office decides it, so the season's shape stays a deliberate act rather than
+ * an accumulation of first-come claims.
+ */
+export async function requestStandingBlock(
+  input: StandingBlockRequestInput,
+  actor: Actor,
+): Promise<StandingBlock> {
+  const requester = await prisma.user.findUnique({
+    where: { id: actor.id },
+    include: { documents: true },
+  });
+  if (!requester || !requester.active) throw new ForbiddenError("That account is deactivated.");
+
+  // The head coach of the sport, or an admin filing on their behalf. The
+  // isHead assignment is the same authority approval routing trusts.
+  if (!isAdmin(actor.role)) {
+    const isHead = await prisma.coachAssignment.findFirst({
+      where: { userId: actor.id, sportId: input.sportId, isHead: true },
+    });
+    if (!isHead) {
+      throw new ForbiddenError(
+        "Only the head coach of that sport can request its standing practice time.",
+      );
+    }
+  }
+
+  // The same compliance gate a booking would hit, checked now rather than at
+  // publish time, when the coach is no longer looking.
+  const agreement = checkAnnualAgreement(requester.role, requester.documents);
+  if (!agreement.ok) {
+    throw new ComplianceError(agreement.message ?? "Annual agreement required.", {
+      label: "Sign your Annual Coach Agreement",
+      href: "/my-documents",
+    });
+  }
+
+  const season = await prisma.season.findUnique({ where: { id: input.seasonId } });
+  if (!season) throw new NotFoundError("Season");
+  const seasonFrom = dateColumnToISO(season.startDate);
+  const seasonTo = dateColumnToISO(season.endDate);
+  if (seasonTo < instantToLocalDate(new Date())) {
+    throw new ValidationError(`${season.name} has already ended.`);
+  }
+
+  const subSpace = await prisma.subSpace.findUnique({
+    where: { id: input.subSpaceId },
+    include: { facility: true },
+  });
+  if (!subSpace || !subSpace.active) throw new NotFoundError("Sub-space");
+  if (
+    !canBookFacility(
+      { role: requester.role, facilityScope: requester.facilityScope },
+      subSpace.facility,
+    )
+  ) {
+    throw new ForbiddenError(
+      `${subSpace.facility.name} is not available to your account. ` +
+        "Ask the athletic office if you need access.",
+    );
+  }
+
+  if (!/^\d{2}:\d{2}$/.test(input.startTime) || !/^\d{2}:\d{2}$/.test(input.endTime)) {
+    throw new ValidationError("Enter a start and end time.");
+  }
+  if (input.endTime <= input.startTime) {
+    throw new ValidationError("The block must end after it starts.");
+  }
+
+  for (const value of [input.startDate, input.endDate]) {
+    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new ValidationError("Enter practice dates as full dates.");
+    }
+  }
+  if (input.startDate && input.endDate && input.endDate < input.startDate) {
+    throw new ValidationError("The last practice date must not be before the first.");
+  }
+  // Dates that merely spill past the season's edges are clamped at expansion;
+  // dates that miss the season entirely would expand to nothing, which is a
+  // mistake worth stopping while the coach is still looking at the form.
+  const window = expansionWindow(
+    { fromDate: seasonFrom, toDate: seasonTo },
+    { fromDate: input.startDate ?? null, toDate: input.endDate ?? null },
+  );
+  if (!window) {
+    throw new ValidationError(
+      `Those dates fall outside the season — ${season.name} runs ${seasonFrom} to ${seasonTo}.`,
+    );
+  }
+
+  const rules = await prisma.rule.findMany();
+  const { rule } = selectRule(rules, ActivityType.TEAM_PRACTICE, "HEAD_COACH");
+  const priority = computePriority(rule, input.teamLevel);
+
+  const block = await prisma.standingBlock.create({
+    data: {
+      seasonId: input.seasonId,
+      sportId: input.sportId,
+      subSpaceId: input.subSpaceId,
+      teamLevel: input.teamLevel,
+      rrule: input.rrule,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      startDate: input.startDate ? new Date(`${input.startDate}T00:00:00Z`) : null,
+      endDate: input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
+      priority,
+      status: ApprovalStatus.PENDING,
+      requestNote: input.requestNote?.trim() || null,
+      createdById: actor.id,
+    },
+    include: {
+      sport: true,
+      subSpace: { include: { facility: true } },
+      season: true,
+      createdBy: true,
+    },
+  });
+
+  await recordAudit({
+    entityType: "standing_block",
+    entityId: block.id,
+    action: "standing_block.requested",
+    actorId: actor.id,
+    actorLabel: actor.name,
+    ipAddress: actor.ipAddress,
+    payload: {
+      seasonId: input.seasonId,
+      sportId: input.sportId,
+      rrule: input.rrule,
+      window: `${input.startTime}-${input.endTime}`,
+      dates: `${window.fromDate}..${window.toDate}`,
+      priority,
+    },
+  });
+
+  await notifyStandingBlockRequested(block, requester.name);
+
+  return block;
+}
+
+export interface StandingBlockDecisionResult {
+  block: StandingBlock;
+  status: "APPROVED" | "DENIED";
+  created: number;
+  skipped: PublishResult["skipped"];
+  /** True when the season is still a draft; sessions appear when it publishes. */
+  awaitingSeasonPublish: boolean;
+}
+
+/**
+ * Decide a coach's standing time request.
+ *
+ * Approving into a season that is still a draft simply admits the block to
+ * the allocation, where it collides and publishes with everything else.
+ * Approving into a season already published cannot wait for a publish that
+ * will never come again, so the block's occurrences become bookings on the
+ * spot -- through the same path publishing uses, one createBooking per
+ * occurrence, with each impossible day reported rather than fatal.
+ */
+export async function decideStandingBlockRequest(
+  blockId: string,
+  decision: "APPROVED" | "DENIED",
+  actor: Actor,
+  note?: string,
+): Promise<StandingBlockDecisionResult> {
+  if (!isAdmin(actor.role)) {
+    throw new ForbiddenError("Only the athletic office can decide standing time requests.");
+  }
+
+  const block = await prisma.standingBlock.findUnique({
+    where: { id: blockId },
+    include: {
+      season: true,
+      sport: true,
+      subSpace: { include: { facility: true } },
+      createdBy: true,
+    },
+  });
+  if (!block) throw new NotFoundError("Standing block");
+  if (block.status !== ApprovalStatus.PENDING) {
+    throw new ValidationError("That request has already been decided.");
+  }
+
+  const trimmedNote = note?.trim() || null;
+  if (decision === "DENIED" && !trimmedNote) {
+    throw new ValidationError("Give a reason for the denial; it is sent to the coach verbatim.");
+  }
+
+  // Marked published even if some days below end up skipped, exactly as a
+  // season publish would leave it: the block is on the calendar, minus the
+  // days that were reported as impossible.
+  const publishNow = decision === "APPROVED" && block.season.published;
+
+  const updated = await prisma.standingBlock.update({
+    where: { id: block.id },
+    data: {
+      status: decision === "APPROVED" ? ApprovalStatus.APPROVED : ApprovalStatus.DENIED,
+      decidedById: actor.id,
+      decidedAt: new Date(),
+      decisionNote: trimmedNote,
+      ...(publishNow ? { published: true } : {}),
+    },
+  });
+
+  let created = 0;
+  let skipped: PublishResult["skipped"] = [];
+  const awaitingSeasonPublish = decision === "APPROVED" && !block.season.published;
+
+  if (publishNow) {
+    const seasonWindow = {
+      fromDate: dateColumnToISO(block.season.startDate),
+      toDate: dateColumnToISO(block.season.endDate),
+    };
+    const occurrences = occurrencesForBlock(block, seasonWindow);
+    ({ created, skipped } = await bookOccurrences(
+      occurrences,
+      new Map([[block.id, block]]),
+      block.seasonId,
+      actor,
+    ));
+  }
+
+  await recordAudit({
+    entityType: "standing_block",
+    entityId: block.id,
+    action: decision === "APPROVED" ? "standing_block.approved" : "standing_block.denied",
+    actorId: actor.id,
+    actorLabel: actor.name,
+    reason: trimmedNote,
+    ipAddress: actor.ipAddress,
+    payload: { created, skipped: skipped.length, awaitingSeasonPublish },
+  });
+
+  await notifyStandingBlockDecision(block, decision, {
+    note: trimmedNote,
+    created,
+    skippedDates: skipped.map((s) => s.date),
+    awaitingSeasonPublish,
+  });
+
+  return { block: updated, status: decision, created, skipped, awaitingSeasonPublish };
+}
+
+/**
+ * A coach takes back a request nobody has decided yet. Decided blocks stay:
+ * an approved one is the AD's to manage, and a denied one is a record.
+ */
+export async function withdrawStandingBlockRequest(blockId: string, actor: Actor): Promise<void> {
+  const block = await prisma.standingBlock.findUnique({ where: { id: blockId } });
+  if (!block) throw new NotFoundError("Standing block");
+  if (block.createdById !== actor.id && !isAdmin(actor.role)) {
+    throw new ForbiddenError("Only the requesting coach or an administrator can withdraw this.");
+  }
+  if (block.status !== ApprovalStatus.PENDING) {
+    throw new ValidationError("Only a request still waiting on a decision can be withdrawn.");
+  }
+
+  await prisma.standingBlock.delete({ where: { id: blockId } });
+  await recordAudit({
+    entityType: "standing_block",
+    entityId: blockId,
+    action: "standing_block.withdrawn",
+    actorId: actor.id,
+    actorLabel: actor.name,
+    payload: { seasonId: block.seasonId, sportId: block.sportId },
+  });
+}
+
+export interface StandingBlockRequestPreview {
+  /** Sessions the request would put on the calendar. */
+  sessions: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  collisionCount: number;
+  /** The first few collisions, for the reviewer's card. */
+  collisions: { date: string; withLabel: string; startAt: Date; endAt: Date }[];
+}
+
+/**
+ * What the reviewer needs before deciding: how much calendar the request
+ * claims, and what is already in the way. "In the way" means real bookings
+ * plus the approved-but-unpublished allocation; published blocks are already
+ * on the calendar as bookings, so counting their occurrences too would report
+ * every clash twice.
+ */
+export async function previewStandingBlockRequest(
+  blockId: string,
+): Promise<StandingBlockRequestPreview> {
+  const block = await prisma.standingBlock.findUnique({
+    where: { id: blockId },
+    include: {
+      season: { include: { standingBlocks: { include: { sport: true, subSpace: { include: { facility: true } } } } } },
+      sport: true,
+      subSpace: { include: { facility: true } },
+    },
+  });
+  if (!block) throw new NotFoundError("Standing block");
+
+  const seasonWindow = {
+    fromDate: dateColumnToISO(block.season.startDate),
+    toDate: dateColumnToISO(block.season.endDate),
+  };
+  const mine = occurrencesForBlock(block, seasonWindow);
+  if (mine.length === 0) {
+    return { sessions: 0, firstDate: null, lastDate: null, collisionCount: 0, collisions: [] };
+  }
+
+  const planned: ExistingReservation[] = block.season.standingBlocks
+    .filter((b) => b.id !== block.id && b.status === ApprovalStatus.APPROVED && !b.published)
+    .flatMap((b) => occurrencesForBlock(b, seasonWindow))
+    .map((occ) => ({
+      bookingId: `planned:${occ.blockId}:${occ.date}`,
+      reference: "planned allocation",
+      title: occ.blockLabel,
+      subSpaceId: occ.subSpaceId,
+      subSpaceName: occ.subSpaceName,
+      priority: occ.priority,
+      startAt: occ.startAt,
+      endAt: occ.endAt,
+    }));
+
+  // Unlike the season preview, bookings born from standing blocks count here:
+  // to a new request they are competition like any other.
+  const bookings = await prisma.booking.findMany({
+    where: {
+      startAt: { lt: block.season.endDate },
+      endAt: { gt: block.season.startDate },
+      status: {
+        in: [
+          BookingStatus.PENDING_APPROVAL,
+          BookingStatus.APPROVED,
+          BookingStatus.AWAITING_DOCUMENTS,
+          BookingStatus.AWAITING_PAYMENT,
+          BookingStatus.CONFIRMED,
+          BookingStatus.CHECKED_IN,
+        ],
+      },
+    },
+    include: { subSpace: { include: { facility: true } } },
+  });
+
+  const existing: ExistingReservation[] = [
+    ...bookings.map((b) => ({
+      bookingId: b.id,
+      reference: b.reference,
+      title: b.title,
+      subSpaceId: b.subSpaceId,
+      subSpaceName: `${b.subSpace.facility.name} — ${b.subSpace.name}`,
+      priority: b.priority,
+      startAt: b.startAt,
+      endAt: b.endAt,
+    })),
+    ...planned,
+  ];
+
+  const allSubSpaces = await prisma.subSpace.findMany({ where: { active: true } });
+  const report = detectCollisions(mine, existing, indexSubSpaces(allSubSpaces as SubSpaceNode[]));
+
+  return {
+    sessions: mine.length,
+    firstDate: mine[0]?.date ?? null,
+    lastDate: mine[mine.length - 1]?.date ?? null,
+    collisionCount: report.collisions.length,
+    collisions: report.collisions.slice(0, 8).map((c) => ({
+      date: c.date,
+      withLabel: "blockLabel" in c.right ? c.right.blockLabel : c.right.title,
+      startAt: c.right.startAt,
+      endAt: c.right.endAt,
+    })),
+  };
 }
 
 function humanTeamLevel(level: TeamLevel): string {

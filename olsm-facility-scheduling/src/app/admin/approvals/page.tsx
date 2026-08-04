@@ -8,12 +8,18 @@ import { AppShell } from "@/components/app-shell";
 import { Alert, Badge, Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import { SOFT_LOCK_STATES } from "@/domain/booking-state";
 import { MAX_ACTIVE_HOLDS_PER_REQUESTER } from "@/services/booking-service";
-import { formatRange } from "@/lib/time";
+import { dateColumnToISO, formatRange } from "@/lib/time";
 import { formatMoney } from "@/domain/pricing";
 import { ACTIVITY_LABELS } from "@/domain/rules-engine";
+import { describeRecurrence } from "@/domain/recurrence";
 import { indexSubSpaces, occupiedSubSpaceIds, type SubSpaceNode } from "@/domain/conflict-graph";
 import { findConflicts } from "@/services/booking-service";
+import {
+  previewStandingBlockRequest,
+  type StandingBlockRequestPreview,
+} from "@/services/allocation-service";
 import { ApprovalDecision } from "./approval-decision";
+import { StandingBlockDecision } from "./standing-block-decision";
 
 export const metadata: Metadata = { title: "Approval queue" };
 
@@ -98,6 +104,26 @@ export default async function ApprovalsPage() {
           )
       : [];
 
+  // Coaches' standing time requests. Season-scale claims are the athletic
+  // office's call, so head coaches do not see this section.
+  const blockRequests = admin
+    ? await prisma.standingBlock.findMany({
+        where: { status: ApprovalStatus.PENDING },
+        include: {
+          sport: true,
+          season: true,
+          createdBy: true,
+          subSpace: { include: { facility: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+
+  const requestPreviews = new Map<string, StandingBlockRequestPreview>();
+  for (const request of blockRequests) {
+    requestPreviews.set(request.id, await previewStandingBlockRequest(request.id));
+  }
+
   return (
     <AppShell user={user}>
       <PageHeader
@@ -132,13 +158,108 @@ export default async function ApprovalsPage() {
         </div>
       )}
 
-      {steps.length === 0 ? (
+      {blockRequests.length > 0 && (
+        <div className="mb-5 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-navy-600">
+            Standing time requests
+          </h2>
+          {blockRequests.map((request) => {
+            const preview = requestPreviews.get(request.id);
+            return (
+              <Card
+                key={request.id}
+                title={`${request.sport.name} ${request.teamLevel.replace("_", " ").toLowerCase()} — ${request.subSpace.facility.name}, ${request.subSpace.name}`}
+                description={`Requested by ${request.createdBy.name}`}
+                action={<Badge tone="warn">Awaiting review</Badge>}
+              >
+                <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-navy-600">Pattern</dt>
+                    <dd className="font-medium">
+                      {describeRecurrence(request.rrule)}, {request.startTime}–{request.endTime}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-navy-600">Season</dt>
+                    <dd className="font-medium">
+                      {request.season.name}
+                      {(request.startDate || request.endDate) && (
+                        <span className="block text-xs font-normal text-navy-600">
+                          {request.startDate ? dateColumnToISO(request.startDate) : "season start"}{" "}
+                          to {request.endDate ? dateColumnToISO(request.endDate) : "season end"}
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  {preview && (
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-navy-600">Claims</dt>
+                      <dd className="font-medium">
+                        {preview.sessions} session{preview.sessions === 1 ? "" : "s"}
+                        {preview.firstDate && preview.lastDate && (
+                          <span className="block text-xs font-normal text-navy-600">
+                            {preview.firstDate} to {preview.lastDate}
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  )}
+                  {request.requestNote && (
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-navy-600">
+                        Coach&apos;s note
+                      </dt>
+                      <dd>{request.requestNote}</dd>
+                    </div>
+                  )}
+                </dl>
+
+                {preview && preview.collisionCount > 0 && (
+                  <div className="mt-3">
+                    <Alert
+                      tone="warn"
+                      title={`${preview.collisionCount} session${preview.collisionCount === 1 ? " collides" : "s collide"} with time already claimed`}
+                    >
+                      <ul className="list-inside list-disc">
+                        {preview.collisions.map((c, i) => (
+                          <li key={i}>
+                            {c.date}: {c.withLabel} — {formatRange(c.startAt, c.endAt)}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-1">
+                        {request.season.published
+                          ? "Approving books every clear day and skips these; the coach is told which days were skipped."
+                          : "Approving admits the block to the draft allocation, where these must be resolved before the season publishes."}
+                      </p>
+                    </Alert>
+                  </div>
+                )}
+                {preview && preview.collisionCount === 0 && (
+                  <p className="mt-3 text-sm text-navy-700">
+                    <span className="font-medium">No collisions.</span>{" "}
+                    {request.season.published
+                      ? "Approving books every session now."
+                      : "Approving admits the block to the draft allocation; sessions are booked when the season publishes."}
+                  </p>
+                )}
+
+                <div className="mt-4">
+                  <StandingBlockDecision blockId={request.id} />
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {steps.length === 0 && blockRequests.length === 0 ? (
         <Card>
           <EmptyState title="Nothing waiting">
             Everything submitted has been decided. New requests appear here and by email.
           </EmptyState>
         </Card>
-      ) : (
+      ) : steps.length === 0 ? null : (
         <div className="space-y-4">
           {steps.map((step) => {
             const booking = step.booking;

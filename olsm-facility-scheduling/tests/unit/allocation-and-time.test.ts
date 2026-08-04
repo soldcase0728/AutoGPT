@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandRecurrence, weekdayRule } from "@/domain/recurrence";
+import { expandRecurrence, expansionWindow, weekdayRule } from "@/domain/recurrence";
 import { detectCollisions, freeIntervals, type AllocationOccurrence } from "@/domain/allocation";
 import { indexSubSpaces, type SubSpaceNode } from "@/domain/conflict-graph";
 import { instantToLocalTime, localToInstant } from "@/lib/time";
@@ -66,6 +66,41 @@ describe("recurrence expansion", () => {
     for (const occ of occurrences) {
       expect(instantToLocalTime(occ.startAt)).toBe("15:30");
     }
+  });
+});
+
+describe("expansion window", () => {
+  const season = { fromDate: "2026-11-10", toDate: "2027-03-06" };
+
+  it("defaults to the season when the block sets no bounds", () => {
+    expect(expansionWindow(season, {})).toEqual(season);
+    expect(expansionWindow(season, { fromDate: null, toDate: null })).toEqual(season);
+  });
+
+  it("narrows to the block's own dates inside the season", () => {
+    expect(expansionWindow(season, { fromDate: "2026-11-16", toDate: "2027-02-27" })).toEqual({
+      fromDate: "2026-11-16",
+      toDate: "2027-02-27",
+    });
+  });
+
+  /**
+   * A coach types "November 1" without knowing the season opens on the 10th.
+   * The block never widens its season: the season's edge wins.
+   */
+  it("clamps bounds that spill past the season's edges", () => {
+    expect(expansionWindow(season, { fromDate: "2026-11-01", toDate: "2027-03-20" })).toEqual(
+      season,
+    );
+  });
+
+  it("returns null when the block's dates miss the season entirely", () => {
+    expect(expansionWindow(season, { fromDate: "2027-04-01", toDate: "2027-05-01" })).toBeNull();
+    expect(expansionWindow(season, { fromDate: null, toDate: "2026-10-01" })).toBeNull();
+  });
+
+  it("returns null for an inverted window", () => {
+    expect(expansionWindow(season, { fromDate: "2027-02-01", toDate: "2026-12-01" })).toBeNull();
   });
 });
 

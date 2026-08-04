@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ApprovalStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/current-user";
 import { AppShell } from "@/components/app-shell";
@@ -46,6 +48,8 @@ export default async function AllocationPage({
 
   const preview = seasonId ? await previewSeasonAllocation(seasonId) : null;
   const season = seasons.find((s) => s.id === seasonId);
+  const approvedCount = blocks.filter((b) => b.status === ApprovalStatus.APPROVED).length;
+  const pendingCount = blocks.filter((b) => b.status === ApprovalStatus.PENDING).length;
 
   const spaces = facilities.flatMap((f) =>
     f.subSpaces.map((s) => ({ id: s.id, label: `${f.name} — ${s.name}` })),
@@ -98,9 +102,18 @@ export default async function AllocationPage({
           >
             {preview && (
               <p className="text-sm text-navy-700">
-                {blocks.length} standing block{blocks.length === 1 ? "" : "s"} expanding to{" "}
+                {approvedCount} approved standing block{approvedCount === 1 ? "" : "s"} expanding to{" "}
                 <strong>{preview.occurrences.length}</strong> session
                 {preview.occurrences.length === 1 ? "" : "s"} across the season.
+              </p>
+            )}
+            {pendingCount > 0 && (
+              <p className="mt-1 text-sm text-navy-700">
+                {pendingCount} coach request{pendingCount === 1 ? "" : "s"} awaiting review in the{" "}
+                <Link href="/admin/approvals" className="font-medium underline">
+                  approval queue
+                </Link>
+                . Undecided requests are not part of this preview and will not publish.
               </p>
             )}
           </Card>
@@ -181,7 +194,10 @@ export default async function AllocationPage({
             )
           )}
 
-          <Card title="Standing blocks" description="Recurring time reserved for a team.">
+          <Card
+            title="Standing blocks"
+            description="Recurring time reserved for a team. Coach requests join once approved; denied ones stay for the record."
+          >
             {blocks.length === 0 ? (
               <EmptyState title="No blocks yet">Add the first one below.</EmptyState>
             ) : (
@@ -195,6 +211,7 @@ export default async function AllocationPage({
                       <Th>Pattern</Th>
                       <Th>Time</Th>
                       <Th>Priority</Th>
+                      <Th>Status</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -206,11 +223,29 @@ export default async function AllocationPage({
                           {block.subSpace.facility.name}
                           <span className="block text-xs text-navy-600">{block.subSpace.name}</span>
                         </Td>
-                        <Td>{describeRecurrence(block.rrule)}</Td>
+                        <Td>
+                          {describeRecurrence(block.rrule)}
+                          {(block.startDate || block.endDate) && (
+                            <span className="block text-xs text-navy-600">
+                              {block.startDate ? dateColumnToISO(block.startDate) : "season start"}{" "}
+                              to {block.endDate ? dateColumnToISO(block.endDate) : "season end"}
+                            </span>
+                          )}
+                        </Td>
                         <Td className="whitespace-nowrap font-mono text-xs">
                           {block.startTime}–{block.endTime}
                         </Td>
                         <Td>{block.priority}</Td>
+                        <Td>
+                          {block.status === ApprovalStatus.PENDING && (
+                            <Badge tone="warn">Awaiting review</Badge>
+                          )}
+                          {block.status === ApprovalStatus.DENIED && (
+                            <Badge tone="danger">Denied</Badge>
+                          )}
+                          {block.status === ApprovalStatus.APPROVED &&
+                            (block.published ? <Badge tone="good">Published</Badge> : <Badge>Approved</Badge>)}
+                        </Td>
                       </tr>
                     ))}
                   </tbody>

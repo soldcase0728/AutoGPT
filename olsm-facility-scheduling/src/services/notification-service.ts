@@ -6,12 +6,13 @@
  * key covers it).
  */
 
-import { BookingStatus, Role } from "@prisma/client";
+import { BookingStatus, Role, type TeamLevel } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
-import { formatRange } from "@/lib/time";
+import { dateColumnToISO, formatRange } from "@/lib/time";
 import { formatMoney } from "@/domain/pricing";
 import { STATUS_LABELS } from "@/domain/booking-state";
+import { describeRecurrence } from "@/domain/recurrence";
 import type { BumpCandidate } from "@/domain/priority";
 import { enqueue } from "./job-queue";
 import type { Actor } from "./booking-service";
@@ -198,6 +199,104 @@ export async function notifyCalendarEditReverted(params: {
         `Make the change here instead: ${env.appUrl}/portal/bookings/${params.bookingId}`,
     },
     idempotencyKey: `notify:reverted:${params.bookingId}:${Date.now()}`,
+  });
+}
+
+/** The fields of a standing block a notification needs to describe it. */
+interface StandingBlockNotice {
+  id: string;
+  rrule: string;
+  startTime: string;
+  endTime: string;
+  teamLevel: TeamLevel;
+  startDate: Date | null;
+  endDate: Date | null;
+  requestNote: string | null;
+  sport: { name: string };
+  subSpace: { name: string; facility: { name: string } };
+  season: { name: string };
+  createdBy: { name: string; email: string };
+}
+
+function describeStandingBlock(block: StandingBlockNotice): string {
+  const level =
+    block.teamLevel === "NONE" ? "" : ` ${block.teamLevel.replace("_", " ").toLowerCase()}`;
+  const bounds =
+    block.startDate || block.endDate
+      ? ` (${block.startDate ? dateColumnToISO(block.startDate) : "season start"} to ${
+          block.endDate ? dateColumnToISO(block.endDate) : "season end"
+        })`
+      : "";
+  return (
+    `${block.sport.name}${level} — ${block.subSpace.facility.name} — ${block.subSpace.name}\n` +
+    `${describeRecurrence(block.rrule)}, ${block.startTime}–${block.endTime}\n` +
+    `${block.season.name}${bounds}`
+  );
+}
+
+export async function notifyStandingBlockRequested(
+  block: StandingBlockNotice,
+  requesterName: string,
+): Promise<void> {
+  const note = block.requestNote ? `\n"${block.requestNote}"\n` : "";
+  await notifyAdmins(
+    `Standing time requested: ${block.sport.name} — ${block.subSpace.facility.name}`,
+    `${requesterName} requested recurring practice time:\n\n` +
+      `${describeStandingBlock(block)}\n${note}\n` +
+      `Approve or deny: ${env.appUrl}/admin/approvals`,
+    `standing-block-request:${block.id}`,
+  );
+}
+
+export async function notifyStandingBlockDecision(
+  block: StandingBlockNotice,
+  decision: "APPROVED" | "DENIED",
+  outcome: {
+    note: string | null;
+    created: number;
+    skippedDates: string[];
+    awaitingSeasonPublish: boolean;
+  },
+): Promise<void> {
+  const description = describeStandingBlock(block);
+
+  let text: string;
+  if (decision === "DENIED") {
+    text =
+      `${block.createdBy.name},\n\n` +
+      `The athletic office did not approve your standing practice request:\n\n${description}\n\n` +
+      `"${outcome.note}"\n\n` +
+      `You can adjust and submit it again from your team page: ${env.appUrl}/my-team`;
+  } else if (outcome.awaitingSeasonPublish) {
+    text =
+      `${block.createdBy.name},\n\n` +
+      `Your standing practice request is approved:\n\n${description}\n\n` +
+      "It goes on the calendar when the athletic office publishes the season schedule. " +
+      `You can follow it here: ${env.appUrl}/my-team`;
+  } else {
+    const skipped =
+      outcome.skippedDates.length > 0
+        ? `\n\nThese dates could not be booked and were skipped: ${outcome.skippedDates.join(", ")}. ` +
+          "The athletic office can help find alternatives for them."
+        : "";
+    text =
+      `${block.createdBy.name},\n\n` +
+      `Your standing practice time is approved and on the calendar:\n\n${description}\n\n` +
+      `${outcome.created} session${outcome.created === 1 ? " was" : "s were"} booked.${skipped}\n\n` +
+      `${env.appUrl}/my-team`;
+  }
+
+  await enqueue({
+    kind: "notify.email",
+    payload: {
+      to: block.createdBy.email,
+      subject:
+        decision === "APPROVED"
+          ? `Approved: ${block.sport.name} standing practice time`
+          : `Not approved: ${block.sport.name} standing practice time`,
+      text,
+    },
+    idempotencyKey: `notify:standing-block:${block.id}:${decision}`,
   });
 }
 
