@@ -326,6 +326,28 @@ Invoices are visible per booking. Refunds are issued from the invoice page.
 
 ## 9. Reference
 
+### Reading the calendar
+
+**Colour is the sport.** Each sport has its own colour, and the key beside the
+grid — below it on a phone — names the ones booked in the view you are looking
+at. It lists only what is on screen, so it stays short.
+
+Two things worth knowing about it:
+
+- **Bookings with no sport are grey.** Rentals, school events and maintenance
+  share one slate colour, because they are a category rather than a team.
+- **Colour is a shortcut, never the whole story.** Every block also carries its
+  own title, so you never have to rely on telling two colours apart. Two sports
+  share a colour only when their seasons do not overlap.
+
+**Lighter, ringed blocks are held, not confirmed.** They also say *held* in the
+block. Somebody has the slot reserved while their paperwork is outstanding; if
+it is not finished in time the hold releases.
+
+The **Day** view puts spaces side by side, which is the one to use when you are
+looking for a free court. **Week** puts days side by side. **Month** and
+**Agenda** are for scanning further out.
+
 ### The eight facilities
 
 | Facility | Notes |
