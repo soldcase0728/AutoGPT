@@ -28,3 +28,21 @@ export const WAIVER_TERMS: string[] = [
   "Minors. If any participant is under 18, this release must be signed by that participant's parent or legal guardian.",
   "Medical treatment. I authorize the school to arrange emergency medical care if needed and accept responsibility for the cost of that care.",
 ];
+
+/**
+ * The per-booking agreement an outside group signs. Distinct from the annual
+ * one a coach signs: this binds a named organisation for a single reservation,
+ * and carries the insurance, damage and cancellation terms that only apply when
+ * somebody outside the school is using a space.
+ */
+export const FACILITY_USE_TERMS: string[] = [
+  "FACILITY USE AGREEMENT (DRAFT — PENDING LEGAL REVIEW)",
+  "This agreement covers the single reservation identified above. The organisation named on the booking is responsible for everything in it, whether or not the individual signing remains involved.",
+  "Permitted use. The space may be used only for the activity described in the booking, only by the group named, and only during the reserved hours including any setup and teardown time shown.",
+  "Supervision. A responsible adult from the organisation will be present for the entire reservation. Participants may not be left unsupervised at any time, and areas of the building outside the reserved space are not included.",
+  "Condition and damage. The space will be inspected before and after use and left as it was found. The organisation is responsible for the cost of repairing or replacing anything damaged beyond ordinary wear during the reservation.",
+  "Insurance. The organisation will maintain commercial general liability insurance naming Orchard Lake St. Mary's Preparatory as an additional insured, valid through the date of the reservation, and will provide a certificate before the booking is confirmed.",
+  "Cancellation. Refunds follow the cancellation schedule shown on the booking. The school may cancel a reservation when the facility becomes unavailable or when a school activity requires the space, and will refund in full when it does.",
+  "Indemnification. To the extent permitted by law, the organisation agrees to indemnify and hold harmless Orchard Lake St. Mary's Preparatory, its trustees, officers, employees and agents from claims arising out of its use of the facilities, other than claims arising from the school's own negligence.",
+  "Compliance. The organisation will follow the school's rules for the building, including access hours, prohibited equipment, and any restriction posted in the space.",
+];

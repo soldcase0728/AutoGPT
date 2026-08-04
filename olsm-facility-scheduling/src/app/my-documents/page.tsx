@@ -93,9 +93,20 @@ export default async function MyDocumentsPage() {
               </div>
             ))}
 
-            {annual.length === 0 && (
+            {/*
+              Offered whenever the coach does not have a current agreement, not
+              only when they have never had one. Keying this on "no agreement
+              exists" stranded every coach whose agreement expired: the old row
+              was still there, so the button vanished, and the expiry gate they
+              had just been shown had no way to clear it.
+            */}
+            {!agreement.ok && (
               <form action={requestAnnualAgreementAction}>
-                <Button type="submit">Start my Annual Coach Agreement</Button>
+                <Button type="submit">
+                  {annual.length === 0
+                    ? "Start my Annual Coach Agreement"
+                    : "Start this year's agreement"}
+                </Button>
               </form>
             )}
           </div>

@@ -48,8 +48,25 @@ class LocalStorage implements StorageProvider {
 
   async put(key: string, body: Uint8Array, contentType: string): Promise<StoredObject> {
     const target = this.path(key);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, body);
+    try {
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, body);
+    } catch (error) {
+      // A hosted container's application directory is usually read-only, so the
+      // default relative path fails with a bare EACCES that says nothing about
+      // what to change. Name the setting and the path instead: this surfaced as
+      // certificates of insurance silently failing to upload, which stalls every
+      // external rental at the insurance gate with no way forward.
+      const code = (error as NodeJS.ErrnoException)?.code;
+      if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
+        throw new Error(
+          `Cannot write uploaded files to ${dirname(target)} (${code}). ` +
+            "STORAGE_LOCAL_DIR must point at a writable, persistent path — on Render that means " +
+            "a mounted disk, not the application directory. Set it and redeploy.",
+        );
+      }
+      throw error;
+    }
     return { key, size: body.byteLength, contentType };
   }
 

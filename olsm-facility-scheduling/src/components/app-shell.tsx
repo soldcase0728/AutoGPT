@@ -18,7 +18,11 @@ const NAV: NavItem[] = [
   { href: "/my-documents", label: "My documents", roles: [Role.HEAD_COACH, Role.ASSISTANT_COACH, Role.TRAINER, Role.STRENGTH_COACH] },
   { href: "/portal", label: "My requests", roles: [Role.EXTERNAL] },
   { href: "/custodial", label: "Setup board", roles: [Role.FACILITIES, Role.SUPER_ADMIN, Role.FACILITY_ADMIN] },
-  { href: "/admin/approvals", label: "Approvals", roles: [Role.SUPER_ADMIN, Role.FACILITY_ADMIN] },
+  // Head coaches too: an assistant's practice request routes to them by name,
+  // the page already scopes what they see to their own sport, and decideApproval
+  // accepts them as the named approver. Only the link was missing, so the
+  // request sat in a queue they had no way to open.
+  { href: "/admin/approvals", label: "Approvals", roles: [Role.SUPER_ADMIN, Role.FACILITY_ADMIN, Role.HEAD_COACH] },
   { href: "/admin/reports", label: "Reports", roles: [Role.SUPER_ADMIN, Role.FACILITY_ADMIN, Role.FINANCE] },
   { href: "/admin", label: "Admin", roles: [Role.SUPER_ADMIN, Role.FACILITY_ADMIN] },
 ];

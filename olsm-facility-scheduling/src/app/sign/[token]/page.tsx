@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { DocumentStatus } from "@prisma/client";
+import { DocumentStatus, type DocumentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { PublicShell } from "@/components/app-shell";
 import { Alert, Card } from "@/components/ui";
 import { formatRange } from "@/lib/time";
 import { DOCUMENT_LABELS } from "@/domain/compliance";
 import { SignForm } from "./sign-form";
-import { AGREEMENT_TERMS, WAIVER_TERMS } from "./terms";
+import { AGREEMENT_TERMS, FACILITY_USE_TERMS, WAIVER_TERMS } from "./terms";
 
 export const metadata: Metadata = { title: "Sign document", robots: { index: false } };
 
@@ -32,8 +32,39 @@ export default async function SignPage({ params }: { params: Promise<{ token: st
   if (!document) notFound();
 
   const alreadySigned = document.status === DocumentStatus.SIGNED;
-  const terms =
-    document.type === "ANNUAL_COACH_AGREEMENT" ? AGREEMENT_TERMS : WAIVER_TERMS;
+  /*
+    Keyed on the document type, not "the annual one or else the waiver". That
+    fallback meant a Facility Use Agreement displayed the waiver's text: an
+    outside group was shown one document, told it was another, and signed it.
+    A signature on the wrong instrument is worth nothing, so an unrecognised
+    type must not quietly borrow somebody else's terms.
+  */
+  const TERMS_BY_TYPE: Partial<Record<DocumentType, string[]>> = {
+    ANNUAL_COACH_AGREEMENT: AGREEMENT_TERMS,
+    FACILITY_USE_AGREEMENT: FACILITY_USE_TERMS,
+    LIABILITY_WAIVER: WAIVER_TERMS,
+    MINOR_PARTICIPANT_WAIVER: WAIVER_TERMS,
+    CAMP_ADDENDUM: FACILITY_USE_TERMS,
+  };
+  const terms = TERMS_BY_TYPE[document.type];
+
+  // No terms for this type means nobody has written them yet. Rendering the
+  // form anyway would collect a signature against a blank instrument, so the
+  // page refuses instead and says who to ask.
+  if (!terms) {
+    return (
+      <PublicShell>
+        <div className="mx-auto max-w-2xl">
+          <Card title={DOCUMENT_LABELS[document.type]}>
+            <Alert tone="warn" title="This document is not ready to sign">
+              Its wording has not been set up yet. Contact the athletic office — nothing is wrong
+              with your booking, and no signature is needed from you until they confirm.
+            </Alert>
+          </Card>
+        </div>
+      </PublicShell>
+    );
+  }
 
   return (
     <PublicShell>

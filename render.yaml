@@ -36,7 +36,25 @@ services:
     dockerContext: .
     plan: starter
     healthCheckPath: /api/health
+    # Signed agreements and certificates of insurance land here.
+    #
+    # They were going to ./.storage, which resolves inside the read-only
+    # application directory: every upload failed with EACCES, and an external
+    # rental could never clear its insurance gate. A mounted disk fixes that and
+    # fixes the quieter half of the problem too -- container filesystems are
+    # replaced on every deploy, so without this a certificate accepted in March
+    # is gone in April, and these are the records that matter if anyone is ever
+    # hurt in one of these buildings.
+    #
+    # A disk pins the service to one instance and to recreate-style deploys.
+    # Fine at this size. Move to STORAGE_PROVIDER=s3 before that stops being true.
+    disk:
+      name: olsm-documents
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
+      - key: STORAGE_LOCAL_DIR
+        value: /var/data/documents
       - key: DATABASE_URL
         fromDatabase:
           name: olsm-facilities-db
