@@ -1,7 +1,11 @@
 # DATA AUDIT — Morning Convocation Logistics
 
 **Date:** 2026-08-09
-**Status:** ⛔ **Design BLOCKED.** Population is established; routing is not.
+**Status:** 🟡 **Partially unblocked.** Population, buildings, and floors established.
+Still blocked on: chapel plan, walking times, student→section link.
+
+**Update 2026-08-09:** `Room_Assignments_2026_Sheet1.pdf` received — resolves building + room
+for 48 of 52 third-hour sections. Origin matrix below is now real, not a placeholder.
 
 ---
 
@@ -169,3 +173,76 @@ If verified student capacity lands under ~853 + faculty, the single-assembly mod
 | `DATA_AUDIT.md` | This file. |
 
 **Not produced, by design:** seating chart, door loading, release schedule, campus flow, routing. Producing any of them now would mean inventing rooms, buildings, distances, and chapel geometry — which the brief explicitly forbids, and which would be worse than useless because it would look authoritative.
+
+
+---
+---
+
+# ADDENDUM — Room Assignments received
+
+**Source:** `d22f37c9-Room_Assignments_2026__Sheet1.pdf` (51 teachers → building + room)
+
+## A1. Third-hour origin matrix — NOW POPULATED
+
+| Origin | Gr9 | Gr10 | Gr11 | Gr12 | TOTAL |
+|---|---:|---:|---:|---:|---:|
+| **BAC** | 125 | 91 | 57 | 35 | **308** |
+| **Prep** | 33 | 13 | 82 | 68 | **195** |
+| **Library** | 0 | 51 | 21 | 60 | **132** |
+| **Science** | 19 | 13 | 32 | 41 | **105** |
+| **Gym** | 19 | 10 | 0 | 0 | **29** |
+| **Cafeteria** | 0 | 0 | 20 | 0 | **20** |
+| *Unknown room* | 0 | 25 | 9 | 4 | **38** |
+| **TOTAL** | **196** | **202** | **221** | **208** | **827** |
+
+*Grade splits are calculated (course grade-mix applied to section headcount), not measured. Building/room/floor are measured.*
+
+## A2. Building × floor — the stagger driver
+
+| Origin | Floor | Students |
+|---|---|---:|
+| BAC | 1 | 151 |
+| BAC | 2 | **157** |
+| Prep | 1 | 14 |
+| Prep | 2 | 70 |
+| Prep | 3 | **111** |
+| Library | Lower (LL 1–4) | 59 |
+| Library | Upper (UL 1–2) | 32 |
+| Library | *unknown level* (Music, Art, Physics) | 41 |
+| Science | 1 (assumed) | 105 |
+| Gym | 1 (assumed) | 29 |
+| Cafeteria | 1 (assumed) | 20 |
+
+**Prep 3rd floor (111 students) is the deepest stack on campus** — three floors down, and Prep is a hypothesized long route. It is the strongest candidate for first release.
+
+**BAC 2nd floor (157) is the single largest floor population**, feeding whichever BAC stairwells exist.
+
+## A3. ⚠️ Key structural finding — no building maps to one grade
+
+Every major building sends students to **all four** grade sections:
+
+- BAC alone contains 125 freshmen, 91 sophomores, 57 juniors, 35 seniors.
+- Prep is junior/senior-heavy (82/68) but still holds 33 freshmen.
+- Library is sophomore/senior split (51/60) with zero freshmen.
+
+**Consequence:** "one chapel door per grade" is impossible without massive cross-traffic — exactly what §7 of the brief forbids. Doors must be assigned by **approach direction**, and each door must feed **multiple grade territories**. This confirms the brief's own instruction not to bind an entrance to a grade, and it is now demonstrated from data rather than assumed.
+
+## A4. 🚨 Conflicts found in the room data
+
+| # | Issue | Detail |
+|---|---|---|
+| 1 | **BAC 208 double-booked at 3rd period** | Anwar (Computer Science, 13) **and** Z Teacher Business (G Accounting/Business, 19) are both assigned BAC 208 = **32 students in one room**. Anwar's 3rd-period cell also carries a `C:1` conflict flag on the master schedule — likely this. **Needs registrar resolution.** |
+| 2 | **Gym holds two simultaneous classes** | Carli (Grammar and Genre Studies, 10) + Jeffery (PE/Health, 19) = 29. Plausible in a gym, but Carli teaching an academic class there affects convocation staging. |
+| 3 | **`Murphy` has Prep 201 but no classes** on the 7/30 master schedule | Either a new hire not yet on the grid, or a name mismatch. |
+
+## A5. Still missing
+
+| Item | Impact |
+|---|---|
+| **4 sections have no room** — Aronoff (10), Buchanan (14), Howard ×2 (14) = **38 students** | Buchanan/Howard likely Gym-adjacent; Aronoff unknown. Cannot assign exit. |
+| **Library level for Music / Art / Physics rooms** (41 students) | Cannot place in stair stagger |
+| **Which rooms sit near which door** (BAC North vs East; Prep N1/N2/South) | Floor plan needed. Floors are known; **wing/position is not.** This is the last piece blocking exit assignment. |
+| **Science / Gym / Cafeteria floor count** | Assumed single-storey — confirm |
+| **Chapel plan + approved occupancy** | Still blocks all seating work |
+| **Timed walking data** | Still blocks all release timing |
+| **Student → section link** | Still blocks per-student routing |
