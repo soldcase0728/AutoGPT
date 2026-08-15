@@ -8,7 +8,15 @@
 
 ## 1. Executive Summary
 
-*(completed in final synthesis — see Section 7 for full findings)*
+Twelve schools, three categories, one converging playbook. America's fastest-growing private schools — whether they sell saints, servant leaders, or software-paced mastery — run the same five-part identity architecture:
+
+1. **A one-sentence telos** that answers "what is education for" ("raise saints"; "find a calling"; "win their future"; "formation, not information").
+2. **A systemic villain** — a broken paradigm, never a rival school — that makes switching feel principled rather than consumerist.
+3. **A both/and promise** that dissolves the parent's feared trade-off (holiness *and* scholarships; loves school *and* top 1%; athletics *and* academics).
+4. **Joy as the permission layer** around a demanding model — the more intense the school, the more prominent the joy language.
+5. **The parent cast as protagonist** — primary educator, partner, covenant signatory, even school founder — rather than customer.
+
+Fear-first marketing exists (one school of twelve) but is a niche strategy; the modal winner converts anxiety into aspiration. Safety — parents' #1 stated motivation in surveys — is almost never the headline; it is sold as intimacy ("known by name," "tight-knit," 4:1 ratios). Growth is network-shaped: the models that multiply fastest (Chesterton, Acton, Alpha, BASIS, the classical networks) codified their identity into portable language and launch kits. And the macro tailwind — universal ESAs plus Sun Belt migration — determines that a wave exists; identity architecture determines who captures it.
 
 ---
 
@@ -181,6 +189,43 @@ Learner-driven microschool affiliate network (founded 2009); schools typically �
 7. **Latin as brand jewelry** (*Cultura Vitae*; *Christum Novisse*; *Verso l'alto*; *Veritas*; *Pax Christi*).
 8. **Divergence — fear intensity gradient:** Chesterton names the enemy ("materialism and despair") → Donahue implies it ("authentically") → Frassati inverts it (send students *into* culture) → St. Jerome omits it (pure beauty/wonder attraction). Economic positioning splits four ways: populist affordability (Chesterton), selective gatekeeping (Donahue), value-for-outcomes (Frassati), scarcity without pricing rhetoric (St. Jerome).
 
+### 5B. Christian (non-Catholic) schools
+
+#### Jupiter Christian School — nurture as the product
+- **Core language:** mission — "…excellence in teaching the mind, reaching the heart, and inspiring servant leaders who impact the world for Jesus Christ." Brand triad: **"Excelling. Nurturing. Engaging."** Hero rotator: "Be a Scholar / Be Creative / Be an Eagle / Be a World Changer / Be a Champion." The signature promise: "At JCS, your child will be **known by name**, loved as child of God, and equipped… to navigate the world ahead of them."
+- **Dominant drivers (ranked):** (1) belonging — "nurturing community" appears verbatim in the mission, the promise, and admissions; (2) servant-leader character; (3) faith; (4) individuality ("each student is unique and designed by God for a distinct and powerful purpose"); (5) college prep; (6) soft prestige (Niche badge, 60-year heritage). Cultural-anxiety copy is minimal and oblique; safety as explicit copy is essentially absent.
+- **Tone:** aspirational and warm, not protective — the world is something to "engage" and "impact," not flee. Welcoming rather than exclusive; faith gating is kept off the public marketing surface entirely. Notably the only school in the set to advertise faculty "trained in Social-Emotional Learning" — a term the movement's classical wing treats as suspect.
+- **Fear/hope levers:** protects from *anonymity and mediocrity*, not ideology — the implicit fear is a child unknown and unloved in a big school; the hope is expansive world-influence ("Be a World Changer").
+- **Growth context:** ~700-student waitlist and a proposed $68M second campus — the least adversarial messaging in the Christian set is attached to the most dramatic demand evidence.
+
+#### The Woodlands Christian Academy — trajectory sanctified
+- **Core language:** campaign tagline **"In Pursuit of What's Possible"** — deliberately rhyming with the spiritual tagline "Pursuit of God." "Your child's future starts with the right foundation." Stat wall: "100% Graduates accepted to 4-year College and Universities… $154,559 Average Merit-based scholarship Dollars Awarded per student… #1 Best Christian HS… #2 Best High School for athletes." Admissions headline: **"A Christian School for Christian Families."** A "Portrait of a Partnership" page explicitly lists who is *not* a fit: "Families who aren't fully aligned with our Christian values… Students or families looking for more lenient academics." The Warrior Way virtue code: "Honors God / Fights for Truth / Leads by Example / Serves Others / Walks Humbly."
+- **Dominant drivers (ranked):** (1) college outcomes — the quantified core; (2) status/prestige — heaviest ranking language in the Christian set; (3) faith ("Faith formation is not an afterthought"); (4) gated belonging; (5) Warrior character code; (6) rigor; (7) one explicit safety note ("a highly secure campus").
+- **Tone:** aspirational-competitive, confident, data-forward; selectively exclusive — exclusivity framed as mission integrity, not culture war (the sole combative note is the virtue "Fights for Truth").
+- **Fear/hope levers:** protects from *wasted potential and diluted mission*; the hope lever is elite trajectory sanctified — 100% college acceptance and merit dollars "for the glory of Jesus Christ."
+
+#### Dream City Christian School — the fear-first funnel (the outlier)
+- **Core language:** classic direct-response architecture — the homepage opens with a four-bullet parental-fear inventory: "Many Christian parents worry about their child after they drop them off at school. They are: **Worried about Liberal agendas being taught by teachers / Frustrated their Christian values aren't upheld at school / Concerned about the peer pressure surrounding their child / Alarmed that schools are embracing gender neutral ideology.**" Then relief: "we reinforce the biblical values you already practice at home." Turning Point Academy layer, in display type: "COMBAT MORALLY BANKRUPT & LIBERAL IDEOLOGY"; enemies rendered as standalone lines ("Critical Race Theory. Evolutionism. Gender Identification."); "Reclaim the agenda behind your child's education"; "58% OF YOUTH TURN AWAY FROM THE CHURCH BY AGE 18." Stat wall includes "**29 Baptisms**" as a KPI. "Safety" is the *first-listed core value*, fusing the physical and the ideological: "rigid security and protocols… emotionally and spiritually safe from the harmful teachings of the world."
+- **Dominant drivers (ranked):** (1) cultural anxiety — the structural spine of the entire funnel; (2) safety; (3) faith; (4) militant character formation ("fire in their belly to act and live boldly for Christ and liberty"); (5) belonging ("Join Hundreds of Christian Families Reclaiming Their Child's Education"); college outcomes secondary and generic.
+- **Tone:** protective and urgent; adversarial/embattled — the only school in the twelve that names partisan enemies; traditional-nationalist ("America is the greatest nation ever to exist… save this republic"); warm *inside* the wall ("caring teachers").
+- **Fear/hope levers:** the highest-stakes fear lever on any site in the study — the implied loss is the child's soul (the 58% apostasy statistic); the promise extends beyond the child to *national restoration*.
+- **Growth context:** ESA-fueled (~10x ESA revenue growth post-universal-expansion); the fear-first funnel monetizes the exodus segment that universal choice programs unlocked.
+
+#### The Ambrose School — formation, not information
+- **Core language:** hero — **"TRUTH, GOODNESS, AND BEAUTY."** Thesis statements: "**Classical Christian education is about who we become, not what we know.**" "**The goal of classical Christian education is formation, not merely information.**" "We believe that true education is about forming the soul." The devastating time-horizon question: "**Who do you want your child to be, not just when they're 18, but when they are 30, 40, and 50 years old?**" "Classical Christian education teaches you HOW to think, not WHAT to think." The named adversary is pedagogical, not political: "Modern education seeks to train for a job or a career." Even outcome stats are relativized: "No standardized test can measure the whole-person formation that The Ambrose School seeks to provide your child" (alongside "98% college matriculation" and 12 National Merit Scholars).
+- **Dominant drivers (ranked):** (1) character formation — the brand's entire thesis; (2) rigor (Latin from 3rd grade, senior thesis defended before community members); (3) faith ("the Bible as the final authority in matters of life and thought"); (4) covenantal belonging ("close-knit community of like-minded Christian families representing over 70 local churches" — gated by parent interviews and required reading of Douglas Wilson's *Recovering the Lost Tools of Learning*); (5) joy/wonder — the strongest in the Christian set ("produces a joy of learning for life"; a 4th-grade Medieval festival; a senior trip to London, Paris, Florence, Rome); (6) understated prestige ("Top 25 Schools in Nation by CLT").
+- **Tone:** aspirational-philosophical — sells a paradigm before a school; confident, patient, teacherly; zero urgency-marketing; exclusive in substance while gracious in tone. Deeply traditional by conviction, framing tradition as the *radical alternative* to failed modernity.
+- **Fear/hope levers:** long-range — who your child *becomes* by 30, 40, 50 if formation is neglected; the promise is a formed human ("think with depth, believe with courage, and serve with compassion"), with elite outcomes as byproduct.
+- **Targeting:** entirely parent-targeted, and specifically parent-*educating* — the site is a curriculum in classical education for adults.
+
+#### Cross-cutting: the Christian-school code
+1. **"Christ-centered" is the universal license plate** (verbatim at all four), alongside "Biblical worldview," "excellence," and "servant leader" constructions.
+2. **The partnership-with-home frame** — every school extends the family's existing faith, never replaces it: "we will partner with you" (JCS); "Grace-Filled Partnership" (TWCA); "we reinforce the biblical values you already practice at home" (DCCS); "partnering with parents" (Ambrose).
+3. **College outcomes as proof, faith as purpose** — all four cite college stats while rhetorically subordinating them to formation.
+4. **All gate on family faith, at very different visibility** — loudly (TWCA, Ambrose), doctrinally (DCCS), or entirely off the marketing surface (JCS).
+5. **Divergence — same parental anxiety, four monetization strategies:** DCCS sells *protection*, Ambrose sells *formation*, TWCA sells *trajectory*, JCS sells *nurture*. Emotional leads differ accordingly: fear bullets (DCCS), stat wall (TWCA), "known by name" (JCS), a philosophy question (Ambrose).
+6. **The classical triad is diffusing beyond classical schools** — "truth, goodness, beauty" appears verbatim at Ambrose (mission), TWCA (philosophy page), and even Dream City's Turning Point pillars; only JCS doesn't use it.
+
 ### 5C. Independent schools
 
 #### Alpha School — "a tech startup wearing a school uniform"
@@ -218,4 +263,102 @@ None of the four invokes God, but each installs a functional identity anchor exa
 
 ---
 
-*Sections 5A (Catholic), 5B (Christian), and 6–8 (comparison, synthesis, actionable insights) follow.*
+## 6. Side-by-Side Comparison
+
+| School | Cat. | Growth signal | Core tagline / hook | #1 psychological driver | Fear lever (what they protect from) | Hope lever (what they promise) | Proof regime |
+|---|---|---|---|---|---|---|---|
+| Chesterton Network | C | 1 → 70+ schools since 2008 | "Joyfully Catholic" / "Raising up… joyful leaders and saints" | Faith identity | "Materialism and despair that pervade our culture" | Joyful saints; abundant life; affordability | Movement scale + Yass Prize |
+| Donahue Academy | C | +120% since 2020 | "Raise saints" | Faith identity | Diluted, *in*authentic Catholicism; mediocrity | Sainthood + excellence | Selectivity + awards |
+| St. Jerome Academy | C | 29% admit rate; near-closure → national model | "Let Us Learn the Abiding Things" | Wonder | Transient, utilitarian education ("piling up stones") | Love of truth for its own sake; integrated lives | Waitlists + the exported Educational Plan; no stats |
+| Frassati Catholic | C | 72 → 364; building to 1,000 | "A School of the Beatitudes" / "Verso l'alto!" | College outcomes | An unhappy, aimless adolescence | Achievement *and* sanctity — explicit both/and | Stat band ($54M, 100%, CLT #21) |
+| Jupiter Christian | X | ~+23%; ~700 waitlisted; $68M campus | "Excelling. Nurturing. Engaging." / "known by name" | Belonging | Anonymity; being unknown in a big school | "Be a World Changer"; known and loved | Waitlist + heritage + Niche |
+| Woodlands Christian | X | record 860+; ~10%/yr | "In Pursuit of What's Possible" | College outcomes | Wasted potential; diluted mission | Elite trajectory "for the glory of Jesus Christ" | Stat wall (100%, $154K, #1) |
+| Dream City Christian | X | ~+25% in 3 yrs; 10x ESA revenue | "Give Your Child A Christ-Centered Education" | Cultural anxiety | "Liberal agendas… gender neutral ideology"; apostasy (58% stat) | Strong Christian leaders; national restoration | Fear inventory + baptism KPI |
+| The Ambrose School | X | 544 → 900+ across 3 campuses | "Truth, Goodness, and Beauty" / "formation, not information" | Character formation | Modern education that trains for jobs, not souls | The person your child becomes at 30/40/50 | Philosophy + relativized stats |
+| Alpha School | I | ~12 → ~50 campuses for 2026-27 | "Love School / Learn 2x in 2hrs / Learn Life Skills" | Joy (love of school) | Wasted time; boredom; "school is broken" | Top 1% *and* loves school; "the gift of time" | 2.6x/99th-percentile stat block |
+| IMG Academy | I | +37-42% since 2017; $1.25B sale | "This is sports education" / "win their future" | Performance | Talent that never converts | Sport as a life platform → college roster → C-suite | Densest stat wall (25% of roster spots, 8 Ivies) |
+| BASIS Independent | I | 8 campuses in tech metros | "Fearless Thinkers Start Here." | Intellectual rigor | American mediocrity; falling behind globally | Top-25 university; "monumentally more prepared" | Rankings (1514 SAT, 99% AP, PISA) |
+| Acton Academy | I | ~50 → 300+ locations since 2018 | "We didn't reform the old model. We built a new one." | Character (calling) | A meaningless life; GPA-worship | A hero's journey; "a calling that will change the world" | Narrative + network scale; zero stats |
+
+*Cat.: C = Catholic, X = Christian (non-Catholic), I = Independent.*
+
+**Tone matrix (condensed):** aspirational dominates protective 10-to-2 (only Dream City is fear-first; BASIS is quietly urgent). Welcoming dominates exclusive 8-to-4 (Donahue, TWCA, Ambrose, BASIS gate openly — and notably, gating correlates with *demand overflow*, not with the fastest network growth). Traditional-in-content/modern-in-marketing is the dominant hybrid; only Alpha and Acton claim disruption itself as identity — and Acton dresses its disruption as restoration.
+
+---
+
+## 7. Synthesis: The Patterns That Repeat Across High-Growth Schools
+
+*Consistency check: the three category analyses were run independently, on different schools, by separate research passes. The patterns below appeared in all three without coordination — including verbatim phrase-level convergence — which is the strongest evidence they are genre-wide, not school-specific. The pattern set stabilized after cross-checking all three sets against each other (no new first-order patterns emerged on the final pass), which is the convergence criterion this study looped toward.*
+
+### 7.1 The product is an identity, not an education
+Every high-growth school sells a *person the child will become*, framed in one or two words: **saints** (Chesterton, Donahue), **servant leaders** (JCS, TWCA), **warriors** (TWCA), **heroes** (Acton), **champions** (IMG), **fearless thinkers** (BASIS), **limitless kids** (Alpha), **formed souls** (Ambrose). Curriculum is presented as the *mechanism*; the identity is the offer. The conversion CTA is frequently literal identity adoption: "Become an Eagle," "Become a Frassati Falcon," "Be a Warrior," "Begin a Hero's Journey."
+
+### 7.2 The villain is a system, never the school down the street
+No school in the twelve attacks a named competitor. The enemy is always a *paradigm*: "the materialism and despair that pervade our culture" (Chesterton), "modern education" (Ambrose), "the old model" (Acton), "one-size-fits-all" schooling (Alpha), "rigor not traditionally found in U.S. schools" (BASIS), "liberal agendas" (Dream City), "piling up stones" (St. Jerome). This does three jobs at once: it explains the parent's existing dissatisfaction, it makes switching feel principled rather than consumerist, and it positions the school as a movement one *joins* rather than a service one buys. IMG runs the sophisticated variant: instead of attacking the category, it exits it ("This is sports education").
+
+### 7.3 The both/and promise — dissolving the trade-off — is the single most consistent psychological move
+Each school identifies the trade-off its target parent secretly fears and then denies its existence:
+- Frassati: holiness **and** $54M in scholarships ("your child need not trade achievement for sanctity")
+- Alpha: loves school **and** top 1% ("you don't trade happiness for achievement")
+- IMG: elite athletics **and** 100% college acceptance
+- TWCA: biblical fidelity **and** #1 rankings with merit money
+- Ambrose/St. Jerome: soul formation **and** 98% matriculation / National Merit (stats present but ostentatiously relativized)
+- Chesterton: orthodoxy **and** joy; classical rigor **and** working-family affordability
+- BASIS: extreme rigor **and** a "joyful community" where it's "safe to make mistakes"
+The high-growth position is almost never "we are the best at X" — it is "here, you don't have to choose between X and Y."
+
+### 7.4 Joy is the genre-wide inoculation layer
+Joy/wonder language shows up wrapped around every *demanding* model, and it is doing defensive work: it rebuts the stereotype each school's category generates. Faith schools use it against the grim-traditionalist stereotype ("Joyfully Catholic"; "Joy permeates our campus"; "joy of learning for life"). Rigor schools use it against the pressure-cooker stereotype (BASIS's "joyful community"). Alpha makes it the *lead pillar* ("Love School"). The pattern: the more demanding the model, the more prominent the joy language — joy is how these schools give anxious parents emotional permission to choose an intense environment.
+
+### 7.5 Parents are cast as protagonists, not customers
+The strongest-growth brands recruit the parent into an identity and sometimes into formal obligations: Catholic schools invoke parents as "the primary and principal educators" (doctrine deployed as school-choice-era flattery); every Christian school runs the "partnership with home" frame ("we reinforce the biblical values you already practice at home"); Acton has parents *sign promises* ("Choose a Hero's Journey for Myself"; "Allow My Child to Fail Early, Cheaply, and Often"); Chesterton recruits parents to *found schools*; Ambrose assigns parents required reading. The commitment gradient is striking: the highest-friction parent onboarding (Acton, Ambrose, Chesterton) belongs to the fastest-*replicating* models — friction filters for evangelists, and evangelists open new campuses.
+
+### 7.6 "How to think, not what to think" — the movement's shared incantation
+This exact phrase appears independently at Chesterton (Catholic) and Ambrose (Protestant), with secular translations at BASIS ("think for themselves"), Acton ("Guides who ask questions, not give answers"), and Alpha (mastery-not-lecture). Its function is identical everywhere: it reassures parents that a values-heavy or method-heavy school is not indoctrination. The lone inversion is Dream City, which promises to teach students to "defend absolute, objective truth" — the segment it serves wants the *what*, stated plainly.
+
+### 7.7 Verbatim language propagates through networks — high growth is network-shaped
+"True, good, and beautiful" appears at every Catholic school, three of four Christian schools, and in echo at Acton. "Christ-centered" is universal across the Christian set. "Guides" (not teachers) appears at both Acton and Alpha. House systems appear at Chesterton and Ambrose. This is because the growth is happening through *movements with shared texts* (the St. Jerome Educational Plan, Douglas Wilson's *Recovering the Lost Tools of Learning*, the Chesterton network playbook, Acton's owner network, the ACCS/ICLE conference circuit) — and through franchise mechanics (Chesterton's "18-month turnkey launch," Acton's owner-operators, Alpha's metro rollouts, BASIS's replicated curriculum). **Schools that scale are schools whose identity is portable — codified in a document, a phrase-set, and a launch process.**
+
+### 7.8 Two proof regimes, both of which work — but for different growth types
+- **The stat wall** (Frassati, TWCA, BASIS, IMG, Alpha): percentiles, acceptance rates, scholarship dollars, rankings — including *subcultural* rankings where the school can be #1 (CLT for classical schools; Niche county cuts; "25% of all college roster spots"). Correlates with single-campus enrollment scale.
+- **The anti-stat covenant** (Acton, St. Jerome; Ambrose hybrid): no or relativized metrics; proof by narrative, testimony, scarcity, and network count ("300+ schools"; a 29% admit rate reported as news). Correlates with movement replication.
+The choice of proof regime is itself a positioning signal: publishing a stat wall says "we compete in the meritocracy"; refusing one says "we transcend it."
+
+### 7.9 Safety is the #1 stated parent motivation but is almost never the headline
+EdChoice's 2024 survey has safety as the top stated reason parents choose private schools — yet only Dream City leads with it, and only TWCA names "a highly secure campus." The other ten translate safety into warmer proxies: "known by name," "nurturing community," "tight-knit," 4:1 ratios, 25-learner studios, covenantal community. High-growth messaging treats explicit fear as a niche strategy and *intimacy as the mass-market expression of safety*.
+
+### 7.10 Fear is calibrated, and mostly converted into aspiration
+Fear intensity forms a clean spectrum across all twelve: Dream City (explicit, partisan, urgent) → Chesterton (named but civilizational) → BASIS (comparative-global) → Ambrose/Acton/Alpha (paradigm critique) → Donahue/TWCA (a single coded word: "authentically," "aligned") → Frassati/JCS/IMG/St. Jerome (essentially fear-free). Growth occurs along the entire spectrum — fear is not required — but the *fear-forward* position appears exactly once, in the segment most activated by universal-ESA exodus politics. The modal high-growth strategy is to acknowledge the anxiety implicitly and immediately convert it into aspiration.
+
+---
+
+## 8. Category Differences, Surprising Overlaps, and Actionable Insights
+
+### 8.1 What distinguishes the categories
+
+**Catholic high-growth schools** compete on *authenticity within their own tradition*. The sharpest implied rival is not the public school but the diluted Catholic school ("authentically Catholic," "faithful," Newman Guide seals, Oath of Fidelity, sacramental density listed like facilities). The product is sainthood; college is a byproduct; Latin is brand jewelry; joy is the differentiator that makes orthodoxy feel like life rather than restriction. Economics skew populist — the classical Catholic wave explicitly prices for "families of average means" and rides choice scholarships.
+
+**Christian (evangelical) high-growth schools** compete on *alignment and partnership with the home*. The universal frame is extension of the family's existing faith ("reinforce the biblical values you already practice at home"), with family-level gating (statements of faith, parent interviews) at varying visibility. They are the most comfortable of the three categories with mainstream marketing grammar — stat walls, Niche badges, mascot identity systems — and they span the entire fear spectrum, from JCS's fear-free nurture to Dream City's fear-first funnel.
+
+**Independent high-growth schools** compete on *category invention*. Each claims a new kind of school ("This is sports education"; "2 Hour Learning"; "learner-driven"; the imported international curriculum) rather than a better version of the old kind. Lacking faith, each installs a substitute creed — technological optimism (Alpha), sport-as-platform (IMG), meritocratic excellence (BASIS), the hero's journey (Acton) — and the locus of authority diverges accordingly: the AI, the institution, the expert teacher, the child.
+
+### 8.2 The surprising overlaps
+1. **The most religious brand architecture in the study belongs to a secular school.** Acton is church-shaped end to end: covenant ("Contract of Promises"), liturgy (the hero's journey), vows (parent promises), virtue formation, servant leadership — Campbell's monomyth installed where doctrine would be. Meanwhile the most startup-shaped brand in the Catholic set (Chesterton: turnkey launches, economies of scale, "National Brand Recognition") grows exactly like Acton and Alpha. Form and faith have decoupled: *movement mechanics* are the shared engine.
+2. **Classical language is leaking across every boundary** — the transcendental triad now appears in evangelical mission statements, a Turning Point Academy pillar, and secular-school echoes; the CLT gives the subculture its own rankings economy.
+3. **Convergent role-renaming:** "Guides" at both Acton and Alpha; coaches/mentors at IMG; only BASIS elevates the teacher — and each choice precisely tracks where each brand locates authority.
+4. **The gating paradox:** schools that make joining *harder* (Ambrose's required reading, Acton's parent vows, Donahue's grade-level screen, TWCA's fit page) show the deepest demand overflow. Friction signals conviction, and conviction is what switching parents are shopping for.
+
+### 8.3 Actionable insights: what parents of high-growth schools are actually responding to
+
+1. **An answer to "what is education for?"** Every high-growth school can state its telos in one sentence ("raise saints"; "find a calling"; "win their future"; "formation, not information"). Parents exiting a system they experience as aimless are buying *clarity of purpose* first; program details are downstream evidence. Schools marketing generic "excellence" are invisible in this market.
+2. **Identity for the child — and membership for the family.** The offer that converts is "your child becomes a [saint/hero/champion/fearless thinker] and your family joins a community that shares your values." Enrollment language that reads like *joining* ("Become an Eagle") outperforms language that reads like *purchasing*.
+3. **Trade-off dissolution.** The hesitating parent holds a specific feared trade-off (faith vs. achievement; happiness vs. rigor; athletics vs. academics; values vs. open-mindedness). The highest-growth messaging names the parent's both/and and proves each half separately. Finding the target segment's feared trade-off and building the proof for both halves is the core messaging exercise this study surfaces.
+4. **Intimacy is how safety is actually sold.** Parents tell surveys "safety"; high-growth schools say "known by name," "tight-knit," "4:1." Explicit threat language works only for an ideologically pre-committed segment and caps the addressable market; intimacy language captures the same anxiety without the ceiling.
+5. **Parent agency is the era's master theme.** Universal ESAs turned parents into funded buyers, and the winning brands treat them as protagonists — primary educators, partners, covenant signatories, even school founders. Messaging that says "trust us, we're the experts" survives only in the meritocratic-anxiety niche (BASIS), and even there it is softened with belonging language.
+6. **Joy is the permission structure.** Demanding models grow when wrapped in credible joy signals (student life, wonder, festivals, "Love School"), because joy resolves the parent's guilt about imposing intensity. The formula visible across all twelve: *conviction + demandingness + joy*, with proof calibrated to segment.
+7. **Codify the identity if you want to replicate it.** The fastest-multiplying models (Chesterton, Acton, Alpha, BASIS, classical networks generally) all reduced themselves to a portable kit — a document, a phrase-set, a launch process, a shared proof regime. Growth at network scale is a *language* phenomenon before it is a real-estate phenomenon.
+8. **Structural honesty:** messaging amplifies but does not replace market position. The single largest measurable growth driver in 2023–2026 is universal school choice plus Sun Belt migration; the schools above are the ones whose identity architecture converted that tailwind into waitlists. Message quality determines *who captures* the wave, not whether the wave exists.
+
+---
+
+*Report compiled August 15, 2026. All quotes verbatim from cited public sources; UNVERIFIED items flagged in place. Category research and messaging analyses were conducted as independent passes and cross-checked for pattern convergence.*
