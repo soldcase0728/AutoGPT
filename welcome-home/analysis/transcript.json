@@ -1,0 +1,315 @@
+{
+ "source": "vo_lkmatch.wav",
+ "words": [
+  {
+   "start": 0.0,
+   "end": 0.62,
+   "word": "Not"
+  },
+  {
+   "start": 0.62,
+   "end": 0.76,
+   "word": "by"
+  },
+  {
+   "start": 0.76,
+   "end": 1.1,
+   "word": "chance,"
+  },
+  {
+   "start": 1.3,
+   "end": 1.38,
+   "word": "by"
+  },
+  {
+   "start": 1.38,
+   "end": 1.68,
+   "word": "formation."
+  },
+  {
+   "start": 2.86,
+   "end": 3.3,
+   "word": "Here,"
+  },
+  {
+   "start": 3.5,
+   "end": 3.72,
+   "word": "character"
+  },
+  {
+   "start": 3.72,
+   "end": 4.04,
+   "word": "is"
+  },
+  {
+   "start": 4.04,
+   "end": 4.48,
+   "word": "forged"
+  },
+  {
+   "start": 4.48,
+   "end": 4.72,
+   "word": "in"
+  },
+  {
+   "start": 4.72,
+   "end": 5.22,
+   "word": "community."
+  },
+  {
+   "start": 6.04,
+   "end": 6.66,
+   "word": "Excellence"
+  },
+  {
+   "start": 6.66,
+   "end": 7.02,
+   "word": "is"
+  },
+  {
+   "start": 7.02,
+   "end": 7.48,
+   "word": "expected,"
+  },
+  {
+   "start": 7.82,
+   "end": 8.08,
+   "word": "not"
+  },
+  {
+   "start": 8.08,
+   "end": 8.74,
+   "word": "optional."
+  },
+  {
+   "start": 9.4,
+   "end": 9.52,
+   "word": "Faith"
+  },
+  {
+   "start": 9.52,
+   "end": 9.74,
+   "word": "is"
+  },
+  {
+   "start": 9.74,
+   "end": 10.12,
+   "word": "lived,"
+  },
+  {
+   "start": 10.46,
+   "end": 10.76,
+   "word": "not"
+  },
+  {
+   "start": 10.76,
+   "end": 11.28,
+   "word": "merely"
+  },
+  {
+   "start": 11.28,
+   "end": 11.7,
+   "word": "taught."
+  },
+  {
+   "start": 12.52,
+   "end": 12.8,
+   "word": "Class"
+  },
+  {
+   "start": 12.8,
+   "end": 13.18,
+   "word": "of"
+  },
+  {
+   "start": 13.18,
+   "end": 13.88,
+   "word": "2031."
+  },
+  {
+   "start": 14.58,
+   "end": 14.74,
+   "word": "You"
+  },
+  {
+   "start": 14.74,
+   "end": 15.0,
+   "word": "don't"
+  },
+  {
+   "start": 15.0,
+   "end": 15.34,
+   "word": "arrive"
+  },
+  {
+   "start": 15.34,
+   "end": 15.62,
+   "word": "as"
+  },
+  {
+   "start": 15.62,
+   "end": 15.84,
+   "word": "strange."
+  },
+  {
+   "start": 16.28,
+   "end": 16.46,
+   "word": "You"
+  },
+  {
+   "start": 16.46,
+   "end": 16.7,
+   "word": "arrive"
+  },
+  {
+   "start": 16.7,
+   "end": 16.9,
+   "word": "as"
+  },
+  {
+   "start": 16.9,
+   "end": 17.02,
+   "word": "the"
+  },
+  {
+   "start": 17.02,
+   "end": 17.2,
+   "word": "next"
+  },
+  {
+   "start": 17.2,
+   "end": 17.62,
+   "word": "chapter"
+  },
+  {
+   "start": 17.62,
+   "end": 17.82,
+   "word": "of"
+  },
+  {
+   "start": 17.82,
+   "end": 17.94,
+   "word": "a"
+  },
+  {
+   "start": 17.94,
+   "end": 18.14,
+   "word": "proven"
+  },
+  {
+   "start": 18.14,
+   "end": 18.6,
+   "word": "tradition."
+  },
+  {
+   "start": 19.68,
+   "end": 20.14,
+   "word": "Parents,"
+  },
+  {
+   "start": 20.36,
+   "end": 20.44,
+   "word": "you're"
+  },
+  {
+   "start": 20.44,
+   "end": 20.72,
+   "word": "replacing"
+  },
+  {
+   "start": 20.72,
+   "end": 20.94,
+   "word": "your"
+  },
+  {
+   "start": 20.94,
+   "end": 21.36,
+   "word": "child"
+  },
+  {
+   "start": 21.36,
+   "end": 21.6,
+   "word": "in"
+  },
+  {
+   "start": 21.6,
+   "end": 21.72,
+   "word": "a"
+  },
+  {
+   "start": 21.72,
+   "end": 21.92,
+   "word": "safe"
+  },
+  {
+   "start": 21.92,
+   "end": 22.36,
+   "word": "environment."
+  },
+  {
+   "start": 22.84,
+   "end": 23.02,
+   "word": "A"
+  },
+  {
+   "start": 23.02,
+   "end": 23.34,
+   "word": "place"
+  },
+  {
+   "start": 23.34,
+   "end": 23.68,
+   "word": "that"
+  },
+  {
+   "start": 23.68,
+   "end": 23.94,
+   "word": "has"
+  },
+  {
+   "start": 23.94,
+   "end": 24.28,
+   "word": "already"
+  },
+  {
+   "start": 24.28,
+   "end": 24.62,
+   "word": "done"
+  },
+  {
+   "start": 24.62,
+   "end": 24.82,
+   "word": "this"
+  },
+  {
+   "start": 24.82,
+   "end": 25.2,
+   "word": "important"
+  },
+  {
+   "start": 25.2,
+   "end": 25.58,
+   "word": "work"
+  },
+  {
+   "start": 25.58,
+   "end": 26.22,
+   "word": "for"
+  },
+  {
+   "start": 26.22,
+   "end": 26.72,
+   "word": "generations."
+  },
+  {
+   "start": 27.46,
+   "end": 27.8,
+   "word": "Welcome"
+  },
+  {
+   "start": 27.8,
+   "end": 28.24,
+   "word": "home."
+  }
+ ]
+}

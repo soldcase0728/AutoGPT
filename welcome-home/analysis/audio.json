@@ -1,0 +1,17 @@
+{
+ "master": {
+  "input_i": "-14.96",
+  "input_tp": "-1.04",
+  "input_lra": "4.40"
+ },
+ "vo_stem": {
+  "input_i": "-14.64",
+  "input_tp": "0.08",
+  "input_lra": "4.40"
+ },
+ "music_stem": {
+  "input_i": "-9.52",
+  "input_tp": "0.07",
+  "input_lra": "2.40"
+ }
+}

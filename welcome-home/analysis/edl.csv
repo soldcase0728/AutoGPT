@@ -1,0 +1,10 @@
+shot,label,source,src_in,src_out,speed,tl_start,tl_end,dissolve_s,vo_line
+1,seal_1885,clip1_seal.mp4,0.00,3.60,1.0,0.00,2.92,0.7,"Not by chance, by formation."
+2,quad_aerial,clip2_animate.mp4,0.00,4.20,1.0,2.92,6.04,0.7,"Here character is forged in community."
+3,podium,clip4.mp4,0.50,4.50,1.0,6.04,9.00,0.7,"Excellence is expected, not optional."
+4,cross_altar,clip9.mp4,0.50,4.60,1.0,9.00,12.10,0.7,"Faith is lived, not merely taught."
+5,brothers_walk,clip6.mp4,0.00,6.04,0.765,12.10,19.30,0.7,"Class of 2031 / strangers"
+6,choir_breath,clip3.mp4,0.30,4.90,1.0,19.30,23.05,0.7,"(instrumental in Alex; Parents line in Adam/LK)"
+7,historic_1885,clip5.mp4,0.00,6.04,1.33,23.05,26.90,0.7,"generations"
+8,caps_girls,clip7.mp4,1.30,4.00,1.0,26.90,28.60,0.7,"Welcome home."
+9,caps_boys,clip10.mp4,0.80,3.20,1.0,28.60,30.40,0.7,"(button)"

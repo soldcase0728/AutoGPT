@@ -1,0 +1,15 @@
+{
+  "name": "olsm-welcome-home",
+  "version": "4.0.0",
+  "private": true,
+  "scripts": {
+    "render:master": "remotion render src/index.ts Master9x16 ../deliverables/WelcomeHome_v4_9x16_clean.mov --codec=prores --prores-profile=hq",
+    "render:all": "bash ../scripts/render.sh"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.245",
+    "remotion": "4.0.245",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

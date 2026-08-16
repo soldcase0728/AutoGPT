@@ -1,0 +1,3 @@
+detected=[0.0, 19.57]
+authored=[0.0, 2.92, 6.04, 9.0, 12.1, 19.3, 23.05, 26.9, 28.6]
+note=all transitions are authored 0.7s dissolves; AdaptiveDetector correctly finds no unintended hard cuts. Authored EDL authoritative.

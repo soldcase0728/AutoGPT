@@ -1,0 +1,9 @@
+source/raw/*
+source/audio/*
+source/*.mp4
+deliverables/*
+remotion/node_modules/
+remotion/out/
+*.wav
+*.mov
+remotion/public/*
