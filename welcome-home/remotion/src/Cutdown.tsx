@@ -13,8 +13,7 @@ const f = (s: number) => Math.round(s * FPS);
 const PLAN: { shot: Shot; from: number; dur: number; trimS?: number }[] = [
   { shot: SHOTS[0], from: 0, dur: f(2.79 + DISSOLVE_S / 2) },
   { shot: SHOTS[4], from: f(2.79 - DISSOLVE_S / 2), dur: f(4.64 + DISSOLVE_S) },
-  { shot: SHOTS[7], from: f(7.43 - DISSOLVE_S / 2), dur: f(1.86 + DISSOLVE_S) },
-  { shot: SHOTS[8], from: f(9.29 - DISSOLVE_S / 2), dur: f(1.86 + DISSOLVE_S) },
+  { shot: SHOTS[7], from: f(7.43 - DISSOLVE_S / 2), dur: f(4.18 + DISSOLVE_S) },
 ];
 
 import { OffthreadVideo, staticFile, useVideoConfig } from "remotion";

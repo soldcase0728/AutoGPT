@@ -1,47 +1,42 @@
 1
-00:00:00,400 --> 00:00:02,010
+00:00:00,400 --> 00:00:02,300
 Not by chance — by formation.
 
 2
-00:00:02,820 --> 00:00:05,370
+00:00:03,040 --> 00:00:05,600
 Here, character is forged
 in community.
 
 3
-00:00:06,180 --> 00:00:08,920
+00:00:06,380 --> 00:00:08,450
 Excellence is expected,
 not optional.
 
 4
-00:00:09,150 --> 00:00:11,870
+00:00:09,320 --> 00:00:11,350
 Faith is lived,
 not merely taught.
 
 5
-00:00:12,330 --> 00:00:15,880
+00:00:12,370 --> 00:00:16,100
 Class of 2031 —
 you do not arrive as strangers.
 
 6
-00:00:16,100 --> 00:00:18,860
+00:00:16,580 --> 00:00:19,550
 You arrive as the next chapter
 of a proven tradition.
 
 7
-00:00:19,570 --> 00:00:22,460
-Parents — you are placing your
-child in a safe environment.
+00:00:23,300 --> 00:00:24,700
+It's a place that has already
 
 8
-00:00:22,620 --> 00:00:24,800
-A place that has already done
-
-9
-00:00:24,800 --> 00:00:26,990
-this important work
+00:00:24,700 --> 00:00:26,700
+done this important work
 for generations.
 
-10
-00:00:27,280 --> 00:00:28,660
+9
+00:00:27,500 --> 00:00:28,650
 Welcome home.
 

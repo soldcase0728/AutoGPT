@@ -1,16 +1,78 @@
 {
-  "_note": "1x1 reframe: crop=1080:1080:0:y from the graded 1080x1920 master, keyframed per shot. DRAFT — requires human sign-off via docs/proofs/reframe_1x1_strip.png before paid use.",
-  "aspect": "1x1",
-  "shots": [
-    { "id": "seal", "tl": [0.0, 2.92], "y": 380 },
-    { "id": "quad", "tl": [2.92, 6.04], "y": 340 },
-    { "id": "podium", "tl": [6.04, 9.0], "y": 420 },
-    { "id": "cross", "tl": [9.0, 12.1], "y": 300 },
-    { "id": "brothers", "tl": [12.1, 19.3], "y": 500 },
-    { "id": "choir", "tl": [19.3, 23.05], "y": 380 },
-    { "id": "historic", "tl": [23.05, 26.9], "y": 420 },
-    { "id": "capsGirls", "tl": [26.9, 28.6], "y": 350 },
-    { "id": "capsBoys", "tl": [28.6, 30.4], "y": 380 },
-    { "id": "endcard", "tl": [30.4, 33.0], "y": 460 }
-  ]
+ "_note": "1x1 reframe: crop=1080:1080:0:y from the graded 1080x1920 master, keyframed per shot. DRAFT \u2014 requires human sign-off via docs/proofs/reframe_1x1_strip.png before paid use.",
+ "aspect": "1x1",
+ "shots": [
+  {
+   "id": "seal",
+   "tl": [
+    0.0,
+    2.92
+   ],
+   "y": 380
+  },
+  {
+   "id": "quad",
+   "tl": [
+    2.92,
+    6.04
+   ],
+   "y": 340
+  },
+  {
+   "id": "podium",
+   "tl": [
+    6.04,
+    9.0
+   ],
+   "y": 420
+  },
+  {
+   "id": "cross",
+   "tl": [
+    9.0,
+    12.1
+   ],
+   "y": 300
+  },
+  {
+   "id": "brothers",
+   "tl": [
+    12.1,
+    19.3
+   ],
+   "y": 500
+  },
+  {
+   "id": "nave",
+   "tl": [
+    19.3,
+    23.05
+   ],
+   "y": 420
+  },
+  {
+   "id": "historic",
+   "tl": [
+    23.05,
+    26.9
+   ],
+   "y": 420
+  },
+  {
+   "id": "capsBoys",
+   "tl": [
+    26.9,
+    30.4
+   ],
+   "y": 380
+  },
+  {
+   "id": "endcard",
+   "tl": [
+    30.4,
+    33.0
+   ],
+   "y": 460
+  }
+ ]
 }

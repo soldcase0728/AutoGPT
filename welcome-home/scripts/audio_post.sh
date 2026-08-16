@@ -1,6 +1,6 @@
 #!/bin/bash
 # audio-post: stems -> mastered 33.0s mix at -14 LUFS / <=-1.5 dBTP (two-pass).
-# VO stem: source/audio/vo_lkmatch.wav (LK-paced, sentence-seated; arrives with
+# VO stem: source/audio/vo_bill.wav (LK-paced, sentence-seated; arrives with
 # clipped peaks at +0.08 dBTP -> de-essed and ceilinged here before the mix).
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -8,8 +8,8 @@ cd "$DIR"
 DUR=33.0
 
 # 1) VO conditioning: de-ess, restore headroom, pad to master duration.
-ffmpeg -y -v error -i source/audio/vo_lkmatch.wav -af \
-  "deesser=i=0.28,alimiter=limit=0.85:level=false,apad=whole_dur=${DUR}" \
+ffmpeg -y -v error -i source/audio/vo_bill.wav -af \
+  "deesser=i=0.25,apad=whole_dur=${DUR}" \
   /tmp/vo_cond.wav
 
 # 2) Music bed: licensed FPC V4, -6 dB ride under the end card (t>=29.7),

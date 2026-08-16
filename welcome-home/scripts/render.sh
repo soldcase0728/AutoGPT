@@ -54,13 +54,13 @@ ffmpeg -y -v error -i /tmp/wh/master_graded.mov -i deliverables/mix_v4.wav -map 
   -c:a aac -b:a 192k -movflags +faststart "deliverables/WelcomeHome_v4_16x9.mp4"
 
 echo "=== [7/8] :15 cutdown (beat-snapped) + audio"
-ffmpeg -y -v error -i "source/audio/vo_lkmatch.wav" -af "atrim=0.0:2.2,asetpts=PTS-STARTPTS" /tmp/wh/cd_s1.wav
-ffmpeg -y -v error -i "source/audio/vo_lkmatch.wav" -af "atrim=12.2:16.0,asetpts=PTS-STARTPTS" /tmp/wh/cd_s5.wav
-ffmpeg -y -v error -i "source/audio/vo_lkmatch.wav" -af "atrim=27.15:28.7,asetpts=PTS-STARTPTS" /tmp/wh/cd_s9.wav
+ffmpeg -y -v error -i "source/audio/vo_bill.wav" -af "atrim=0.0:2.65,asetpts=PTS-STARTPTS" /tmp/wh/cd_s1.wav
+ffmpeg -y -v error -i "source/audio/vo_bill.wav" -af "atrim=11.95:16.17,asetpts=PTS-STARTPTS" /tmp/wh/cd_s5.wav
+ffmpeg -y -v error -i "source/audio/vo_bill.wav" -af "atrim=26.93:28.6,asetpts=PTS-STARTPTS" /tmp/wh/cd_s9.wav
 ffmpeg -y -v error \
   -i /tmp/wh/cd_s1.wav -i /tmp/wh/cd_s5.wav -i /tmp/wh/cd_s9.wav \
   -i "source/audio/For Positive Classic V4.wav" -filter_complex "\
-[0:a]adelay=400|400[v1];[1:a]adelay=3000|3000[v2];[2:a]adelay=11800|11800[v3];\
+[0:a]adelay=400|400[v1];[1:a]adelay=2600|2600[v2];[2:a]adelay=11630|11630[v3];\
 [v1][v2][v3]amix=inputs=3:duration=longest:normalize=0,apad=whole_dur=15.0,asplit=2[vo][vok];\
 [3:a]atrim=17.5:32.5,asetpts=PTS-STARTPTS,aresample=48000,volume=0.32,afade=t=in:st=0:d=0.6,apad=whole_dur=15.0[mus];\
 [mus][vok]sidechaincompress=threshold=0.02:ratio=7:attack=20:release=350[md];\
