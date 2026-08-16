@@ -14,8 +14,8 @@ ffmpeg -y -v error -i source/audio/vo_bill.wav -af \
 
 # 2) Music bed: licensed FPC V4, -6 dB ride under the end card (t>=29.7),
 #    natural resolution ~29.6s; padded to DUR.
-ffmpeg -y -v error -i "source/audio/For Positive Classic V4.wav" -af \
-  "atrim=0.4:33.4,asetpts=PTS-STARTPTS,aresample=48000,volume=0.32,\
+ffmpeg -y -v error -i "source/audio/Emotional Piano & Cello V3.wav" -af \
+  "atrim=5.4:38.4,asetpts=PTS-STARTPTS,aresample=48000,volume=0.40,\
 afade=t=in:st=0:d=0.8,volume=enable='gte(t,29.7)':volume=0.5,apad=whole_dur=${DUR}" \
   /tmp/mus_bed.wav
 
@@ -38,5 +38,13 @@ ffmpeg -y -v error -i /tmp/mix_raw.wav -af \
   "loudnorm=I=-14:TP=-1.5:LRA=7:measured_I=${II}:measured_TP=${TP}:measured_LRA=${LRA}:measured_thresh=${TH}:linear=true,aresample=48000" \
   deliverables/mix_v4.wav
 
-# 6) Verify.
+# 6) Exact-gain correction (linear loudnorm can undershoot protecting TP).
+I2=$(ffmpeg -v info -i deliverables/mix_v4.wav -af loudnorm=print_format=json -f null - 2>&1 | grep '"input_i"' | grep -oE '[-0-9.]+' | head -1)
+GAIN=$(python3 -c "g=round(-14.0-(${I2}),2); print(g if g>0 else 0)")
+if [ "$GAIN" != "0" ]; then
+  ffmpeg -y -v error -i deliverables/mix_v4.wav -af "volume=${GAIN}dB,alimiter=limit=0.84:level=false" /tmp/mix_corr.wav
+  mv /tmp/mix_corr.wav deliverables/mix_v4.wav
+fi
+
+# 7) Verify.
 ffmpeg -v info -i deliverables/mix_v4.wav -af loudnorm=I=-14:TP=-1.5:LRA=7:print_format=json -f null - 2>&1 | sed -n '/{/,/}/p' | grep -E 'input_i|input_tp'

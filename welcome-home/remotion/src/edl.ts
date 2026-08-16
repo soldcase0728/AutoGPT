@@ -17,7 +17,7 @@ export type Shot = {
 export const DISSOLVE_S = 0.7;
 
 export const SHOTS: Shot[] = [
-  { id: "seal", src: "clip1_seal.mp4", srcW: 1168, srcH: 768, cropX: 360, cropW: 432, trimStartS: 0.0, rate: 1, tlStartS: 0.0, tlEndS: 2.92 },
+  { id: "focal", src: "focal_aerial.mp4", srcW: 1080, srcH: 1920, cropX: 0, cropW: 1080, trimStartS: 0.0, rate: 1, tlStartS: 0.0, tlEndS: 2.92 },
   { id: "quad", src: "clip2_animate.mp4", srcW: 1280, srcH: 720, cropX: 540, cropW: 405, trimStartS: 0.0, rate: 1, tlStartS: 2.92, tlEndS: 6.04 },
   { id: "podium", src: "clip4.mp4", srcW: 816, srcH: 1104, cropX: 195, cropW: 621, trimStartS: 0.5, rate: 1, tlStartS: 6.04, tlEndS: 9.0 },
   { id: "cross", src: "clip9.mp4", srcW: 1280, srcH: 720, cropX: 430, cropW: 405, trimStartS: 0.5, rate: 1, tlStartS: 9.0, tlEndS: 12.1 },

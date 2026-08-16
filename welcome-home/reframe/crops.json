@@ -3,12 +3,12 @@
  "aspect": "1x1",
  "shots": [
   {
-   "id": "seal",
+   "id": "focal",
    "tl": [
     0.0,
     2.92
    ],
-   "y": 380
+   "y": 500
   },
   {
    "id": "quad",
