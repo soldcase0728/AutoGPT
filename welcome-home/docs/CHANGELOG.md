@@ -9,3 +9,9 @@
 - **Coverage.** New 1x1, 16x9 (blurred-pillarbox, no upscale), and beat-snapped :15 cutdown with its own loudnormed mix. v3 was 9:16 only.
 - **Portable grade.** The v3 look exported as `luts/olsm_warm.cube` (validated 47dB PSNR against the original filter chain); bloom/vignette/grain preserved as explicit steps.
 - **Reproducibility.** Timeline-as-code (Remotion EDL), phase-gated git history, one-command render ladder, automated QC with post-render hook, skills + subagents for future sessions.
+
+## v6 — music-only cut (2026-08-16)
+- Narration removed entirely per user direction; the Emotional Piano & Cello bed carries the film (in-fade 0.8s, out-fade 2s into the end card hold).
+- Burned captions removed: no captioned 9x16 deliverable, no SRT/VTT sidecars, caption spot-check gates retired. On-screen text is now only the "Class of 2031" title and the "Welcome home." end card.
+- No girls-division imagery added (girls-photo thread closed per user direction); timeline unchanged from v5 — focal spring aerial, quad, podium, cross, brothers, nave, historic 1885, boys' cap toss.
+- Master mix music-only: no sidechain duck; two-pass loudnorm + exact-gain correction -> -14.00 LUFS / -2.23 dBTP verified. Cutdown mix likewise music-only.

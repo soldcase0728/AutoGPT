@@ -22,22 +22,13 @@ export const Root: React.FC = () => (
   <>
     <Composition id="Master9x16" component={Master} durationInFrames={MASTER_FRAMES} fps={FPS} width={W} height={H} />
     <Composition
-      id="Master9x16Captioned"
-      component={Master}
-      durationInFrames={MASTER_FRAMES}
-      fps={FPS}
-      width={W}
-      height={H}
-      defaultProps={{ captions: true }}
-    />
-    <Composition
       id="Master9x16SafeProof"
       component={Master}
       durationInFrames={MASTER_FRAMES}
       fps={FPS}
       width={W}
       height={H}
-      defaultProps={{ captions: true, safeOverlay: true }}
+      defaultProps={{ safeOverlay: true }}
     />
     <Composition id="Cutdown15s" component={Cutdown} durationInFrames={CUTDOWN_FRAMES} fps={FPS} width={W} height={H} />
   </>
