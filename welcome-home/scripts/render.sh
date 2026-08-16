@@ -69,7 +69,11 @@ ffmpeg -y -v error \
 M=$(ffmpeg -v info -i /tmp/wh/cd_mix_raw.wav -af loudnorm=I=-14:TP=-1.5:LRA=7:print_format=json -f null - 2>&1 | sed -n '/{/,/}/p')
 II=$(echo "$M" | grep input_i | grep -oE '[-0-9.]+'); TP=$(echo "$M" | grep input_tp | grep -oE '[-0-9.]+')
 LRA=$(echo "$M" | grep input_lra | grep -oE '[-0-9.]+' | head -1); TH=$(echo "$M" | grep input_thresh | grep -oE '[-0-9.]+')
-ffmpeg -y -v error -i /tmp/wh/cd_mix_raw.wav -af "loudnorm=I=-14:TP=-1.5:LRA=7:measured_I=${II}:measured_TP=${TP}:measured_LRA=${LRA}:measured_thresh=${TH}:linear=true" /tmp/wh/cd_mix.wav
+ffmpeg -y -v error -i /tmp/wh/cd_mix_raw.wav -af "loudnorm=I=-14:TP=-1.5:LRA=7:measured_I=${II}:measured_TP=${TP}:measured_LRA=${LRA}:measured_thresh=${TH}:linear=true" /tmp/wh/cd_mix_pre.wav
+# exact-gain correction: linear loudnorm can undershoot while protecting TP
+I2=$(ffmpeg -v info -i /tmp/wh/cd_mix_pre.wav -af loudnorm=I=-14:TP=-1.5:LRA=7:print_format=json -f null - 2>&1 | grep input_i | grep -oE '[-0-9.]+')
+GAIN=$(python3 -c "print(round(-14.0 - (${I2}), 2))")
+ffmpeg -y -v error -i /tmp/wh/cd_mix_pre.wav -af "volume=${GAIN}dB,alimiter=limit=0.84:level=false" /tmp/wh/cd_mix.wav
 ffmpeg -y -v error -i /tmp/wh/cutdown_graded.mov -i /tmp/wh/cd_mix.wav -map 0:v -map 1:a \
   -c:v libx264 -profile:v high -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart \
   "deliverables/WelcomeHome_v4_15s.mp4"

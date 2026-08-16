@@ -1,0 +1,142 @@
+
+## QC run 2026-08-16T00:18:57
+
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: codec (prores)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: audio codec (pcm_s16le)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: loudness I (-14.43 LUFS)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: true peak (-1.50 dBTP)
+- FAIL — deliverables/WelcomeHome_v4_master_9x16.mov: no unintended black ([blackdetect @ 0x7f80482c9500] black_start:30.3 black_end:32.9667 black_duration:2.66667)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: true peak (-1.40 dBTP)
+- FAIL — deliverables/WelcomeHome_v4_9x16.mp4: no unintended black ([blackdetect @ 0x7f9b2c012740] black_start:30.3 black_end:32.9667 black_duration:2.66667)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: true peak (-1.40 dBTP)
+- FAIL — deliverables/WelcomeHome_v4_9x16_captioned.mp4: no unintended black ([blackdetect @ 0x7f7ba80128c0] black_start:30.3 black_end:32.9667 black_duration:2.66667)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: resolution (1080x1080)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: true peak (-1.40 dBTP)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: no unintended black
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: resolution (1280x720)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: true peak (-1.40 dBTP)
+- FAIL — deliverables/WelcomeHome_v4_16x9.mp4: no unintended black ([blackdetect @ 0x7fe01c001800] black_start:30.3 black_end:32.9667 black_duration:2.66667)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: duration (15.000s vs 15.0s)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: faststart (moov in head)
+- FAIL — deliverables/WelcomeHome_v4_15s.mp4: loudness I (-15.04 LUFS)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: true peak (-1.17 dBTP)
+- FAIL — deliverables/WelcomeHome_v4_15s.mp4: no unintended black ([blackdetect @ 0x7f423400dcc0] black_start:11.5 black_end:14.9667 black_duration:3.46667)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: no unintended freeze
+- PASS — caption spot 4.0s ('forged in community') (docs/proofs/qc_caption_4_0.png)
+- PASS — caption spot 13.5s ('strangers') (docs/proofs/qc_caption_13_5.png)
+- PASS — caption spot 27.6s ('Welcome home') (docs/proofs/qc_caption_27_6.png)
+- PASS — sidecar SRT
+- PASS — sidecar VTT
+- PASS — safe-area proofs
+
+**Result: 6 FAILURE(S)**
+
+### Human checklist (must be acknowledged by a human — not the agent)
+- [ ] ⚠️ transcript lines confirmed (captions corrected to script per kickoff)
+- [ ] media releases confirmed for all identifiable students in ALL aspect ratios
+- [ ] music license confirmed for paid placements + cutdowns
+- [ ] brand/Archdiocese sign-off on end-card copy
+- [ ] 1x1 reframe crops signed off (docs/proofs/reframe_1x1_strip.png)
+
+## QC run 2026-08-16T00:25:29
+
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: codec (prores)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: audio codec (pcm_s16le)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: loudness I (-14.43 LUFS)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: true peak (-1.50 dBTP)
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: no unintended black
+- PASS — deliverables/WelcomeHome_v4_master_9x16.mov: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: true peak (-1.40 dBTP)
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: no unintended black
+- PASS — deliverables/WelcomeHome_v4_9x16.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: true peak (-1.40 dBTP)
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: no unintended black
+- PASS — deliverables/WelcomeHome_v4_9x16_captioned.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: resolution (1080x1080)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: true peak (-1.40 dBTP)
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: no unintended black
+- PASS — deliverables/WelcomeHome_v4_1x1.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: resolution (1280x720)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: duration (33.000s vs 33.0s)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: loudness I (-14.47 LUFS)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: true peak (-1.40 dBTP)
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: no unintended black
+- PASS — deliverables/WelcomeHome_v4_16x9.mp4: no unintended freeze
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: resolution (1080x1920)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: codec (h264)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: pix_fmt (yuv420p)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: duration (15.000s vs 15.0s)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: faststart (moov in head)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: loudness I (-14.20 LUFS)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: true peak (-1.05 dBTP)
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: no unintended black
+- PASS — deliverables/WelcomeHome_v4_15s.mp4: no unintended freeze
+- PASS — caption spot 4.0s ('forged in community') (docs/proofs/qc_caption_4_0.png)
+- PASS — caption spot 13.5s ('strangers') (docs/proofs/qc_caption_13_5.png)
+- PASS — caption spot 27.6s ('Welcome home') (docs/proofs/qc_caption_27_6.png)
+- PASS — sidecar SRT
+- PASS — sidecar VTT
+- PASS — safe-area proofs
+
+**Result: ALL GATES PASS**
+
+### Human checklist (must be acknowledged by a human — not the agent)
+- [ ] ⚠️ transcript lines confirmed (captions corrected to script per kickoff)
+- [ ] media releases confirmed for all identifiable students in ALL aspect ratios
+- [ ] music license confirmed for paid placements + cutdowns
+- [ ] brand/Archdiocese sign-off on end-card copy
+- [ ] 1x1 reframe crops signed off (docs/proofs/reframe_1x1_strip.png)

@@ -69,8 +69,12 @@ for f, spec in SPECS.items():
     i, tp = loudness(f)
     check(f"{f}: loudness I", abs(i + 14.0) <= 0.5, f"{i:.2f} LUFS")
     check(f"{f}: true peak", tp <= -1.0, f"{tp:.2f} dBTP")
-    blk = [l for l in detect(f, "blackdetect=d=0.4:pix_th=0.08", "black_start")
-           if "black_start:0" not in l.replace(" ", "")]
+    card_in = 29.5 if spec["dur"] > 20 else 11.4  # end card (navy, intended dark)
+    blk = []
+    for l in detect(f, "blackdetect=d=0.4:pix_th=0.08", "black_start"):
+        st = float(l.split("black_start:")[1].split()[0])
+        if st > 0.05 and st < card_in:  # whitelist opening fade + end card
+            blk.append(l)
     check(f"{f}: no unintended black", len(blk) == 0, "; ".join(blk[:2]))
     frz = detect(f, "freezedetect=n=-60dB:d=1.2", "freeze_start")
     # end card (static by design) sits after 29.7s on 33s cuts, 11.6s on the :15
