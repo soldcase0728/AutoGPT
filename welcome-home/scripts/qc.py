@@ -15,10 +15,13 @@ FRAME = 1.0 / FPS
 SPECS = {
     "deliverables/WelcomeHome_v4_master_9x16.mov": dict(w=1080, h=1920, dur=33.0, vcodec="prores", acodec="pcm_s16le"),
     "deliverables/WelcomeHome_v4_9x16.mp4": dict(w=1080, h=1920, dur=33.0, vcodec="h264", pix="yuv420p", faststart=True),
+    "deliverables/WelcomeHome_v4_9x16_captioned.mp4": dict(w=1080, h=1920, dur=33.0, vcodec="h264", pix="yuv420p", faststart=True),
     "deliverables/WelcomeHome_v4_1x1.mp4": dict(w=1080, h=1080, dur=33.0, vcodec="h264", pix="yuv420p", faststart=True),
     "deliverables/WelcomeHome_v4_16x9.mp4": dict(w=1280, h=720, dur=33.0, vcodec="h264", pix="yuv420p", faststart=True),
     "deliverables/WelcomeHome_v4_15s.mp4": dict(w=1080, h=1920, dur=15.0, vcodec="h264", pix="yuv420p", faststart=True),
 }
+CAPTION_SPOTS = [(4.0, "forged in community"), (13.5, "strangers"), (27.6, "Welcome home")]
+
 results, failures = [], []
 
 def probe(f):
@@ -79,8 +82,16 @@ for f, spec in SPECS.items():
     frz_bad = [l for l in frz if float(l.split("freeze_start:")[1].split()[0]) < limit]
     check(f"{f}: no unintended freeze", len(frz_bad) == 0, "; ".join(frz_bad[:2]))
 
-# v6 (music-only): no captioned deliverable, no caption spot-checks, no sidecars.
-check("no stale captioned deliverable", not os.path.exists("deliverables/WelcomeHome_v4_9x16_captioned.mp4"))
+# Caption sync spot-check grabs (human-verifiable stills)
+cap = "deliverables/WelcomeHome_v4_9x16_captioned.mp4"
+if os.path.exists(cap):
+    for t, expected in CAPTION_SPOTS:
+        out = f"docs/proofs/qc_caption_{str(t).replace('.','_')}.png"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", str(t), "-i", cap, "-frames:v", "1", out])
+        check(f"caption spot {t}s ('{expected}')", os.path.exists(out), out)
+
+check("sidecar SRT", os.path.exists("captions/master.srt"))
+check("sidecar VTT", os.path.exists("captions/master.vtt"))
 check("safe-area proofs", len([f for f in os.listdir("docs/proofs") if f.startswith("safe_")]) >= 3)
 
 stamp = datetime.datetime.now().isoformat(timespec="seconds")
@@ -89,6 +100,7 @@ for name, ok, detail in results:
     lines.append(f"- {'PASS' if ok else 'FAIL'} — {name}" + (f" ({detail})" if detail else ""))
 lines.append(f"\n**Result: {'ALL GATES PASS' if not failures else f'{len(failures)} FAILURE(S)'}**\n")
 lines.append("""### Human checklist (must be acknowledged by a human — not the agent)
+- [ ] ⚠️ transcript lines confirmed (captions corrected to script per kickoff)
 - [ ] media releases confirmed for all identifiable students in ALL aspect ratios
 - [ ] music license confirmed for paid placements + cutdowns
 - [ ] brand/Archdiocese sign-off on end-card copy

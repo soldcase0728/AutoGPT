@@ -72,27 +72,38 @@ const Title2031: React.FC = () => {
   );
 };
 
+// Cinematic caption style: no box — ivory Playfair over a soft full-width
+// gradient scrim, so the type sits IN the image instead of on a gray card.
 const Captions: React.FC = () => {
   const frame = useCurrentFrame();
   const t = frame / FPS;
   const cue = CUES.find((c) => t >= c.start && t <= c.end);
   if (!cue) return null;
-  const o = interpolate(t, [cue.start, cue.start + 0.15, cue.end - 0.15, cue.end], [0, 1, 1, 0]);
+  const o = interpolate(t, [cue.start, cue.start + 0.2, cue.end - 0.2, cue.end], [0, 1, 1, 0]);
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-end" }}>
       <div
         style={{
-          marginBottom: SAFE.bottom + 40,
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: SAFE.bottom + 260,
           opacity: o,
-          background: "rgba(0,0,0,0.38)",
-          borderRadius: 14,
-          padding: "14px 28px",
+          background: "linear-gradient(to top, rgba(8,10,14,0.55), rgba(8,10,14,0) 85%)",
+        }}
+      />
+      <div
+        style={{
+          marginBottom: SAFE.bottom + 44,
+          opacity: o,
           textAlign: "center",
-          fontFamily: FONTS.caption,
-          fontWeight: 600,
-          fontSize: 44,
-          lineHeight: 1.3,
-          color: "white",
+          fontFamily: FONTS.displayMedium,
+          fontSize: 47,
+          lineHeight: 1.38,
+          letterSpacing: "0.012em",
+          color: COLORS.ivory,
+          textShadow: "0 2px 26px rgba(0,0,0,0.8), 0 1px 5px rgba(0,0,0,0.55)",
           maxWidth: 1080 - SAFE.side * 2,
         }}
       >
