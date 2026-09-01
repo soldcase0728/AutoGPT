@@ -26,14 +26,10 @@ import {
  * change to the app shows up here.
  */
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 // Screenshots must not drift every time the date changes.
 const FIXED_DAY = new Date("2026-09-01T09:00:00Z");
-
-export function generateStaticParams() {
-  return SCREENS.map((screen) => ({ screen }));
-}
 
 const SCREENS = [
   "today",
@@ -47,11 +43,14 @@ const SCREENS = [
 
 export default async function PreviewScreen({
   params,
+  searchParams,
 }: {
   params: Promise<{ screen: string }>;
+  searchParams: Promise<{ url?: string; headline?: string }>;
 }) {
   if (!demoScreensEnabled()) notFound();
   const { screen } = await params;
+  const { url: urlParam, headline } = await searchParams;
 
   switch (screen) {
     case "today":
@@ -113,11 +112,13 @@ export default async function PreviewScreen({
       );
 
     case "poster": {
-      const url = "https://capture.example.edu";
+      // Only ever encode a web address — a printed code must not be able to
+      // carry a javascript: or data: payload.
+      const url = safeUrl(urlParam) ?? "https://capture.example.edu";
       return (
         <PosterView
           orgName="Northside Athletics"
-          headline="One clip. Every day."
+          headline={headline || "One clip. Every day."}
           url={url}
           qrSvg={await QRCode.toString(url, {
             type: "svg",
@@ -131,5 +132,17 @@ export default async function PreviewScreen({
 
     default:
       notFound();
+  }
+}
+
+function safeUrl(candidate: string | undefined): string | null {
+  if (!candidate) return null;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "https:" || parsed.protocol === "http:"
+      ? parsed.toString()
+      : null;
+  } catch {
+    return null;
   }
 }
