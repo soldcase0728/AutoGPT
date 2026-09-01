@@ -38,6 +38,7 @@ export function ReviewQueue({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [takingDown, setTakingDown] = useState(false);
 
   const current = rows[Math.min(index, rows.length - 1)];
 
@@ -257,6 +258,41 @@ export function ReviewQueue({
               >
                 Download master
               </a>
+              {(current.state === "published" || current.state === "approved") && (
+                <button
+                  className="btn btn-quiet"
+                  disabled={busy || takingDown}
+                  style={{ borderColor: "var(--clay)", color: "var(--clay)" }}
+                  onClick={async () => {
+                    const reason = note.trim();
+                    if (!reason) {
+                      setError(
+                        "Put the reason in the note first — it goes in the permanent record.",
+                      );
+                      return;
+                    }
+                    setTakingDown(true);
+                    setError("");
+                    const response = await fetch(`/api/captures/${current.id}/takedown`, {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ reason }),
+                    });
+                    setTakingDown(false);
+                    if (!response.ok) {
+                      const body = await response
+                        .json()
+                        .catch(() => ({ error: "That did not save." }));
+                      setError(body.error ?? "That did not save.");
+                      return;
+                    }
+                    setNote("");
+                    router.refresh();
+                  }}
+                >
+                  {takingDown ? "Taking down…" : "Take down"}
+                </button>
+              )}
             </div>
 
             {error && (
@@ -265,6 +301,9 @@ export function ReviewQueue({
               </p>
             )}
             <p className="label mt-4">J / K to move · A R X P to decide</p>
+            <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+              Nothing here has been posted. Every item needs a person to release it.
+            </p>
           </div>
         </section>
       )}

@@ -6,6 +6,7 @@ import { hasSignedRelease, requirePerson } from "@/lib/session";
 import { buildChecklist } from "@/lib/guidelines";
 import { publicEnv } from "@/lib/env";
 import type { GuidelineVersion, Idea } from "@/lib/types";
+import { RELEASE_VERSION } from "@/app/consent/version";
 import { CaptureFlow } from "./CaptureFlow";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function CapturePage({
 }) {
   const { assignmentId } = await params;
   const person = await requirePerson();
-  if (person.role === "student" && !(await hasSignedRelease(person.id))) {
+  if (person.role === "student" && !(await hasSignedRelease(person.id, RELEASE_VERSION))) {
     redirect("/consent");
   }
 
@@ -65,6 +66,7 @@ export default async function CapturePage({
         />
         <CaptureFlow
           assignmentId={assignment.id}
+          ideaId={idea.id}
           spec={idea.format_spec}
           checklist={checklist}
           people={(people ?? []) as Array<{ id: string; display_name: string }>}

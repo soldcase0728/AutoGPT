@@ -28,6 +28,51 @@ Transcripts, caption drafting, streaks and leaderboards, SMS nudges, transcoded
 proxies, scheduled posting, analytics. All phase 2 or 3. Adding any of them now
 buys nothing until the loop itself is proven.
 
+## Kill rules
+
+Product invariants that the system must not allow to be violated. Each is
+enforced where it cannot be argued with — mostly in the database, so no client,
+script, or future route can route around it — and each has a test in
+`supabase/tests/30_kill_rules.sql` that fails loudly if the enforcement is
+removed.
+
+| # | Rule | Enforced by | Test |
+|---|---|---|---|
+| 1 | Nothing goes public without human review. A submission is never an approval, and there is no automatic publishing. | Two independent defenses: the `captures_update_own_while_uploading` RLS check restricts a student to `uploading → submitted`, and the `captures_state_machine` trigger states the whole rule | rule 1 |
+| 2 | Terms are not a recurring login screen. | `has_current_release()` matches the accepted version, so someone who accepted the current wording is never asked again | rule 2 |
+| 3 | New legal language needs a new affirmative acceptance, with its own timestamp and version. | An older acceptance does not satisfy a new version, and `consents_immutable` refuses to let a consent row be edited in place — you supersede it with a new row | rule 3 |
+| 4 | The school never takes ownership or gives the work away. | The release text: the student keeps copyright, permission covers school-owned accounts and school marketing only, no sale, no third-party licensing | consent wording |
+| 5 | Protected or dangerous material never appears in frame; if found after posting, it comes down. | Required brand rules at capture time, plus `take_down_capture()` — staff only, reason mandatory, writes an audit row | rule 5 |
+| 6 | **Unsafe filming is never part of the programme.** | Safety is a distinct kind of guideline: always required whatever the source data says, always sorted first, and rendered in its own emphasised block. Anyone can file a report — see below | rule 6 |
+| 7 | Credential status cannot be bypassed. | `people.participation` is `pending` by default; only a person can move someone to `active`, and `revoked` is read-only. A school email address grants nothing on its own — sign-in only claims an existing roster row | rule 7 |
+
+The tests are mutation-checked: removing any single enforcement makes the suite
+fail. Rule 1 is deliberately defended twice, so breaking it takes removing both
+the policy predicate and the trigger.
+
+> **Note.** You described these as ten rules and listed seven. Rules 8–10 are
+> not implemented because they were not stated — send them and they get the
+> same treatment rather than a guess.
+
+### Reporting unsafe filming
+
+`POST /api/safety` takes a report from **anyone signed in** — above all the
+student who was asked to do something unsafe. The report is written to
+`safety_flags` and the audit log first, then alerted, so a chat outage can
+never lose one.
+
+Set `SAFETY_ALERT_WEBHOOK_URL` to a Slack or Teams incoming webhook and every
+report pages the channel. Unset, reports still land in the database and staff
+see them at `GET /api/safety`; they just do not page anyone. On the capture
+screen the control sits inside the safety block, two taps away, and says
+plainly that a prompt which cannot be shot safely should not be shot.
+
+One thing this surfaced immediately: the seeded prompt "The walk to practice"
+told students to *start walking before you hit record*, which is the exact
+thing rule 6 forbids. It is now "The path to practice", filmed standing still.
+Check the rest of your idea bank for the same contradiction — a prompt that
+asks for an unsafe shot defeats every control downstream of it.
+
 ## How the consent model works
 
 Three things are versioned or attached differently on purpose:
@@ -150,7 +195,7 @@ pnpm lint
 pnpm build
 pnpm shots       # requires a dev server and Playwright; see above
 pnpm db:verify   # spins up a throwaway Postgres, applies every migration,
-                 # runs the consent-gate and RLS tests against it
+                 # runs the consent-gate, RLS and kill-rule tests against it
 ```
 
 `pnpm db:verify` needs the Postgres binaries on `PATH` (no Docker, no network).

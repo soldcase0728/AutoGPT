@@ -16,6 +16,7 @@ export const STUDENT: Person = {
   display_name: "Ali Haddad",
   email: "ali@example.edu",
   birth_year: 2005,
+  participation: "active",
 };
 
 export const REVIEWER: Person = {
@@ -37,9 +38,9 @@ export const MINOR: Person = {
 
 export const IDEA: Idea & { campaigns: { name: string } } = {
   id: "51111111-1111-1111-1111-111111111111",
-  title: "The walk to practice",
+  title: "The path to practice",
   brief:
-    "Fifteen seconds of the walk from your last class to practice. Start walking before you hit record. Say nothing.",
+    "Fifteen seconds of the route you take from your last class to practice — filmed standing still. Pick a spot, plant your feet, let people walk past you. Never film while walking.",
   format_spec: {
     kind: "video",
     orientation: "portrait",
@@ -65,7 +66,13 @@ const VERSIONS: GuidelineVersion[] = [
         { id: "vertical", text: "Hold the phone upright. Vertical, 9:16.", required: true },
         { id: "length", text: "Keep it between 10 and 30 seconds.", required: true },
         { id: "light", text: "Face the light. Never shoot into it.", required: true },
-        { id: "steady", text: "Brace your elbows. No walking-and-filming.", required: false },
+        {
+          id: "safety",
+          safety: true,
+          required: true,
+          text: "Never film while walking, on stairs, near traffic, or anywhere it puts you or anyone else at risk. Stop, plant your feet, then record.",
+        },
+        { id: "steady", text: "Brace your elbows. Let the shot settle before you start.", required: false },
         { id: "headroom", text: "Leave space at the top and bottom for captions.", required: false },
       ],
     },

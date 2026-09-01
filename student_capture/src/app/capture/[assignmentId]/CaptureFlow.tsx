@@ -4,11 +4,17 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as tus from "tus-js-client";
 import { createClient } from "@/lib/supabase/client";
-import { checklistSatisfied, requiredIds, type Checklist } from "@/lib/guidelines";
+import {
+  checklistSatisfied,
+  requiredIds,
+  safetyItems,
+  type Checklist,
+} from "@/lib/guidelines";
 import { blocks, checkFormat, formatBytes, type FormatFinding } from "@/lib/format-spec";
 import { mediaKind, probeMedia, type Probe } from "@/lib/probe";
 import type { FormatSpec } from "@/lib/types";
 import { Chip } from "@/components/Chip";
+import { SafetyReport } from "@/components/SafetyReport";
 
 // Supabase's resumable endpoint requires exactly this chunk size.
 const CHUNK_SIZE = 6 * 1024 * 1024;
@@ -17,6 +23,7 @@ type UploadState = "idle" | "uploading" | "done" | "failed";
 
 interface Props {
   assignmentId: string;
+  ideaId?: string;
   spec: FormatSpec;
   checklist: Checklist;
   people: Array<{ id: string; display_name: string }>;
@@ -27,6 +34,7 @@ interface Props {
 
 export function CaptureFlow({
   assignmentId,
+  ideaId,
   spec,
   checklist,
   people,
@@ -51,6 +59,11 @@ export function CaptureFlow({
   const [error, setError] = useState("");
 
   const required = useMemo(() => requiredIds(checklist), [checklist]);
+  const safety = useMemo(() => safetyItems(checklist), [checklist]);
+  const ordinary = useMemo(
+    () => checklist.items.filter((i) => !i.safety),
+    [checklist],
+  );
   const ready = checklistSatisfied(checklist, ticked);
   const peopleDecided = nobody ? tagged.length === 0 : tagged.length > 0;
   const canSubmit =
@@ -193,11 +206,49 @@ export function CaptureFlow({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* 1 — the rules, at the moment they matter */}
+      {/* 1a — safety, set apart because ignoring it hurts someone */}
+      {safety.length > 0 && (
+        <section
+          className="card p-5"
+          style={{ borderColor: "var(--clay)", borderWidth: 2, background: "var(--sunk)" }}
+        >
+          <p className="label" style={{ color: "var(--clay)" }}>
+            Safety — not optional
+          </p>
+          <ul className="mt-3 flex flex-col gap-3">
+            {safety.map((item) => (
+              <li key={item.id}>
+                <label className="flex cursor-pointer items-start gap-3 text-[16px] font-semibold">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0"
+                    checked={ticked.includes(item.id)}
+                    onChange={(e) =>
+                      setTicked((prev) =>
+                        e.target.checked
+                          ? [...prev, item.id]
+                          : prev.filter((t) => t !== item.id),
+                      )
+                    }
+                  />
+                  <span>{item.text}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-[15px]" style={{ color: "var(--clay)" }}>
+            No shot is worth a hallway, a staircase, traffic, or an injury. If a
+            prompt cannot be done safely, do not shoot it — report it instead.
+          </p>
+          <SafetyReport ideaId={ideaId} />
+        </section>
+      )}
+
+      {/* 1b — the rest of the rules, at the moment they matter */}
       <section className="card p-5">
         <p className="label">Tick these off</p>
         <ul className="mt-3 flex flex-col gap-3">
-          {checklist.items.map((item) => (
+          {ordinary.map((item) => (
             <li key={item.id}>
               <label className="flex cursor-pointer items-start gap-3 text-[15px]">
                 <input

@@ -5,13 +5,14 @@ import { hasSignedRelease, requirePerson } from "@/lib/session";
 import { buildChecklist } from "@/lib/guidelines";
 import type { GuidelineVersion, Idea } from "@/lib/types";
 import { isoDate } from "@/lib/assign";
+import { RELEASE_VERSION } from "@/app/consent/version";
 
 export const dynamic = "force-dynamic";
 
 export default async function Today() {
   const person = await requirePerson();
 
-  if (person.role === "student" && !(await hasSignedRelease(person.id))) {
+  if (person.role === "student" && !(await hasSignedRelease(person.id, RELEASE_VERSION))) {
     redirect("/consent");
   }
 

@@ -80,6 +80,7 @@ export default async function PreviewScreen({
         <main className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-8">
           <CaptureFlow
             assignmentId="assignment-1"
+            ideaId={IDEA.id}
             spec={IDEA.format_spec}
             checklist={CHECKLIST}
             people={PEOPLE}

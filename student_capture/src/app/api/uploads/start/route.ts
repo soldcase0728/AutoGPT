@@ -34,6 +34,17 @@ export async function POST(request: Request) {
     return fail(413, `That file is larger than the ${maxBytes} byte limit.`);
   }
 
+  // Rule 7: a roster row is not an approval. The database refuses the insert
+  // either way; saying so here turns a bare 500 into an explanation.
+  if (person.participation !== "active") {
+    return fail(
+      403,
+      person.participation === "revoked"
+        ? "Your account is read-only. Talk to the marketing desk."
+        : "Your account has not been approved yet. The marketing desk has to approve it before you can send anything.",
+    );
+  }
+
   const supabase = await createClient();
 
   const { data: assignment, error: assignmentError } = await supabase

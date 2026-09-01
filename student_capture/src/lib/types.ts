@@ -17,6 +17,8 @@ export type CaptureState =
   | "rejected"
   | "published";
 
+export type ParticipationState = "pending" | "active" | "revoked";
+
 export interface Person {
   id: string;
   org_id: string;
@@ -25,12 +27,22 @@ export interface Person {
   display_name: string;
   email: string;
   birth_year: number | null;
+  /**
+   * Being on the roster is not being approved. Only a person can move someone
+   * to `active`; `revoked` is read-only.
+   */
+  participation: ParticipationState;
 }
 
 export interface GuidelineItem {
   id: string;
   text: string;
   required: boolean;
+  /**
+   * A physical-safety rule. Always required, always shown first, and rendered
+   * with emphasis — these are the ones where ignoring the rule hurts someone.
+   */
+  safety?: boolean;
 }
 
 export interface GuidelineBody {

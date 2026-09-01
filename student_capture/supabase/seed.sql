@@ -23,7 +23,8 @@ insert into guideline_versions (id, set_id, version, body) values
        {"id": "vertical",  "text": "Hold the phone upright. Vertical, 9:16.", "required": true},
        {"id": "length",    "text": "Keep it between 10 and 30 seconds.", "required": true},
        {"id": "light",     "text": "Face the light. Never shoot into it.", "required": true},
-       {"id": "steady",    "text": "Brace your elbows. No walking-and-filming.", "required": false},
+       {"id": "safety",    "safety": true, "required": true, "text": "Never film while walking, on stairs, near traffic, or anywhere it puts you or anyone else at risk. Stop, plant your feet, then record."},
+       {"id": "steady",    "text": "Brace your elbows. Let the shot settle before you start.", "required": false},
        {"id": "headroom",  "text": "Leave space at the top and bottom for captions.", "required": false},
        {"id": "sound",     "text": "If someone is talking, kill the background music.", "required": false}
      ]}'::jsonb),
@@ -33,7 +34,7 @@ insert into guideline_versions (id, set_id, version, body) values
      "items": [
        {"id": "no-alcohol",   "text": "No alcohol, vaping, or gambling in frame.", "required": true},
        {"id": "no-competitor","text": "No competitor logos or apparel.", "required": true},
-       {"id": "no-records",   "text": "No grades, schedules, rosters, or ID cards visible.", "required": true},
+       {"id": "no-records",   "text": "No grades, schedules, rosters, ID cards, or anything else private about a student visible.", "required": true},
        {"id": "tone",         "text": "Talk like a student, not a brochure.", "required": false}
      ]}'::jsonb)
 on conflict (id) do nothing;
@@ -47,8 +48,8 @@ on conflict (id) do nothing;
 
 insert into ideas (id, campaign_id, title, brief, format_spec, guideline_set_ids) values
   ('51111111-1111-1111-1111-111111111111', '41111111-1111-1111-1111-111111111111',
-   'The walk to practice',
-   'Fifteen seconds of the walk from your last class to practice. Start walking before you hit record. Say nothing.',
+   'The path to practice',
+   'Fifteen seconds of the route you take from your last class to practice — filmed standing still. Pick a spot, plant your feet, let people walk past you. Never film while walking.',
    '{"kind":"video","orientation":"portrait","min_seconds":10,"max_seconds":30}'::jsonb,
    array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[]),
 
@@ -100,6 +101,11 @@ insert into people (id, org_id, role, display_name, email, birth_year) values
   ('65555555-5555-5555-5555-555555555555', '11111111-1111-1111-1111-111111111111',
    'student',  'Sam Okafor',     'sam@example.edu',    null)
 on conflict (id) do nothing;
+
+-- Demo students are moved to `active` explicitly. New rows default to
+-- `pending`: a roster row is not an approval (rule 7).
+update people set participation = 'active', participation_changed_at = now()
+ where org_id = '11111111-1111-1111-1111-111111111111' and role = 'student';
 
 -- Ali is an adult with a live release: clear to publish.
 -- Jo is a minor with a release but no parental consent: blocked.

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildChecklist, checklistSatisfied, requiredIds } from "@/lib/guidelines";
+import {
+  buildChecklist,
+  checklistSatisfied,
+  requiredIds,
+  safetyItems,
+} from "@/lib/guidelines";
 import type { GuidelineVersion } from "@/lib/types";
 
 const craft: GuidelineVersion = {
@@ -61,5 +66,49 @@ describe("checklistSatisfied", () => {
 
   it("does not care about the optional ones", () => {
     expect(checklistSatisfied(checklist, ["vertical", "no-records"])).toBe(true);
+  });
+});
+
+// --- kill rule 6 -----------------------------------------------------------
+
+const safetySet: GuidelineVersion = {
+  id: "v-safety",
+  set_id: "s-craft",
+  version: 2,
+  body: {
+    summary: "Do not get hurt.",
+    items: [
+      { id: "tone", text: "Talk like a student.", required: false },
+      {
+        id: "safety",
+        text: "Never film while walking, on stairs, or near traffic.",
+        required: false, // deliberately understated in the source data
+        safety: true,
+      },
+      { id: "vertical", text: "Hold the phone upright.", required: true },
+    ],
+  },
+};
+
+describe("safety rules (kill rule 6)", () => {
+  const checklist = buildChecklist([safetySet]);
+
+  it("is always required, whatever the source data says", () => {
+    const safety = checklist.items.find((i) => i.id === "safety");
+    expect(safety?.required).toBe(true);
+    expect(requiredIds(checklist)).toContain("safety");
+  });
+
+  it("is shown first, above every other rule", () => {
+    expect(checklist.items[0]?.id).toBe("safety");
+  });
+
+  it("is separable so it can be rendered with emphasis", () => {
+    expect(safetyItems(checklist).map((i) => i.id)).toEqual(["safety"]);
+  });
+
+  it("blocks the camera until it is ticked", () => {
+    expect(checklistSatisfied(checklist, ["vertical"])).toBe(false);
+    expect(checklistSatisfied(checklist, ["vertical", "safety"])).toBe(true);
   });
 });

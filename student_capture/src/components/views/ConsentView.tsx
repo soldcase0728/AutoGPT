@@ -26,15 +26,25 @@ export function ConsentView({
 
         <section className="card mt-5 p-5 text-[15px] leading-relaxed">
           <p>
-            You are giving Northside permission to use the photos and clips you send
-            through this app on our social accounts and in our own marketing.
+            You are giving permission to use the photos and clips you send through
+            this app on <strong>school-owned accounts and school marketing only</strong>.
           </p>
           <ul className="mt-4 flex flex-col gap-2" style={{ color: "var(--muted)" }}>
-            <li>— You keep owning what you shoot. This is permission, not a transfer.</li>
-            <li>— We never sell it, and we never license it to anyone else.</li>
             <li>
-              — You can withdraw this at any time. When you do, anything already posted
-              that you appear in comes down.
+              — <strong>You keep the copyright in what you shoot.</strong> This is
+              permission to use it, not a transfer of ownership.
+            </li>
+            <li>
+              — We will never sell it, and never license it to anyone outside the
+              school.
+            </li>
+            <li>
+              — Nothing you send is posted automatically. A person reviews and
+              approves every single item before it goes anywhere.
+            </li>
+            <li>
+              — You can withdraw this at any time. When you do, anything already
+              posted that you appear in comes down.
             </li>
             <li>
               — Anyone else recognisable in your clip needs to have signed this too

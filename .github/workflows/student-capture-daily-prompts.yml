@@ -1,0 +1,72 @@
+# Fires the morning prompt job for student_capture.
+#
+# This is the whole of what GitHub can contribute to running the app: a free
+# scheduler. GitHub has no hosted database, so the app's data still lives
+# elsewhere — see student_capture/README.md.
+#
+# Repository secrets required:
+#   CAPTURE_APP_URL       https://your-app.example.com  (no trailing slash)
+#   CAPTURE_CRON_SECRET   must equal the app's CAPTURE_CRON_SECRET
+name: student-capture · daily prompts
+
+on:
+  schedule:
+    # 11:00 UTC. GitHub cron is UTC only and does not follow daylight saving,
+    # so this is 07:00 US Eastern in summer and 06:00 in winter. Shift it if
+    # that hour matters; the job itself is safe to run at any time.
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report what would be assigned without writing anything"
+        type: boolean
+        default: false
+
+concurrency:
+  group: student-capture-daily-prompts
+  cancel-in-progress: false
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assign today's prompts
+        env:
+          APP_URL: ${{ secrets.CAPTURE_APP_URL }}
+          CRON_SECRET: ${{ secrets.CAPTURE_CRON_SECRET }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Set the CAPTURE_APP_URL and CAPTURE_CRON_SECRET repository secrets."
+            exit 1
+          fi
+
+          # The endpoint is idempotent — one prompt per student per day is a
+          # unique constraint — so a retry after a timeout cannot double-assign.
+          for attempt in 1 2 3; do
+            code=$(curl -sS -o response.json -w '%{http_code}' \
+              --max-time 60 \
+              -X POST "${APP_URL%/}/api/assignments/run" \
+              -H "x-capture-cron-secret: ${CRON_SECRET}" \
+              -H 'content-type: application/json' \
+              -d "{\"dryRun\": ${DRY_RUN}}") && [ "$code" = "200" ] && break
+
+            echo "attempt ${attempt} failed (HTTP ${code:-none})"
+            cat response.json 2>/dev/null || true
+            if [ "$attempt" = "3" ]; then
+              echo "::error::Prompt assignment failed after 3 attempts."
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+
+          echo "### Prompts assigned" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat response.json >> "$GITHUB_STEP_SUMMARY"
+          # The body has no trailing newline; without this the closing fence
+          # lands on the same line and the block does not render.
+          printf '\n' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

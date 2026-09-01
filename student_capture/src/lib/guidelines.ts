@@ -21,8 +21,16 @@ export function buildChecklist(versions: GuidelineVersion[]): Checklist {
     }
   }
 
-  // Required rules first — they are the ones that gate the capture button.
-  items.sort((a, b) => Number(b.required) - Number(a.required));
+  // Safety first, then the rest of the required rules, then the advice. A
+  // safety rule is required whether or not the source data says so.
+  for (const item of items) {
+    if (item.safety) item.required = true;
+  }
+  items.sort(
+    (a, b) =>
+      Number(Boolean(b.safety)) - Number(Boolean(a.safety)) ||
+      Number(b.required) - Number(a.required),
+  );
 
   return {
     versionIds: versions.map((v) => v.id),
@@ -33,6 +41,10 @@ export function buildChecklist(versions: GuidelineVersion[]): Checklist {
 
 export function requiredIds(checklist: Checklist): string[] {
   return checklist.items.filter((i) => i.required).map((i) => i.id);
+}
+
+export function safetyItems(checklist: Checklist): GuidelineItem[] {
+  return checklist.items.filter((i) => i.safety);
 }
 
 export function checklistSatisfied(checklist: Checklist, ticked: string[]): boolean {

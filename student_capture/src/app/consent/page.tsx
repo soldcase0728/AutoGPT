@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ConsentPage() {
   const person = await requirePerson();
-  if (await hasSignedRelease(person.id)) redirect("/");
+  if (await hasSignedRelease(person.id, RELEASE_VERSION)) redirect("/");
 
   const ageUnknown = person.birth_year === null;
   const minor = ageUnknown || new Date().getFullYear() - person.birth_year! < 18;

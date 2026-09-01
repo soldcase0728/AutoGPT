@@ -12,7 +12,7 @@ export async function currentPerson(): Promise<Person | null> {
 
   const { data } = await supabase
     .from("people")
-    .select("id, org_id, auth_user_id, role, display_name, email, birth_year")
+    .select("id, org_id, auth_user_id, role, display_name, email, birth_year, participation")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -32,22 +32,22 @@ export async function requireStaff(): Promise<Person> {
 }
 
 /**
- * The onboarding gate. A student cannot submit anything until their own media
- * release is on file; everyone else in frame is checked at publish time by the
- * database.
+ * The onboarding gate, asked per version of the wording.
+ *
+ * Rule 2: someone who has accepted the current wording is never asked again.
+ * Rule 3: bumping RELEASE_VERSION means everyone must affirmatively accept the
+ * new text — an older signature does not carry forward, and is not overwritten.
  */
-export async function hasSignedRelease(personId: string): Promise<boolean> {
+export async function hasSignedRelease(
+  personId: string,
+  version: string,
+): Promise<boolean> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("consents")
-    .select("id, revoked_at, expires_at")
-    .eq("person_id", personId)
-    .eq("type", "media_release")
-    .is("revoked_at", null);
-
-  const now = Date.now();
-  return (data ?? []).some(
-    (c: { expires_at: string | null }) =>
-      !c.expires_at || new Date(c.expires_at).getTime() > now,
-  );
+  const { data, error } = await supabase.rpc("has_current_release", {
+    p_person_id: personId,
+    p_version: version,
+  });
+  // Fail closed: if we cannot prove acceptance, ask for it.
+  if (error) return false;
+  return data === true;
 }
