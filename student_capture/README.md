@@ -103,6 +103,28 @@ curl -X POST https://your-app/api/assignments/run \
 
 Point cron at it for 7am in your timezone. Drop `dryRun` to actually assign.
 
+## Looking at it without a Supabase project
+
+```bash
+pnpm dev            # then open http://localhost:3000/preview
+```
+
+`/preview` renders every screen from fixtures with nothing behind it. These are
+the same view components the real pages use — `TodayView`, `CaptureFlow`,
+`ConsentView`, `SubmissionsView`, `ReviewQueue` — so the preview cannot drift
+from the app. The routes call `notFound()` when `NODE_ENV` is production, and
+the build bakes them as 404 pages.
+
+To capture them:
+
+```bash
+NODE_PATH=$(npm root -g) node scripts/screenshots.mjs .tmp-shots http://localhost:3000
+```
+
+It fails on a non-200, an empty body, or a console error, which catches things
+`next build` and `tsc` both wave through — a server component handing a client
+component a function prop, for one.
+
 ## Verifying
 
 ```bash
@@ -110,6 +132,7 @@ pnpm test        # 33 unit tests over the pure logic
 pnpm types       # tsc --noEmit
 pnpm lint
 pnpm build
+pnpm shots       # requires a dev server and Playwright; see above
 pnpm db:verify   # spins up a throwaway Postgres, applies every migration,
                  # runs the consent-gate and RLS tests against it
 ```

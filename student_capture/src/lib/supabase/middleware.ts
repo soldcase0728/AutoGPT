@@ -10,6 +10,10 @@ const PUBLIC_PREFIXES = [
   "/icon.svg",
 ];
 
+// Fixture-rendered screens for local development. The routes themselves 404 in
+// production, so this never widens access to anything real.
+const DEV_PUBLIC_PREFIXES = process.env.NODE_ENV === "production" ? [] : ["/preview"];
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -38,7 +42,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  const isPublic = [...PUBLIC_PREFIXES, ...DEV_PUBLIC_PREFIXES].some((p) =>
+    pathname.startsWith(p),
+  );
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

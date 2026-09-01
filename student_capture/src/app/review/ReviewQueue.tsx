@@ -19,7 +19,20 @@ const KEYS: Record<string, Decision> = {
   p: "published",
 };
 
-export function ReviewQueue({ rows, filter }: { rows: QueueRow[]; filter: string }) {
+export function ReviewQueue({
+  rows,
+  filter,
+  /**
+   * Plays this file for every row instead of each capture's own signed URL.
+   * Only for previews and tests — a plain string, because props crossing the
+   * server/client boundary have to serialise.
+   */
+  mediaSrc,
+}: {
+  rows: QueueRow[];
+  filter: string;
+  mediaSrc?: string;
+}) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -130,19 +143,29 @@ export function ReviewQueue({ rows, filter }: { rows: QueueRow[]; filter: string
       {/* the capture */}
       {current && (
         <section className="flex flex-col gap-4">
-          <div className="card overflow-hidden">
+          {/* Vertical clips are the norm, and a 9:16 frame stretched across a
+              desktop panel is mostly black bars. Hold portrait media to a
+              sensible column instead. */}
+          <div
+            className="card overflow-hidden"
+            style={
+              (current.height ?? 1) >= (current.width ?? 0)
+                ? { maxWidth: "26rem", marginInline: "auto", width: "100%" }
+                : undefined
+            }
+          >
             {current.kind === "photo" ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={current.id}
-                src={`/api/captures/${current.id}/media`}
+                src={mediaSrc ?? `/api/captures/${current.id}/media`}
                 alt={current.one_liner ?? current.idea_title}
                 className="max-h-[60vh] w-full bg-black object-contain"
               />
             ) : (
               <video
                 key={current.id}
-                src={`/api/captures/${current.id}/media`}
+                src={mediaSrc ?? `/api/captures/${current.id}/media`}
                 controls
                 playsInline
                 preload="metadata"
