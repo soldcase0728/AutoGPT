@@ -22,7 +22,7 @@ export default async function Today() {
   const { data: assignment } = await supabase
     .from("assignments")
     .select(
-      "id, due_on, completed_at, ideas!inner(id, title, brief, format_spec, reference_urls, guideline_set_ids, campaigns(name))",
+      "id, due_on, completed_at, ideas!inner(id, title, brief, format_spec, reference_urls, guideline_set_ids, capture_mode, media_type, min_media_count, max_media_count, orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height, min_duration_seconds, max_duration_seconds, caption_required, campaigns(name))",
     )
     .eq("person_id", person.id)
     .eq("due_on", today)

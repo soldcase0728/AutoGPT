@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  detectedOrientation,
   promptAvailabilityError,
   reservationError,
   submissionError,
@@ -7,10 +8,10 @@ import {
 } from "@/lib/submission-contract";
 
 const PHOTO: PromptSubmissionContract = {
-  media_type: "PHOTO",
+  media_type: "photo_series",
   min_media_count: 1,
   max_media_count: 3,
-  required_orientation: "PORTRAIT",
+  orientation: "portrait",
   repeat_submission_policy: "MULTIPLE",
   opens_at: null,
   closes_at: null,
@@ -43,35 +44,63 @@ describe("promptAvailabilityError", () => {
 describe("reservationError", () => {
   it("enforces media type, image format, and the stricter image byte limit", () => {
     expect(
-      reservationError(PHOTO, { mediaType: "VIDEO", mimeType: "video/mp4", fileSize: 10 }, 20_000_000),
+      reservationError(PHOTO, { mediaType: "video", mimeType: "video/mp4", fileSize: 10 }, 20_000_000),
     ).toContain("photo");
     expect(
-      reservationError(PHOTO, { mediaType: "PHOTO", mimeType: "image/heic", fileSize: 10 }, 20_000_000),
+      reservationError(PHOTO, { mediaType: "photo", mimeType: "image/heic", fileSize: 10 }, 20_000_000),
     ).toContain("format");
     expect(
       reservationError(
         PHOTO,
-        { mediaType: "PHOTO", mimeType: "image/jpeg", fileSize: 5_000_001 },
+        { mediaType: "photo", mimeType: "image/jpeg", fileSize: 5_000_001 },
         20_000_000,
       ),
     ).toContain("larger");
   });
 
   it("keeps the existing video upload contract", () => {
-    const video = { ...PHOTO, media_type: "VIDEO" as const, max_image_size: null, allowed_image_formats: null };
+    const video = {
+      ...PHOTO,
+      media_type: "video" as const,
+      orientation: "landscape" as const,
+      min_media_count: 1,
+      max_media_count: 1,
+      min_duration_seconds: 5,
+      max_duration_seconds: 30,
+      max_image_size: null,
+      allowed_image_formats: null,
+    };
     expect(
       reservationError(
         video,
-        { mediaType: "VIDEO", mimeType: "video/quicktime", fileSize: 50_000_000 },
+        { mediaType: "video", mimeType: "video/quicktime", fileSize: 50_000_000 },
         100_000_000,
       ),
     ).toBeNull();
+    expect(
+      submissionError(video, [{
+        mediaType: "video", mimeType: "video/mp4", fileSize: 1000,
+        durationSeconds: 31, width: 1920, height: 1080,
+      }]),
+    ).toContain("30 seconds");
+    expect(
+      submissionError(video, [{
+        mediaType: "video", mimeType: "video/mp4", fileSize: 1000,
+        durationSeconds: 10, width: 1080, height: 1920,
+      }]),
+    ).toContain("landscape");
+  });
+
+  it("recognizes square without treating near-square sensor pixels as landscape", () => {
+    expect(detectedOrientation(1000, 1000)).toBe("square");
+    expect(detectedOrientation(1000, 1020)).toBe("square");
+    expect(detectedOrientation(1920, 1080)).toBe("landscape");
   });
 });
 
 describe("submissionError", () => {
   const valid = {
-    mediaType: "PHOTO" as const,
+    mediaType: "photo" as const,
     mimeType: "image/jpeg",
     fileSize: 2_000_000,
     width: 1080,

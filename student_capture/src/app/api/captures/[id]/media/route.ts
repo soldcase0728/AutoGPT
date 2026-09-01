@@ -31,15 +31,34 @@ export async function GET(
 
   if (!capture) return fail(404, "That capture does not exist.");
 
-  const wantsDownload =
-    new URL(request.url).searchParams.get("disposition") === "attachment";
+  const searchParams = new URL(request.url).searchParams;
+  const wantsDownload = searchParams.get("disposition") === "attachment";
+  const mediaId = searchParams.get("mediaId");
+
+  let bucket = capture.bucket;
+  let storageKey = capture.storage_key;
+  if (mediaId) {
+    const { data: media } = await supabase
+      .from("submission_media")
+      .select("id, submission_id, bucket, storage_key")
+      .eq("id", mediaId)
+      .eq("submission_id", capture.id)
+      .maybeSingle();
+    if (!media) return fail(404, "That media item does not exist.");
+    bucket = media.bucket;
+    storageKey = media.storage_key;
+  }
 
   // Reviewing plays the proxy when one exists; downloading always takes the master.
-  const key = wantsDownload ? capture.storage_key : capture.proxy_key ?? capture.storage_key;
+  const key = mediaId
+    ? storageKey
+    : wantsDownload
+      ? capture.storage_key
+      : capture.proxy_key ?? capture.storage_key;
 
   const admin = createAdminClient();
   const { data, error } = await admin.storage
-    .from(capture.bucket)
+    .from(bucket)
     .createSignedUrl(key, SIGNED_URL_SECONDS,
       wantsDownload ? { download: key.split("/").pop() ?? "capture" } : undefined);
 

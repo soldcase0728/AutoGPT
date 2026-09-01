@@ -82,6 +82,11 @@ export default async function PreviewScreen({
             assignmentId="assignment-1"
             ideaId={IDEA.id}
             spec={IDEA.format_spec}
+            mediaType={IDEA.media_type}
+            orientation={IDEA.orientation}
+            minMediaCount={IDEA.min_media_count}
+            maxMediaCount={IDEA.max_media_count}
+            captionRequired={IDEA.caption_required}
             checklist={CHECKLIST}
             people={PEOPLE}
             self={{ id: STUDENT.id, display_name: STUDENT.display_name }}

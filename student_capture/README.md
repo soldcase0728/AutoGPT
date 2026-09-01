@@ -1,6 +1,6 @@
 # Student Capture — phase 1
 
-A daily prompt goes out, a student shoots one clip, and marketing receives it
+A daily prompt goes out, a student shoots a clip, photo, or photo series, and marketing receives it
 with enough context to write the post without chasing anyone.
 
 This is phase 1 of that: capture and review, and nothing else. It is a
@@ -11,12 +11,13 @@ platform's external API (see [Phase 2](#where-phase-2-plugs-in)).
 ## What is here
 
 **Student side.** Magic-link sign-in, today's prompt, the guideline checklist on
-the capture screen, a resumable upload straight to storage, one line of context,
-done. The whole loop is built to fit in under sixty seconds.
+the capture screen, an in-app still camera, and resumable uploads straight to
+private storage. Captions are requested only when the prompt requires one.
 
 **Marketing side.** A review queue with inline playback and keyboard shortcuts
 (`J`/`K` to move, `A` approve, `R` ask for changes, `X` reject, `P` mark
-posted), the consent state of every capture shown inline, and a bulk export of
+posted), mixed video/photo-series preview, the consent state of every capture
+shown inline, and a bulk export of
 signed master URLs.
 
 **Consent.** Captured at onboarding and enforced by the database before
@@ -79,7 +80,8 @@ Three things are versioned or attached differently on purpose:
 
 | | Where it lives | Enforcement |
 |---|---|---|
-| **Craft rules** (9:16, 10–30s, lighting) | Structured items on the guideline set attached to each idea, rendered as a pre-shoot checklist | Soft — a checklist, plus format checks that warn rather than block |
+| **Stored media rules** (type, orientation, count, duration, expiration) | First-class fields on the prompt, copied or measured on the submission | **Hard** — checked again by the submit API |
+| **Craft rules** (lighting, composition) | Structured items on the guideline set attached to each idea, rendered as a pre-shoot checklist | Soft — advice and reviewer context |
 | **Brand rules** (logo, tone, what never goes out) | Versioned guideline documents scoped to the org | Soft — shown at capture, flagged in review |
 | **Consent** (media release, parental, NIL) | A ledger keyed to a **person**, never to a file | **Hard** — a database trigger refuses to publish |
 
@@ -209,7 +211,7 @@ pnpm db:verify   # spins up a throwaway Postgres, applies every migration,
 ```
 
 `pnpm db:verify` needs the Postgres binaries on `PATH` (no Docker, no network).
-It shims `auth` and `storage`, applies all four migrations plus the seed, and
+It shims `auth` and `storage`, applies every migration plus the seed, and
 asserts the gate's behaviour end to end — including that publishing a blocked
 capture raises, that revocation unpublishes, and that one student cannot read
 another's captures through RLS.

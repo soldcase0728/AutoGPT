@@ -4,8 +4,8 @@
 -- Phase 1 prompt normalization and relational media behavior.
 
 select t_assert(
-  (select media_type = 'PHOTO'
-          and required_orientation = 'ANY'
+  (select media_type = 'photo'
+          and orientation = 'any'
           and min_media_count = 1
           and max_media_count = 1
      from ideas where id = '56666666-6666-6666-6666-666666666666'),
@@ -33,13 +33,13 @@ select t_assert(
 begin;
   insert into ideas (
     id, campaign_id, title, brief, format_spec, capture_mode, media_type,
-    required_orientation, allowed_image_formats
+    orientation, allowed_image_formats
   ) values (
     '57777777-7777-7777-7777-777777777777',
     '41111111-1111-1111-1111-111111111111',
     'Open verification moment', 'Transaction-only fixture',
     '{"kind":"photo","orientation":"any"}',
-    'OPEN_MOMENT', 'PHOTO', 'ANY', array['image/jpeg']
+    'OPEN_MOMENT', 'photo', 'any', array['image/jpeg']
   );
   insert into captures (
     id, prompt_id, person_id, org_id, bucket, storage_key, kind
@@ -66,7 +66,7 @@ begin;
   ) values (
     'f1000000-0000-0000-0000-000000000002',
     'f0000000-0000-0000-0000-000000000001',
-    'VIDEO', 'captures', 'kit/f1/media-2/clip.mp4', 1, 'video/mp4', 1234
+    'video', 'captures', 'kit/f1/media-2/clip.mp4', 1, 'video/mp4', 1234
   );
 
   update submission_media set width = 1080, height = 1920
@@ -89,7 +89,7 @@ begin
       submission_id, media_type, bucket, storage_key, sort_order
     ) values (
       'f0000000-0000-0000-0000-000000000001',
-      'VIDEO', 'captures', 'jo/forged/clip.mp4', 1
+      'video', 'captures', 'jo/forged/clip.mp4', 1
     );
     raise exception 'ASSERT FAILED: student attached media to another submission';
   exception

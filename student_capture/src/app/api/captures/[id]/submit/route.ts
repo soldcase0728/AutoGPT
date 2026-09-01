@@ -3,12 +3,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { fail, json, readJson } from "@/lib/http";
 import {
+  detectedOrientation,
   promptAvailabilityError,
+  reservationError,
   submissionError,
   type PromptSubmissionContract,
   type SubmissionMediaFacts,
 } from "@/lib/submission-contract";
-import type { PromptMediaType } from "@/lib/types";
+import { inspectImage } from "@/lib/image-inspection";
+import { publicEnv } from "@/lib/env";
 
 interface MediaBody {
   id: string;
@@ -44,8 +47,7 @@ export async function POST(
   if (!person) return fail(401, "Sign in first.");
 
   const body = await readJson<Body>(request);
-  const oneLiner = body?.oneLiner?.trim();
-  if (!oneLiner) return fail(400, "Tell us what is happening, in one line.");
+  const oneLiner = body?.oneLiner?.trim() ?? "";
 
   const peopleIds = [...new Set(body?.peopleIds ?? [])];
   const noPeopleInFrame = Boolean(body?.noPeopleInFrame);
@@ -73,7 +75,7 @@ export async function POST(
   const { data: prompt, error: promptError } = await supabase
     .from("ideas")
     .select(
-      "media_type, min_media_count, max_media_count, required_orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height",
+      "media_type, min_media_count, max_media_count, orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height, min_duration_seconds, max_duration_seconds, caption_required",
     )
     .eq("id", capture.prompt_id)
     .maybeSingle();
@@ -81,6 +83,9 @@ export async function POST(
   if (!prompt) return fail(409, "The prompt for this submission no longer exists.");
 
   const promptContract = prompt as unknown as PromptSubmissionContract;
+  if (promptContract.caption_required && !oneLiner) {
+    return fail(400, "Tell us what is happening, in one line.");
+  }
   const availabilityError = promptAvailabilityError(promptContract);
   if (availabilityError) return fail(409, availabilityError);
 
@@ -115,23 +120,32 @@ export async function POST(
     };
   });
 
-  const contractError = submissionError(
-    promptContract,
-    normalizedMedia.map(
-      (item): SubmissionMediaFacts => ({
-        mediaType: item.row.media_type as PromptMediaType,
-        mimeType: item.mimeType,
-        fileSize: item.fileSize,
-        width: item.width,
-        height: item.height,
-      }),
-    ),
-  );
-  if (contractError) return fail(400, contractError);
-
   // Never accept a submission if any reserved object did not actually land.
   const admin = createAdminClient();
   for (const item of normalizedMedia) {
+    if (item.row.media_type === "photo") {
+      const { data: object, error: downloadError } = await admin.storage
+        .from(item.row.bucket)
+        .download(item.row.storage_key);
+      if (downloadError || !object) {
+        return fail(409, "An upload has not finished. Keep this screen open until it does.");
+      }
+      const bytes = new Uint8Array(await object.arrayBuffer());
+      const image = inspectImage(bytes);
+      if (!image) return fail(400, "An uploaded image has an invalid or unsupported signature.");
+      if (image.hasExif) return fail(400, "An uploaded image still contains EXIF or location metadata.");
+      item.width = image.width;
+      item.height = image.height;
+      item.mimeType = image.mimeType;
+      item.fileSize = bytes.byteLength;
+      const imageError = reservationError(
+        promptContract,
+        { mediaType: "photo", mimeType: image.mimeType, fileSize: bytes.byteLength },
+        publicEnv.maxUploadBytes(),
+      );
+      if (imageError) return fail(imageError.includes("larger") ? 413 : 400, imageError);
+      continue;
+    }
     const slash = item.row.storage_key.lastIndexOf("/");
     const dir = item.row.storage_key.slice(0, slash);
     const filename = item.row.storage_key.slice(slash + 1);
@@ -143,6 +157,21 @@ export async function POST(
       return fail(409, "An upload has not finished. Keep this screen open until it does.");
     }
   }
+
+  const contractError = submissionError(
+    promptContract,
+    normalizedMedia.map(
+      (item): SubmissionMediaFacts => ({
+        mediaType: item.row.media_type,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize,
+        width: item.width,
+        height: item.height,
+        durationSeconds: item.durationSeconds,
+      }),
+    ),
+  );
+  if (contractError) return fail(400, contractError);
 
   // Context and tags must be written while the capture is still `uploading` —
   // their RLS policies close as soon as it moves to the review queue.
@@ -191,6 +220,10 @@ export async function POST(
       duration_s: primary.durationSeconds ?? null,
       width: primary.width ?? null,
       height: primary.height ?? null,
+      orientation: detectedOrientation(primary.width, primary.height),
+      mime: primary.mimeType ?? null,
+      master_bytes: primary.fileSize ?? null,
+      exif_stripped: promptContract.media_type === "video" ? false : true,
       captured_at: body?.capturedAt ?? new Date().toISOString(),
       checklist_ticked: body?.checklistTicked ?? [],
       guideline_version_ids: body?.guidelineVersionIds ?? [],

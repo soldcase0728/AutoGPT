@@ -27,7 +27,7 @@ export default async function CapturePage({
   const { data: assignment } = await supabase
     .from("assignments")
     .select(
-      "id, person_id, completed_at, ideas!inner(id, title, brief, format_spec, reference_urls, guideline_set_ids, capture_mode, media_type, min_media_count, max_media_count, required_orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height, campaigns(name))",
+      "id, person_id, completed_at, ideas!inner(id, title, brief, format_spec, reference_urls, guideline_set_ids, capture_mode, media_type, min_media_count, max_media_count, orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height, min_duration_seconds, max_duration_seconds, caption_required, campaigns(name))",
     )
     .eq("id", assignmentId)
     .maybeSingle();
@@ -61,13 +61,23 @@ export default async function CapturePage({
         <PromptCard
           title={idea.title}
           brief={idea.brief}
-          spec={idea.format_spec}
+          mediaType={idea.media_type}
+          orientation={idea.orientation}
+          minMediaCount={idea.min_media_count}
+          maxMediaCount={idea.max_media_count}
+          minDurationSeconds={idea.min_duration_seconds}
+          maxDurationSeconds={idea.max_duration_seconds}
           campaign={idea.campaigns?.name}
         />
         <CaptureFlow
           assignmentId={assignment.id}
           ideaId={idea.id}
           spec={idea.format_spec}
+          mediaType={idea.media_type}
+          orientation={idea.orientation}
+          minMediaCount={idea.min_media_count}
+          maxMediaCount={idea.max_media_count}
+          captionRequired={idea.caption_required}
           checklist={checklist}
           people={(people ?? []) as Array<{ id: string; display_name: string }>}
           self={{ id: person.id, display_name: person.display_name }}

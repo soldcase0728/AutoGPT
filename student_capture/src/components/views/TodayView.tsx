@@ -54,7 +54,12 @@ export function TodayView({
             <PromptCard
               title={idea.title}
               brief={idea.brief}
-              spec={idea.format_spec}
+              mediaType={idea.media_type}
+              orientation={idea.orientation}
+              minMediaCount={idea.min_media_count}
+              maxMediaCount={idea.max_media_count}
+              minDurationSeconds={idea.min_duration_seconds}
+              maxDurationSeconds={idea.max_duration_seconds}
               campaign={idea.campaigns?.name}
             />
 

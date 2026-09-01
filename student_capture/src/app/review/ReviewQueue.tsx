@@ -155,14 +155,25 @@ export function ReviewQueue({
                 : undefined
             }
           >
-            {current.kind === "photo" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={current.id}
-                src={mediaSrc ?? `/api/captures/${current.id}/media`}
-                alt={current.one_liner ?? current.idea_title}
-                className="max-h-[60vh] w-full bg-black object-contain"
-              />
+            {current.media_type !== "video" ? (
+              <div className={(current.media_items?.length ?? 0) > 1 ? "grid gap-2 sm:grid-cols-2" : ""}>
+                {(current.media_items?.length ? current.media_items : [{ id: "primary" }]).map(
+                  (media, mediaIndex) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={media.id}
+                      src={
+                        mediaSrc ??
+                        `/api/captures/${current.id}/media${
+                          media.id === "primary" ? "" : `?mediaId=${media.id}`
+                        }`
+                      }
+                      alt={`${current.one_liner ?? current.idea_title} — photo ${mediaIndex + 1}`}
+                      className="max-h-[60vh] w-full bg-black object-contain"
+                    />
+                  ),
+                )}
+              </div>
             ) : (
               <video
                 key={current.id}
@@ -179,6 +190,9 @@ export function ReviewQueue({
             <div className="flex flex-wrap items-center gap-2">
               <Chip tone="accent">{current.campaign_name}</Chip>
               <Chip>{current.idea_title}</Chip>
+              <Chip>{current.media_type.replace("_", " ")}</Chip>
+              {current.orientation && <Chip>{current.orientation}</Chip>}
+              {(current.media_items?.length ?? 0) > 1 && <Chip>{current.media_items.length} photos</Chip>}
               {current.duration_s && <Chip>{Math.round(current.duration_s)}s</Chip>}
               {current.width && current.height && (
                 <Chip>

@@ -8,8 +8,9 @@ export type PersonRole = "student" | "reviewer" | "admin";
 export type ConsentType = "media_release" | "parental" | "nil";
 export type CaptureKind = "video" | "photo";
 export type PromptCaptureMode = "ASSIGNED" | "OPEN_MOMENT";
-export type PromptMediaType = "PHOTO" | "VIDEO";
-export type PromptOrientation = "PORTRAIT" | "LANDSCAPE" | "ANY";
+export type PromptMediaType = "video" | "photo" | "photo_series";
+export type MediaObjectType = "video" | "photo";
+export type PromptOrientation = "portrait" | "landscape" | "square" | "any";
 export type PromptRepeatPolicy = "ONCE" | "MULTIPLE";
 export type ScanState = "pending" | "clean" | "infected" | "failed";
 export type CaptureState =
@@ -79,7 +80,7 @@ export interface Idea {
   media_type: PromptMediaType;
   min_media_count: number;
   max_media_count: number;
-  required_orientation: PromptOrientation;
+  orientation: PromptOrientation;
   repeat_submission_policy: PromptRepeatPolicy;
   opens_at: string | null;
   closes_at: string | null;
@@ -87,13 +88,16 @@ export interface Idea {
   allowed_image_formats: string[] | null;
   min_image_width: number | null;
   min_image_height: number | null;
+  min_duration_seconds: number | null;
+  max_duration_seconds: number | null;
+  caption_required: boolean;
 }
 
 /** A media object belonging to the submission envelope stored in `captures`. */
 export interface SubmissionMedia {
   id: string;
   submission_id: string;
-  media_type: PromptMediaType;
+  media_type: MediaObjectType;
   bucket: string;
   storage_key: string;
   sort_order: number;
@@ -150,4 +154,14 @@ export interface QueueRow {
   format_spec: FormatSpec;
   campaign_name: string;
   consent_blockers: ConsentBlocker[];
+  media_type: PromptMediaType;
+  orientation: PromptOrientation | null;
+  media_items: Array<{
+    id: string;
+    sort_order: number;
+    width: number | null;
+    height: number | null;
+    mime_type: string | null;
+    file_size: number | null;
+  }>;
 }

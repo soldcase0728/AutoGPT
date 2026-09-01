@@ -46,42 +46,52 @@ insert into campaigns (id, org_id, name, starts_on) values
    'Fall semester', current_date - 14)
 on conflict (id) do nothing;
 
-insert into ideas (id, campaign_id, title, brief, format_spec, guideline_set_ids) values
+insert into ideas (
+  id, campaign_id, title, brief, format_spec, guideline_set_ids,
+  media_type, orientation, allowed_image_formats,
+  min_duration_seconds, max_duration_seconds
+) values
   ('51111111-1111-1111-1111-111111111111', '41111111-1111-1111-1111-111111111111',
    'The path to practice',
    'Fifteen seconds of the route you take from your last class to practice — filmed standing still. Pick a spot, plant your feet, let people walk past you. Never film while walking.',
    '{"kind":"video","orientation":"portrait","min_seconds":10,"max_seconds":30}'::jsonb,
-   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[]),
+   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[],
+   'video', 'portrait', null, 10, 30),
 
   ('52222222-2222-2222-2222-222222222222', '41111111-1111-1111-1111-111111111111',
    'What is in your bag',
    'Empty your bag on a bench and name three things in it. One of them should be strange.',
    '{"kind":"video","orientation":"portrait","min_seconds":15,"max_seconds":45}'::jsonb,
-   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[]),
+   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[],
+   'video', 'portrait', null, 15, 45),
 
   ('53333333-3333-3333-3333-333333333333', '41111111-1111-1111-1111-111111111111',
    'Pre-game, ninety minutes out',
    'The room ninety minutes before a game. Wide shot, hold it steady, let it run. No narration.',
    '{"kind":"video","orientation":"portrait","min_seconds":10,"max_seconds":30}'::jsonb,
-   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[]),
+   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[],
+   'video', 'portrait', null, 10, 30),
 
   ('54444444-4444-4444-4444-444444444444', '41111111-1111-1111-1111-111111111111',
    'Teach us one thing',
    'Ten seconds teaching one small skill from your sport. Assume we know nothing.',
    '{"kind":"video","orientation":"portrait","min_seconds":8,"max_seconds":25}'::jsonb,
-   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[]),
+   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[],
+   'video', 'portrait', null, 8, 25),
 
   ('55555555-5555-5555-5555-555555555555', '41111111-1111-1111-1111-111111111111',
    'The unglamorous part',
    'The part nobody posts: the laundry, the ice bath, the 6am bus. One shot.',
    '{"kind":"video","orientation":"portrait","min_seconds":10,"max_seconds":30}'::jsonb,
-   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[]),
+   array['21111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222']::uuid[],
+   'video', 'portrait', null, 10, 30),
 
   ('56666666-6666-6666-6666-666666666666', '41111111-1111-1111-1111-111111111111',
    'Your view right now',
    'One photo of whatever is in front of you at this exact moment. Do not tidy up first.',
    '{"kind":"photo","orientation":"any"}'::jsonb,
-   array['22222222-2222-2222-2222-222222222222']::uuid[])
+   array['22222222-2222-2222-2222-222222222222']::uuid[],
+   'photo', 'any', array['image/jpeg','image/png','image/webp'], null, null)
 on conflict (id) do nothing;
 
 -- ------------------------------------------------------------------- people

@@ -49,10 +49,10 @@ export const IDEA: Idea & { campaigns: { name: string } } = {
   },
   reference_urls: [],
   capture_mode: "ASSIGNED",
-  media_type: "VIDEO",
+  media_type: "video",
   min_media_count: 1,
   max_media_count: 1,
-  required_orientation: "PORTRAIT",
+  orientation: "portrait",
   repeat_submission_policy: "ONCE",
   opens_at: null,
   closes_at: null,
@@ -60,6 +60,9 @@ export const IDEA: Idea & { campaigns: { name: string } } = {
   allowed_image_formats: null,
   min_image_width: null,
   min_image_height: null,
+  min_duration_seconds: 10,
+  max_duration_seconds: 30,
+  caption_required: false,
   guideline_set_ids: [
     "21111111-1111-1111-1111-111111111111",
     "22222222-2222-2222-2222-222222222222",
@@ -167,6 +170,9 @@ const baseRow = {
   idea_id: IDEA.id,
   format_spec: IDEA.format_spec,
   campaign_name: "Fall semester",
+  media_type: "photo" as const,
+  orientation: "portrait" as const,
+  media_items: [] as QueueRow["media_items"],
 };
 
 export const QUEUE: QueueRow[] = [

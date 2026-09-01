@@ -12,19 +12,33 @@ import {
 } from "@/lib/guidelines";
 import { blocks, checkFormat, formatBytes, type FormatFinding } from "@/lib/format-spec";
 import { mediaKind, probeMedia, type Probe } from "@/lib/probe";
-import type { FormatSpec } from "@/lib/types";
+import type { FormatSpec, PromptMediaType, PromptOrientation } from "@/lib/types";
 import { Chip } from "@/components/Chip";
 import { SafetyReport } from "@/components/SafetyReport";
+import { PhotoCamera } from "./PhotoCamera";
 
 // Supabase's resumable endpoint requires exactly this chunk size.
 const CHUNK_SIZE = 6 * 1024 * 1024;
 
 type UploadState = "idle" | "uploading" | "done" | "failed";
+type MediaMetadata = {
+  id: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+  mimeType: string;
+  fileSize: number;
+};
 
 interface Props {
   assignmentId: string;
   ideaId?: string;
   spec: FormatSpec;
+  mediaType: PromptMediaType;
+  orientation: PromptOrientation;
+  minMediaCount: number;
+  maxMediaCount: number;
+  captionRequired: boolean;
   checklist: Checklist;
   people: Array<{ id: string; display_name: string }>;
   self: { id: string; display_name: string };
@@ -36,6 +50,11 @@ export function CaptureFlow({
   assignmentId,
   ideaId,
   spec,
+  mediaType,
+  orientation,
+  minMediaCount,
+  maxMediaCount,
+  captionRequired,
   checklist,
   people,
   self,
@@ -43,10 +62,12 @@ export function CaptureFlow({
   supabaseUrl,
 }: Props) {
   const router = useRouter();
-  const uploadRef = useRef<tus.Upload | null>(null);
+  const uploadRef = useRef<tus.Upload[]>([]);
 
   const [ticked, setTicked] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [mediaMetadata, setMediaMetadata] = useState<MediaMetadata[]>([]);
   const [probe, setProbe] = useState<Probe>({});
   const [findings, setFindings] = useState<FormatFinding[]>([]);
   const [captureId, setCaptureId] = useState<string | null>(null);
@@ -67,35 +88,13 @@ export function CaptureFlow({
   const ready = checklistSatisfied(checklist, ticked);
   const peopleDecided = nobody ? tagged.length === 0 : tagged.length > 0;
   const canSubmit =
-    upload === "done" && oneLiner.trim().length > 0 && peopleDecided && !submitting;
+    upload === "done" && (!captionRequired || oneLiner.trim().length > 0) && peopleDecided && !submitting;
 
   const startUpload = useCallback(
-    async (chosen: File) => {
+    async (chosenFiles: File[]) => {
       setError("");
       setUpload("uploading");
       setProgress(0);
-
-      const started = await fetch("/api/uploads/start", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          assignmentId,
-          filename: chosen.name,
-          mime: chosen.type,
-          bytes: chosen.size,
-          kind: mediaKind(chosen),
-        }),
-      });
-
-      if (!started.ok) {
-        const body = await started.json().catch(() => ({ error: "Upload could not start." }));
-        setUpload("failed");
-        setError(body.error ?? "Upload could not start.");
-        return;
-      }
-
-      const { captureId: id, bucket, objectName } = await started.json();
-      setCaptureId(id);
 
       const supabase = createClient();
       const {
@@ -107,41 +106,78 @@ export function CaptureFlow({
         return;
       }
 
-      const tusUpload = new tus.Upload(chosen, {
-        endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
-        // Campus wifi and LTE both drop. Back off and keep going rather than
-        // making the student start over.
-        retryDelays: [0, 3000, 5000, 10000, 20000, 30000],
-        headers: {
-          authorization: `Bearer ${session.access_token}`,
-          "x-upsert": "false",
-        },
-        uploadDataDuringCreation: true,
-        removeFingerprintOnSuccess: true,
-        chunkSize: CHUNK_SIZE,
-        metadata: {
-          bucketName: bucket,
-          objectName,
-          contentType: chosen.type || "application/octet-stream",
-          cacheControl: "3600",
-        },
-        onProgress: (sent, total) => setProgress(total ? sent / total : 0),
-        onError: (err) => {
-          setUpload("failed");
-          setError(err.message || "The upload stopped. Tap retry — it resumes where it left off.");
-        },
-        onSuccess: () => {
-          setProgress(1);
-          setUpload("done");
-        },
-      });
+      let submissionId: string | null = null;
+      const metadata: MediaMetadata[] = [];
+      try {
+        for (let index = 0; index < chosenFiles.length; index += 1) {
+          const chosen = chosenFiles[index]!;
+          const facts = await probeMedia(chosen);
+          const started: Response = await fetch("/api/uploads/start", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              assignmentId,
+              captureId: submissionId ?? undefined,
+              filename: chosen.name,
+              mime: chosen.type,
+              bytes: chosen.size,
+              kind: mediaKind(chosen),
+            }),
+          });
+          if (!started.ok) {
+            const body = await started.json().catch(() => ({ error: "Upload could not start." }));
+            throw new Error(body.error ?? "Upload could not start.");
+          }
+          const reservation = (await started.json()) as {
+            captureId: string;
+            mediaId: string;
+            bucket: string;
+            objectName: string;
+          };
+          submissionId = reservation.captureId;
+          setCaptureId(submissionId);
 
-      uploadRef.current = tusUpload;
-      const previous = await tusUpload.findPreviousUploads();
-      if (previous.length > 0 && previous[0]) {
-        tusUpload.resumeFromPreviousUpload(previous[0]);
+          await new Promise<void>((resolve, reject) => {
+            const tusUpload = new tus.Upload(chosen, {
+              endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+              retryDelays: [0, 3000, 5000, 10000, 20000, 30000],
+              headers: { authorization: `Bearer ${session.access_token}`, "x-upsert": "false" },
+              uploadDataDuringCreation: true,
+              removeFingerprintOnSuccess: true,
+              chunkSize: CHUNK_SIZE,
+              metadata: {
+                bucketName: reservation.bucket,
+                objectName: reservation.objectName,
+                contentType: chosen.type || "application/octet-stream",
+                cacheControl: "3600",
+              },
+              onProgress: (sent, total) =>
+                setProgress((index + (total ? sent / total : 0)) / chosenFiles.length),
+              onError: reject,
+              onSuccess: () => resolve(),
+            });
+            uploadRef.current.push(tusUpload);
+            void tusUpload.findPreviousUploads().then((previous) => {
+              if (previous[0]) tusUpload.resumeFromPreviousUpload(previous[0]);
+              tusUpload.start();
+            }, reject);
+          });
+          metadata.push({
+            id: reservation.mediaId,
+            width: facts.width,
+            height: facts.height,
+            durationSeconds: facts.durationSeconds,
+            mimeType: chosen.type,
+            fileSize: chosen.size,
+          });
+        }
+        setMediaMetadata(metadata);
+        setProgress(1);
+        setUpload("done");
+      } catch (uploadError) {
+        setUpload("failed");
+        setError(uploadError instanceof Error ? uploadError.message : "The upload stopped.");
       }
-      tusUpload.start();
     },
     [assignmentId, supabaseUrl],
   );
@@ -162,7 +198,7 @@ export function CaptureFlow({
     setFindings(result);
 
     // Warnings are advice, not a wall — only a blocking finding stops the upload.
-    if (!blocks(result)) void startUpload(chosen);
+    if (!blocks(result)) void startUpload([chosen]);
     else setUpload("idle");
   }
 
@@ -181,6 +217,7 @@ export function CaptureFlow({
         durationSeconds: probe.durationSeconds,
         width: probe.width,
         height: probe.height,
+        media: mediaMetadata,
         checklistTicked: ticked,
         guidelineVersionIds: checklist.versionIds,
       }),
@@ -285,19 +322,35 @@ export function CaptureFlow({
       {/* 2 — the camera */}
       <section className="card p-5">
         <p className="label">The shot</p>
-        <label
-          className={`btn mt-3 block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
-        >
-          {file ? "Choose a different file" : "Open camera"}
-          <input
-            type="file"
-            className="sr-only"
-            accept={spec.kind === "photo" ? "image/*" : "video/*"}
-            capture="environment"
-            disabled={!ready}
-            onChange={onPick}
-          />
-        </label>
+        {mediaType === "video" ? (
+          <label
+            className={`btn mt-3 block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
+          >
+            {file ? "Choose a different file" : "Open camera"}
+            <input
+              type="file"
+              className="sr-only"
+              accept="video/*"
+              capture="environment"
+              disabled={!ready}
+              onChange={onPick}
+            />
+          </label>
+        ) : (
+          <>
+            <PhotoCamera
+              orientation={orientation}
+              maxCount={maxMediaCount}
+              disabled={!ready || upload === "uploading" || upload === "done"}
+              onChange={setPhotoFiles}
+            />
+            {photoFiles.length >= minMediaCount && upload === "idle" && (
+              <button className="btn mt-3" type="button" onClick={() => void startUpload(photoFiles)}>
+                Use {photoFiles.length === 1 ? "this photo" : `these ${photoFiles.length} photos`}
+              </button>
+            )}
+          </>
+        )}
 
         {file && (
           <div className="mt-4 flex flex-col gap-2 text-sm">
@@ -341,13 +394,13 @@ export function CaptureFlow({
               {upload === "done" && "Uploaded. Now tell us what it is."}
               {upload === "failed" && "Upload stopped."}
             </p>
-            {upload === "failed" && file && (
+            {upload === "failed" && (file || photoFiles.length > 0) && (
               <button
                 className="btn btn-quiet mt-3"
-                onClick={() => void startUpload(file)}
+                onClick={() => window.location.reload()}
                 type="button"
               >
-                Retry — it picks up where it stopped
+                Start over safely
               </button>
             )}
           </div>
@@ -356,20 +409,22 @@ export function CaptureFlow({
 
       {/* 3 — the context marketing needs, and nothing more */}
       <section className="card p-5">
-        <label className="label" htmlFor="one-liner">
-          What is happening? One line.
-        </label>
-        <input
-          id="one-liner"
-          value={oneLiner}
-          onChange={(e) => setOneLiner(e.target.value)}
-          maxLength={140}
-          className="card mt-2 w-full px-3 py-3"
-          style={{ background: "var(--bg)" }}
-          placeholder="Last five minutes before the bus leaves"
-        />
+        {captionRequired && (
+          <>
+            <label className="label" htmlFor="one-liner">What is happening? One line.</label>
+            <input
+              id="one-liner"
+              value={oneLiner}
+              onChange={(e) => setOneLiner(e.target.value)}
+              maxLength={140}
+              className="card mt-2 w-full px-3 py-3"
+              style={{ background: "var(--bg)" }}
+              placeholder="Last five minutes before the bus leaves"
+            />
+          </>
+        )}
 
-        <p className="label mt-5">Who is in it?</p>
+        <p className={`label ${captionRequired ? "mt-5" : ""}`}>Who is in it?</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {[{ id: self.id, display_name: `${self.display_name} (you)` }, ...people.filter((p) => p.id !== self.id)].map(
             (p) => {
