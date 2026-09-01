@@ -85,6 +85,22 @@ to any Postgres.
 pnpm dev
 ```
 
+Or let the setup script do the bucket and the migrations in one go:
+
+```bash
+export NEXT_PUBLIC_SUPABASE_URL='https://<ref>.supabase.co'
+export SUPABASE_SERVICE_ROLE_KEY='...'      # Settings ▸ API
+export DATABASE_URL='postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres'
+pnpm setup -- --seed
+```
+
+It creates the bucket **private**, with the upload size limit and image/video
+mime restrictions applied, and refuses to continue if the bucket already exists
+and is public. Re-running it is safe.
+
+One thing the script cannot do for you: add your app's origin to Supabase ▸
+Authentication ▸ URL Configuration. Without it the magic link bounces.
+
 Students are **roster-gated**: rows in `people` come first, and signing in only
 claims the row whose email matches. Someone who authenticates without one gets
 told they are not on a roster. Edit the addresses in `supabase/seed.sql` before
@@ -180,6 +196,66 @@ be in.
 `process.version` check from middleware. It is the pattern Supabase documents,
 and it is a warning rather than a failure.
 
+## The QR poster
+
+`/poster` renders a printable card for a locker-room wall: your organisation's
+name, a headline, and a QR pointing at the app. Staff only. Print it with the
+browser's print dialog — the page carries its own `@page` rules and forces a
+light palette, so it does not burn a toner cartridge.
+
+```
+/poster                                   → QR to this app's own origin
+/poster?url=https://…&headline=Game+week  → point it anywhere, retitle it
+```
+
+Only `http`/`https` targets are encoded; anything else falls back to the app's
+origin, so a printed code can never carry a `javascript:` or `data:` payload.
+
+## Pushing captures into OneDrive / SharePoint
+
+Marketing already lives in SharePoint, so approved masters can be pushed there
+rather than downloaded and re-uploaded by hand:
+
+```bash
+curl -X POST https://your-app/api/review/push-to-onedrive \
+  -H 'content-type: application/json' -d '{"state":"approved","limit":25}'
+```
+
+Each file streams a chunk at a time from Supabase Storage straight into a Graph
+upload session, so a 200 MB clip never sits whole in the app's memory. Files
+land in `MS_EXPORT_FOLDER/<submission date>/` named
+`<date>-<student>-<idea>.<ext>`, and conflicts rename rather than overwrite — an
+export must never quietly replace something already in the marketing folder.
+
+Unconfigured, the route answers `501` with the list of variables to set rather
+than failing obscurely.
+
+### Setting up the app registration
+
+1. Entra admin centre ▸ **App registrations** ▸ New registration. No redirect
+   URI is needed — this is app-only.
+2. **Certificates & secrets** ▸ new client secret. Copy it now; it is not
+   shown again.
+3. **API permissions** ▸ Microsoft Graph ▸ *Application* permissions ▸
+   `Sites.Selected`, then **Grant admin consent**. Prefer this over
+   `Sites.ReadWrite.All`: it grants nothing until a SharePoint admin also
+   assigns the app to the one target site
+   ([site-post-permissions](https://learn.microsoft.com/graph/api/site-post-permissions)).
+4. Find the target drive id — in Graph Explorer,
+   `GET /sites/{host}:/sites/{site}:/drives`.
+5. Fill in `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_DRIVE_ID`
+   and optionally `MS_EXPORT_FOLDER`.
+
+Delegated permissions will not work here: the export runs on a schedule with
+nobody signed in, so it needs an application permission.
+
+Two Graph rules the upload code exists to respect, both of which fail late and
+confusingly if you get them wrong: every chunk but the last must be a multiple
+of **320 KiB**, and the chunk `PUT` must **not** carry an `Authorization`
+header — the upload URL is already pre-authenticated, and sending a bearer
+token makes Graph answer 401. `src/lib/graph/chunks.ts` is pure and unit
+tested so the arithmetic is checkable without a tenant.
+
 ## Where phase 2 plugs in
 
 The app calls AutoGPT over its external API rather than living inside it:
@@ -206,6 +282,7 @@ The graphs draft and stage. A person still approves and releases.
 supabase/migrations/   schema, RLS, the consent gate, Supabase bindings
 supabase/tests/        SQL assertions run by pnpm db:verify
 src/lib/               pure logic (unit tested) + Supabase clients
+src/lib/graph/         Microsoft Graph: token, upload sessions, chunk planning
 src/app/               student pages, review queue, route handlers
 tests/                 vitest over src/lib
 ```

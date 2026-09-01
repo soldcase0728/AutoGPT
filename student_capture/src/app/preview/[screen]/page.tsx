@@ -4,6 +4,8 @@ import { SubmissionsView } from "@/components/views/SubmissionsView";
 import { ConsentView } from "@/components/views/ConsentView";
 import { CaptureFlow } from "@/app/capture/[assignmentId]/CaptureFlow";
 import { ReviewQueue } from "@/app/review/ReviewQueue";
+import { PosterView } from "@/components/views/PosterView";
+import QRCode from "qrcode";
 import { RELEASE_VERSION } from "@/app/consent/version";
 import {
   CHECKLIST,
@@ -39,6 +41,7 @@ const SCREENS = [
   "consent",
   "submissions",
   "review",
+  "poster",
 ] as const;
 
 export default async function PreviewScreen({
@@ -106,6 +109,23 @@ export default async function PreviewScreen({
           <ReviewQueue rows={QUEUE} filter="open" mediaSrc="/preview-frame.png" />
         </main>
       );
+
+    case "poster": {
+      const url = "https://capture.example.edu";
+      return (
+        <PosterView
+          orgName="Northside Athletics"
+          headline="One clip. Every day."
+          url={url}
+          qrSvg={await QRCode.toString(url, {
+            type: "svg",
+            margin: 0,
+            errorCorrectionLevel: "M",
+            color: { dark: "#17191a", light: "#ffffff" },
+          })}
+        />
+      );
+    }
 
     default:
       notFound();

@@ -41,6 +41,7 @@ const SHOTS = [
   ["submissions", PHONE, "04-submissions", null],
   ["today-done", PHONE, "05-today-done", null],
   ["review", DESK, "06-review", null],
+  ["poster", { width: 820, height: 1160, deviceScaleFactor: 2 }, "08-poster", null],
   [
     "review",
     DESK,

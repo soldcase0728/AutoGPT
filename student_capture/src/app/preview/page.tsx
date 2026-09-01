@@ -8,6 +8,7 @@ const SCREENS = [
   ["consent", "Student · the release, as a minor sees it"],
   ["submissions", "Student · what they have sent"],
   ["review", "Marketing · the review queue"],
+  ["poster", "Print · the QR poster for a locker room wall"],
 ];
 
 export default function PreviewIndex() {

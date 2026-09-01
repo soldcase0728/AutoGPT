@@ -13,12 +13,14 @@
     "test:watch": "vitest",
     "db:verify": "./scripts/db-verify.sh",
     "db:apply": "./scripts/db-apply.sh",
-    "shots": "node scripts/screenshots.mjs"
+    "shots": "node scripts/screenshots.mjs",
+    "setup": "node scripts/setup-supabase.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.6.1",
     "@supabase/supabase-js": "2.55.0",
     "next": "15.4.7",
+    "qrcode": "1.5.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "server-only": "0.0.1",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "22.10.2",
+    "@types/qrcode": "1.5.5",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "autoprefixer": "10.4.20",
