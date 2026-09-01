@@ -8,12 +8,17 @@ export function PosterView({
   headline,
   url,
   qrSvg,
+  callToAction = "Point your camera at this.",
+  note = "Sign in with your school email — no password. You get one prompt a morning, it takes under a minute, and you can stop any time.",
 }: {
   orgName: string;
   headline: string;
   url: string;
   /** Pre-rendered QR as an SVG string. */
   qrSvg: string;
+  callToAction?: string;
+  /** The line under the code. Differs for an app link and an upload link. */
+  note?: string;
 }) {
   return (
     <>
@@ -79,12 +84,9 @@ export function PosterView({
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <p style={{ fontSize: 21, fontWeight: 600, margin: 0 }}>
-            Point your camera at this.
-          </p>
+          <p style={{ fontSize: 21, fontWeight: 600, margin: 0 }}>{callToAction}</p>
           <p style={{ fontSize: 16, color: "#63665f", margin: 0, lineHeight: 1.5 }}>
-            Sign in with your school email — no password. You get one prompt a
-            morning, it takes under a minute, and you can stop any time.
+            {note}
           </p>
         </div>
 

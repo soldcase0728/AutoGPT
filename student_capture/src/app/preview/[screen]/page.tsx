@@ -46,11 +46,11 @@ export default async function PreviewScreen({
   searchParams,
 }: {
   params: Promise<{ screen: string }>;
-  searchParams: Promise<{ url?: string; headline?: string }>;
+  searchParams: Promise<{ url?: string; headline?: string; org?: string; note?: string }>;
 }) {
   if (!demoScreensEnabled()) notFound();
   const { screen } = await params;
-  const { url: urlParam, headline } = await searchParams;
+  const { url: urlParam, headline, org, note } = await searchParams;
 
   switch (screen) {
     case "today":
@@ -117,9 +117,10 @@ export default async function PreviewScreen({
       const url = safeUrl(urlParam) ?? "https://capture.example.edu";
       return (
         <PosterView
-          orgName="Northside Athletics"
+          orgName={org || "Northside Athletics"}
           headline={headline || "One clip. Every day."}
           url={url}
+          note={note}
           qrSvg={await QRCode.toString(url, {
             type: "svg",
             margin: 0,
