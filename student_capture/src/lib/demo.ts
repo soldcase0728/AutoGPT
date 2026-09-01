@@ -12,6 +12,9 @@
  */
 export function demoScreensEnabled(): boolean {
   if (process.env.NODE_ENV !== "production") return true;
+  // Vercel preview deployments are for looking at, so they carry the screens by
+  // default. A production deployment never does unless asked explicitly.
+  if (process.env.VERCEL_ENV === "preview") return true;
   return process.env.DEMO_SCREENS === "1";
 }
 
