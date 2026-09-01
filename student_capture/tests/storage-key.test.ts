@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { captureObjectName, ownerOf, safeFilename } from "@/lib/storage-key";
+import {
+  captureObjectName,
+  ownerOf,
+  safeFilename,
+  submissionMediaObjectName,
+} from "@/lib/storage-key";
 
 describe("safeFilename", () => {
   it("keeps a normal phone filename recognisable", () => {
@@ -23,6 +28,19 @@ describe("safeFilename", () => {
 
   it("caps a runaway name", () => {
     expect(safeFilename("x".repeat(500) + ".mp4").length).toBeLessThanOrEqual(64);
+  });
+});
+
+describe("submissionMediaObjectName", () => {
+  it("keeps the owner first and gives every media row its own prefix", () => {
+    const key = submissionMediaObjectName(
+      "person-1",
+      "submission-9",
+      "media-2",
+      "Second Photo.JPG",
+    );
+    expect(key).toBe("person-1/submission-9/media-2/Second-Photo.jpg");
+    expect(ownerOf(key)).toBe("person-1");
   });
 });
 

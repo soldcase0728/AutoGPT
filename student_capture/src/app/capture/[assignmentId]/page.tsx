@@ -27,7 +27,7 @@ export default async function CapturePage({
   const { data: assignment } = await supabase
     .from("assignments")
     .select(
-      "id, person_id, completed_at, ideas!inner(id, title, brief, format_spec, reference_urls, guideline_set_ids, campaigns(name))",
+      "id, person_id, completed_at, ideas!inner(id, title, brief, format_spec, reference_urls, guideline_set_ids, capture_mode, media_type, min_media_count, max_media_count, required_orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height, campaigns(name))",
     )
     .eq("id", assignmentId)
     .maybeSingle();

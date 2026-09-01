@@ -2,6 +2,22 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { fail, json, readJson } from "@/lib/http";
+import {
+  promptAvailabilityError,
+  submissionError,
+  type PromptSubmissionContract,
+  type SubmissionMediaFacts,
+} from "@/lib/submission-contract";
+import type { PromptMediaType } from "@/lib/types";
+
+interface MediaBody {
+  id: string;
+  durationSeconds?: number;
+  width?: number;
+  height?: number;
+  mimeType?: string;
+  fileSize?: number;
+}
 
 interface Body {
   oneLiner: string;
@@ -14,6 +30,8 @@ interface Body {
   capturedAt?: string;
   checklistTicked?: string[];
   guidelineVersionIds?: string[];
+  /** Normalized multi-media clients send one metadata entry per reserved row. */
+  media?: MediaBody[];
 }
 
 /** Finalises an upload: records context, tags who is in frame, hands it to review. */
@@ -42,7 +60,7 @@ export async function POST(
 
   const { data: capture } = await supabase
     .from("captures")
-    .select("id, person_id, assignment_id, bucket, storage_key, state")
+    .select("id, person_id, assignment_id, prompt_id, bucket, storage_key, state")
     .eq("id", id)
     .maybeSingle();
 
@@ -52,18 +70,78 @@ export async function POST(
     return fail(409, "That capture has already been submitted.");
   }
 
-  // Never accept a submission for a file that did not actually land.
-  const admin = createAdminClient();
-  const slash = capture.storage_key.lastIndexOf("/");
-  const dir = capture.storage_key.slice(0, slash);
-  const filename = capture.storage_key.slice(slash + 1);
-  const { data: listing, error: listError } = await admin.storage
-    .from(capture.bucket)
-    .list(dir, { search: filename, limit: 1 });
+  const { data: prompt, error: promptError } = await supabase
+    .from("ideas")
+    .select(
+      "media_type, min_media_count, max_media_count, required_orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height",
+    )
+    .eq("id", capture.prompt_id)
+    .maybeSingle();
+  if (promptError) return fail(500, promptError.message);
+  if (!prompt) return fail(409, "The prompt for this submission no longer exists.");
 
-  if (listError) return fail(500, listError.message);
-  if (!listing?.some((o) => o.name === filename)) {
-    return fail(409, "The upload has not finished. Keep this screen open until it does.");
+  const promptContract = prompt as unknown as PromptSubmissionContract;
+  const availabilityError = promptAvailabilityError(promptContract);
+  if (availabilityError) return fail(409, availabilityError);
+
+  const { data: mediaRows, error: mediaReadError } = await supabase
+    .from("submission_media")
+    .select(
+      "id, submission_id, media_type, bucket, storage_key, sort_order, width, height, duration, mime_type, file_size",
+    )
+    .eq("submission_id", capture.id)
+    .order("sort_order");
+  if (mediaReadError) return fail(500, mediaReadError.message);
+  if (!mediaRows?.length) return fail(409, "This submission has no media.");
+
+  const metadataById = new Map((body?.media ?? []).map((item) => [item.id, item]));
+  if (body?.media && metadataById.size !== body.media.length) {
+    return fail(400, "Each media item may appear only once.");
+  }
+  if (body?.media?.some((item) => !mediaRows.some((row) => row.id === item.id))) {
+    return fail(400, "A media item does not belong to this submission.");
+  }
+
+  const normalizedMedia = mediaRows.map((row, index) => {
+    const supplied = metadataById.get(row.id);
+    return {
+      row,
+      durationSeconds:
+        supplied?.durationSeconds ?? (index === 0 ? body?.durationSeconds : undefined) ?? row.duration,
+      width: supplied?.width ?? (index === 0 ? body?.width : undefined) ?? row.width,
+      height: supplied?.height ?? (index === 0 ? body?.height : undefined) ?? row.height,
+      mimeType: supplied?.mimeType ?? row.mime_type,
+      fileSize: supplied?.fileSize ?? row.file_size,
+    };
+  });
+
+  const contractError = submissionError(
+    promptContract,
+    normalizedMedia.map(
+      (item): SubmissionMediaFacts => ({
+        mediaType: item.row.media_type as PromptMediaType,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize,
+        width: item.width,
+        height: item.height,
+      }),
+    ),
+  );
+  if (contractError) return fail(400, contractError);
+
+  // Never accept a submission if any reserved object did not actually land.
+  const admin = createAdminClient();
+  for (const item of normalizedMedia) {
+    const slash = item.row.storage_key.lastIndexOf("/");
+    const dir = item.row.storage_key.slice(0, slash);
+    const filename = item.row.storage_key.slice(slash + 1);
+    const { data: listing, error: listError } = await admin.storage
+      .from(item.row.bucket)
+      .list(dir, { search: filename, limit: 1 });
+    if (listError) return fail(500, listError.message);
+    if (!listing?.some((object) => object.name === filename)) {
+      return fail(409, "An upload has not finished. Keep this screen open until it does.");
+    }
   }
 
   // Context and tags must be written while the capture is still `uploading` —
@@ -90,12 +168,29 @@ export async function POST(
     if (peopleError) return fail(500, peopleError.message);
   }
 
+  for (const item of normalizedMedia) {
+    const { error: mediaUpdateError } = await supabase
+      .from("submission_media")
+      .update({
+        duration: item.durationSeconds ?? null,
+        width: item.width ?? null,
+        height: item.height ?? null,
+        mime_type: item.mimeType ?? null,
+        file_size: item.fileSize ?? null,
+      })
+      .eq("id", item.row.id);
+    if (mediaUpdateError) return fail(500, mediaUpdateError.message);
+  }
+
+  const primary = normalizedMedia[0];
+  if (!primary) return fail(409, "This submission has no primary media.");
+
   const { error: updateError } = await supabase
     .from("captures")
     .update({
-      duration_s: body?.durationSeconds ?? null,
-      width: body?.width ?? null,
-      height: body?.height ?? null,
+      duration_s: primary.durationSeconds ?? null,
+      width: primary.width ?? null,
+      height: primary.height ?? null,
       captured_at: body?.capturedAt ?? new Date().toISOString(),
       checklist_ticked: body?.checklistTicked ?? [],
       guideline_version_ids: body?.guidelineVersionIds ?? [],
@@ -106,10 +201,12 @@ export async function POST(
     .eq("id", capture.id);
   if (updateError) return fail(500, updateError.message);
 
-  await admin
-    .from("assignments")
-    .update({ completed_at: new Date().toISOString() })
-    .eq("id", capture.assignment_id);
+  if (capture.assignment_id) {
+    await admin
+      .from("assignments")
+      .update({ completed_at: new Date().toISOString() })
+      .eq("id", capture.assignment_id);
+  }
 
   await admin.from("audit_log").insert({
     org_id: person.org_id,
@@ -117,7 +214,11 @@ export async function POST(
     action: "capture.submitted",
     subject_type: "capture",
     subject_id: capture.id,
-    detail: { people_tagged: peopleIds.length, no_people_in_frame: noPeopleInFrame },
+    detail: {
+      people_tagged: peopleIds.length,
+      no_people_in_frame: noPeopleInFrame,
+      media_count: normalizedMedia.length,
+    },
   });
 
   return json({ ok: true, captureId: capture.id });

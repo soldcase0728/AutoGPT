@@ -7,6 +7,10 @@
 export type PersonRole = "student" | "reviewer" | "admin";
 export type ConsentType = "media_release" | "parental" | "nil";
 export type CaptureKind = "video" | "photo";
+export type PromptCaptureMode = "ASSIGNED" | "OPEN_MOMENT";
+export type PromptMediaType = "PHOTO" | "VIDEO";
+export type PromptOrientation = "PORTRAIT" | "LANDSCAPE" | "ANY";
+export type PromptRepeatPolicy = "ONCE" | "MULTIPLE";
 export type ScanState = "pending" | "clean" | "infected" | "failed";
 export type CaptureState =
   | "uploading"
@@ -71,6 +75,34 @@ export interface Idea {
   format_spec: FormatSpec;
   reference_urls: string[];
   guideline_set_ids: string[];
+  capture_mode: PromptCaptureMode;
+  media_type: PromptMediaType;
+  min_media_count: number;
+  max_media_count: number;
+  required_orientation: PromptOrientation;
+  repeat_submission_policy: PromptRepeatPolicy;
+  opens_at: string | null;
+  closes_at: string | null;
+  max_image_size: number | null;
+  allowed_image_formats: string[] | null;
+  min_image_width: number | null;
+  min_image_height: number | null;
+}
+
+/** A media object belonging to the submission envelope stored in `captures`. */
+export interface SubmissionMedia {
+  id: string;
+  submission_id: string;
+  media_type: PromptMediaType;
+  bucket: string;
+  storage_key: string;
+  sort_order: number;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  mime_type: string | null;
+  file_size: number | null;
+  created_at: string;
 }
 
 export interface Assignment {

@@ -11,6 +11,19 @@ export function captureObjectName(
 }
 
 /**
+ * Stable key for normalized media rows. Keeping both IDs in the path makes a
+ * media object addressable without giving up the owner-first storage policy.
+ */
+export function submissionMediaObjectName(
+  personId: string,
+  submissionId: string,
+  mediaId: string,
+  originalFilename: string,
+): string {
+  return `${personId}/${submissionId}/${mediaId}/${safeFilename(originalFilename)}`;
+}
+
+/**
  * Phone filenames arrive with spaces, unicode, and occasionally path
  * separators. Reduce to something a URL and an object store both tolerate,
  * keeping the extension so players can sniff the type.
