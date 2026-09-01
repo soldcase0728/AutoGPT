@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { demoScreensEnabled } from "@/lib/demo";
 
 const SCREENS = [
   ["today", "Student · today's prompt"],
@@ -12,7 +13,7 @@ const SCREENS = [
 ];
 
 export default function PreviewIndex() {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (!demoScreensEnabled()) notFound();
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-12">

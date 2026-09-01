@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { publicEnv } from "../env";
+import { publicEnv, supabaseConfigured } from "../env";
+import { PREVIEW_PREFIX, demoScreensEnabled } from "../demo";
 
 const PUBLIC_PREFIXES = [
   "/login",
@@ -10,11 +11,32 @@ const PUBLIC_PREFIXES = [
   "/icon.svg",
 ];
 
-// Fixture-rendered screens for local development. The routes themselves 404 in
-// production, so this never widens access to anything real.
-const DEV_PUBLIC_PREFIXES = process.env.NODE_ENV === "production" ? [] : ["/preview"];
 
 export async function updateSession(request: NextRequest) {
+  // Served before the Supabase client is built: these screens hold nothing but
+  // fixtures, and a demo deployment has no project for the client to reach.
+  if (
+    request.nextUrl.pathname.startsWith(PREVIEW_PREFIX) &&
+    demoScreensEnabled()
+  ) {
+    return NextResponse.next({ request });
+  }
+
+  // A demo deployment has no Supabase project. Rather than 500 on every route,
+  // send people to the screens that do work.
+  if (!supabaseConfigured()) {
+    if (!demoScreensEnabled()) {
+      return new NextResponse(
+        "This deployment has no Supabase project configured. See student_capture/README.md.",
+        { status: 503, headers: { "content-type": "text/plain" } },
+      );
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = PREVIEW_PREFIX;
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -42,9 +64,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublic = [...PUBLIC_PREFIXES, ...DEV_PUBLIC_PREFIXES].some((p) =>
-    pathname.startsWith(p),
-  );
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

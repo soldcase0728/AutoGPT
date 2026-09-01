@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { demoScreensEnabled } from "@/lib/demo";
 import { TodayView } from "@/components/views/TodayView";
 import { SubmissionsView } from "@/components/views/SubmissionsView";
 import { ConsentView } from "@/components/views/ConsentView";
@@ -49,7 +50,7 @@ export default async function PreviewScreen({
 }: {
   params: Promise<{ screen: string }>;
 }) {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (!demoScreensEnabled()) notFound();
   const { screen } = await params;
 
   switch (screen) {

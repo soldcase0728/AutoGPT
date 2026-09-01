@@ -186,6 +186,16 @@ It fails on a non-200, an empty body, or a console error, which catches things
 `next build` and `tsc` both wave through — a server component handing a client
 component a function prop, for one.
 
+### Deploying a demo with no database
+
+Set `DEMO_SCREENS=1` at build time and the `/preview` screens are served in a
+production build. With no Supabase project configured the app redirects every
+route there, so the deployment is a usable walkthrough of the real UI rather
+than a wall of 500s. Off by default; the routes 404 without it.
+
+It is only safe because those screens render hard-coded fixtures — there is no
+database for them to read from.
+
 ## Verifying
 
 ```bash
