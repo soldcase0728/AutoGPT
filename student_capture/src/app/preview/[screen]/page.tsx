@@ -108,7 +108,7 @@ export default async function PreviewScreen({
     case "review":
       return (
         <main className="mx-auto max-w-6xl px-5 py-6">
-          <ReviewQueue rows={QUEUE} filter="open" mediaSrc="/preview-frame.png" />
+          <ReviewQueue rows={QUEUE} filter="open" mediaSrc="/preview-frame.svg" />
         </main>
       );
 
