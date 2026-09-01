@@ -1,0 +1,13 @@
+{
+  "name": "Capture",
+  "short_name": "Capture",
+  "description": "Today's prompt, and somewhere to put what you shot.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f0ec",
+  "theme_color": "#f0f0ec",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { currentPerson } from "@/lib/session";
+import { fail } from "@/lib/http";
+
+const SIGNED_URL_SECONDS = 60 * 30;
+
+/**
+ * Redirects to a short-lived signed URL for the capture. Visibility is decided
+ * by RLS on the read below; the signed URL is only minted once that read has
+ * already succeeded for this caller.
+ *
+ * Phase 1 always serves the master. When the ingest worker starts writing
+ * `proxy_key`, this is the one place that has to change.
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const person = await currentPerson();
+  if (!person) return fail(401, "Sign in first.");
+
+  const supabase = await createClient();
+  const { data: capture } = await supabase
+    .from("captures")
+    .select("id, bucket, storage_key, proxy_key, mime")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!capture) return fail(404, "That capture does not exist.");
+
+  const wantsDownload =
+    new URL(request.url).searchParams.get("disposition") === "attachment";
+
+  // Reviewing plays the proxy when one exists; downloading always takes the master.
+  const key = wantsDownload ? capture.storage_key : capture.proxy_key ?? capture.storage_key;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage
+    .from(capture.bucket)
+    .createSignedUrl(key, SIGNED_URL_SECONDS,
+      wantsDownload ? { download: key.split("/").pop() ?? "capture" } : undefined);
+
+  if (error || !data) return fail(500, error?.message ?? "Could not sign that file.");
+
+  return NextResponse.redirect(data.signedUrl, { status: 302 });
+}
