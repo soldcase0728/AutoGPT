@@ -12,8 +12,7 @@ export default async function LoginPage({
       <p className="label">Northside · daily capture</p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Sign in</h1>
       <p className="mt-2 text-[15px] leading-relaxed" style={{ color: "var(--muted)" }}>
-        We will email you a link. No password to remember, and it works on the phone
-        you shoot with.
+        Use your school email and temporary password. No email link is required.
       </p>
       <LoginForm next={next ?? "/"} />
     </main>
