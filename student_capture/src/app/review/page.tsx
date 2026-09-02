@@ -2,7 +2,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { createClient } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/session";
 import type { QueueRow } from "@/lib/types";
-import { ReviewQueue } from "./ReviewQueue";
+import { ReviewQueue, type WithdrawalRow } from "./ReviewQueue";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,37 @@ export default async function ReviewPage({
 
   query = state ? query.eq("state", state) : query.in("state", OPEN_STATES);
 
-  const { data, error } = await query;
+  const [{ data, error }, { data: withdrawalRequests }] = await Promise.all([
+    query,
+    supabase
+      .from("capture_withdrawal_requests")
+      .select("id, capture_id, reason, requested_at")
+      .is("decision", null)
+      .order("requested_at", { ascending: true })
+      .limit(100),
+  ]);
+
+  const withdrawalCaptureIds = (withdrawalRequests ?? []).map((row) => row.capture_id);
+  const { data: withdrawalCaptures } = withdrawalCaptureIds.length
+    ? await supabase
+        .from("review_queue")
+        .select("id, student, idea_title")
+        .in("id", withdrawalCaptureIds)
+    : { data: [] };
+  const withdrawalCaptureById = new Map(
+    (withdrawalCaptures ?? []).map((row) => [row.id, row]),
+  );
+  const withdrawals: WithdrawalRow[] = (withdrawalRequests ?? []).flatMap((request) => {
+    const capture = withdrawalCaptureById.get(request.capture_id);
+    return capture ? [{
+      id: request.id,
+      captureId: request.capture_id,
+      student: capture.student,
+      ideaTitle: capture.idea_title,
+      reason: request.reason,
+      requestedAt: request.requested_at,
+    }] : [];
+  });
 
   return (
     <>
@@ -36,7 +66,11 @@ export default async function ReviewPage({
             {error.message}
           </p>
         ) : (
-          <ReviewQueue rows={(data ?? []) as QueueRow[]} filter={state ?? "open"} />
+          <ReviewQueue
+            rows={(data ?? []) as QueueRow[]}
+            withdrawals={withdrawals}
+            filter={state ?? "open"}
+          />
         )}
       </main>
     </>

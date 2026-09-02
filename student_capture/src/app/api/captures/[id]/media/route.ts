@@ -25,11 +25,17 @@ export async function GET(
   const supabase = await createClient();
   const { data: capture } = await supabase
     .from("captures")
-    .select("id, bucket, storage_key, proxy_key, mime")
+    .select("id, person_id, state, bucket, storage_key, proxy_key, mime")
     .eq("id", id)
     .maybeSingle();
 
   if (!capture) return fail(404, "That capture does not exist.");
+  if (
+    capture.person_id !== person.id &&
+    (capture.state === "withdrawal_requested" || capture.state === "withdrawn")
+  ) {
+    return fail(404, "That capture is no longer available to the marketing desk.");
+  }
 
   const searchParams = new URL(request.url).searchParams;
   const wantsDownload = searchParams.get("disposition") === "attachment";

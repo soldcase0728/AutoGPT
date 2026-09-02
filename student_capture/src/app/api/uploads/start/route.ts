@@ -12,6 +12,8 @@ import {
 
 interface Body {
   assignmentId: string;
+  clientSubmissionId?: string;
+  clientMediaId: string;
   filename: string;
   mime: string;
   bytes: number;
@@ -19,6 +21,8 @@ interface Body {
   /** Present when reserving another object for an uploading submission. */
   captureId?: string;
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Reserves a capture row and an object key. The file itself never touches this
@@ -30,8 +34,11 @@ export async function POST(request: Request) {
   if (!person) return fail(401, "Sign in first.");
 
   const body = await readJson<Body>(request);
-  if (!body?.assignmentId || !body.filename) {
-    return fail(400, "assignmentId and filename are required.");
+  if (!body?.assignmentId || !body.filename || !UUID.test(body.clientMediaId ?? "")) {
+    return fail(400, "assignmentId, filename, and clientMediaId are required.");
+  }
+  if (!body.captureId && !UUID.test(body.clientSubmissionId ?? "")) {
+    return fail(400, "clientSubmissionId is required for a new submission.");
   }
   if (body.kind !== "photo" && body.kind !== "video") {
     return fail(400, "kind must be photo or video.");
@@ -95,6 +102,22 @@ export async function POST(request: Request) {
       return fail(409, "That submission has already been submitted.");
     }
 
+    const { data: retriedMedia } = await supabase
+      .from("submission_media")
+      .select("id, bucket, storage_key, sort_order")
+      .eq("submission_id", capture.id)
+      .eq("client_media_id", body.clientMediaId)
+      .maybeSingle();
+    if (retriedMedia) {
+      return json({
+        captureId: capture.id,
+        mediaId: retriedMedia.id,
+        bucket: retriedMedia.bucket,
+        objectName: retriedMedia.storage_key,
+        sortOrder: retriedMedia.sort_order,
+      });
+    }
+
     const { data: existing, error: mediaReadError } = await supabase
       .from("submission_media")
       .select("id, sort_order")
@@ -120,11 +143,69 @@ export async function POST(request: Request) {
       bucket,
       storage_key: objectName,
       sort_order: sortOrder,
+      client_media_id: body.clientMediaId,
       mime_type: body.mime || null,
       file_size: body.bytes,
     });
-    if (mediaInsertError) return fail(500, mediaInsertError.message);
+    if (mediaInsertError) {
+      if (mediaInsertError.code === "23505") {
+        const { data: concurrentRetry } = await supabase
+          .from("submission_media")
+          .select("id, bucket, storage_key, sort_order")
+          .eq("submission_id", capture.id)
+          .eq("client_media_id", body.clientMediaId)
+          .maybeSingle();
+        if (concurrentRetry) {
+          return json({
+            captureId: capture.id,
+            mediaId: concurrentRetry.id,
+            bucket: concurrentRetry.bucket,
+            objectName: concurrentRetry.storage_key,
+            sortOrder: concurrentRetry.sort_order,
+          });
+        }
+      }
+      return fail(500, mediaInsertError.message);
+    }
     return json({ captureId: capture.id, mediaId, bucket, objectName, sortOrder });
+  }
+
+  const { data: retriedCapture } = await supabase
+    .from("captures")
+    .select("id, assignment_id, state, bucket")
+    .eq("person_id", person.id)
+    .eq("client_submission_id", body.clientSubmissionId!)
+    .maybeSingle();
+  if (retriedCapture) {
+    if (retriedCapture.assignment_id !== assignment.id) {
+      return fail(409, "That retry key belongs to a different prompt.");
+    }
+    if (retriedCapture.state !== "uploading") {
+      return fail(409, "That submission has already been submitted.");
+    }
+    const { data: primaryMedia, error: primaryError } = await supabase
+      .from("submission_media")
+      .select("id, bucket, storage_key, sort_order, client_media_id")
+      .eq("submission_id", retriedCapture.id)
+      .eq("sort_order", 0)
+      .single();
+    if (primaryError) return fail(500, primaryError.message);
+    if (!primaryMedia.client_media_id) {
+      const { error: claimError } = await supabase
+        .from("submission_media")
+        .update({ client_media_id: body.clientMediaId })
+        .eq("id", primaryMedia.id);
+      if (claimError) return fail(500, claimError.message);
+    } else if (primaryMedia.client_media_id !== body.clientMediaId) {
+      return fail(409, "That submission already has a different first media item.");
+    }
+    return json({
+      captureId: retriedCapture.id,
+      mediaId: primaryMedia.id,
+      bucket: primaryMedia.bucket,
+      objectName: primaryMedia.storage_key,
+      sortOrder: primaryMedia.sort_order,
+    });
   }
 
   const captureId = crypto.randomUUID();
@@ -144,10 +225,43 @@ export async function POST(request: Request) {
     kind: body.kind === "photo" ? "photo" : "video",
     mime: body.mime || null,
     master_bytes: body.bytes,
+    client_submission_id: body.clientSubmissionId,
     state: "uploading",
   });
 
-  if (error) return fail(500, error.message);
+  if (error) {
+    if (error.code === "23505") {
+      const { data: concurrentCapture } = await supabase
+        .from("captures")
+        .select("id, state")
+        .eq("person_id", person.id)
+        .eq("client_submission_id", body.clientSubmissionId!)
+        .maybeSingle();
+      if (concurrentCapture?.state === "uploading") {
+        const { data: concurrentMedia } = await supabase
+          .from("submission_media")
+          .select("id, bucket, storage_key, sort_order")
+          .eq("submission_id", concurrentCapture.id)
+          .eq("sort_order", 0)
+          .single();
+        if (concurrentMedia) {
+          await supabase
+            .from("submission_media")
+            .update({ client_media_id: body.clientMediaId })
+            .eq("id", concurrentMedia.id)
+            .is("client_media_id", null);
+          return json({
+            captureId: concurrentCapture.id,
+            mediaId: concurrentMedia.id,
+            bucket: concurrentMedia.bucket,
+            objectName: concurrentMedia.storage_key,
+            sortOrder: concurrentMedia.sort_order,
+          });
+        }
+      }
+    }
+    return fail(500, error.message);
+  }
 
   const { data: primaryMedia, error: mediaErrorAfterInsert } = await supabase
     .from("submission_media")
@@ -156,6 +270,12 @@ export async function POST(request: Request) {
     .eq("sort_order", 0)
     .single();
   if (mediaErrorAfterInsert) return fail(500, mediaErrorAfterInsert.message);
+
+  const { error: mediaClaimError } = await supabase
+    .from("submission_media")
+    .update({ client_media_id: body.clientMediaId })
+    .eq("id", primaryMedia.id);
+  if (mediaClaimError) return fail(500, mediaClaimError.message);
 
   return json({
     captureId,

@@ -17,6 +17,8 @@ export type CaptureState =
   | "uploading"
   | "submitted"
   | "in_review"
+  | "withdrawal_requested"
+  | "withdrawn"
   | "approved"
   | "changes_requested"
   | "rejected"
@@ -146,6 +148,11 @@ export interface QueueRow {
   checklist_ticked: string[];
   created_at: string;
   submitted_at: string | null;
+  state_changed_at: string;
+  review_started_at: string | null;
+  review_started_by: string | null;
+  withdrawn_at: string | null;
+  retention_due_at: string | null;
   one_liner: string | null;
   location_label: string | null;
   idea_id: string;

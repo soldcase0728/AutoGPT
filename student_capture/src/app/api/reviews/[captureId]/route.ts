@@ -1,11 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { fail, json, readJson } from "@/lib/http";
 import type { CaptureState } from "@/lib/types";
 
 const DECISIONS: CaptureState[] = [
-  "in_review",
   "approved",
   "changes_requested",
   "rejected",
@@ -38,41 +36,22 @@ export async function POST(
 
   const supabase = await createClient();
 
-  // State first. The publish barrier lives in the database, so a refused
-  // publish must not leave a review row claiming the capture went out.
-  const { error: stateError } = await supabase
-    .from("captures")
-    .update({ state: body.decision })
-    .eq("id", captureId);
+  // One RPC locks the row and writes the state, review, and audit entry in the
+  // same transaction. The database transition graph is the final authority.
+  const { data, error: stateError } = await supabase.rpc("review_capture", {
+    p_capture_id: captureId,
+    p_decision: body.decision,
+    p_note: body.note?.trim() || null,
+  });
 
   if (stateError) {
-    const admin = createAdminClient();
-    const { data: blockers } = await admin.rpc("capture_consent_blockers", {
+    const { data: blockers } = await supabase.rpc("capture_consent_blockers", {
       p_capture_id: captureId,
     });
     if (blockers && Array.isArray(blockers) && blockers.length > 0) {
       return fail(409, "This capture is not cleared for publication.", { blockers });
     }
-    return fail(500, stateError.message);
+    return fail(stateError.code === "23514" ? 409 : 500, stateError.message);
   }
-
-  const { error: reviewError } = await supabase.from("reviews").insert({
-    capture_id: captureId,
-    reviewer_id: person.id,
-    state: body.decision,
-    note: body.note?.trim() || null,
-  });
-  if (reviewError) return fail(500, reviewError.message);
-
-  const admin = createAdminClient();
-  await admin.from("audit_log").insert({
-    org_id: person.org_id,
-    actor_id: person.id,
-    action: `capture.${body.decision}`,
-    subject_type: "capture",
-    subject_id: captureId,
-    detail: { note: body.note?.trim() || null },
-  });
-
-  return json({ ok: true, state: body.decision });
+  return json({ ok: true, state: data });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Chip } from "@/components/Chip";
 import { describeBlocker, publishable } from "@/lib/consent";
@@ -21,6 +21,7 @@ const KEYS: Record<string, Decision> = {
 
 export function ReviewQueue({
   rows,
+  withdrawals = [],
   filter,
   /**
    * Plays this file for every row instead of each capture's own signed URL.
@@ -30,6 +31,7 @@ export function ReviewQueue({
   mediaSrc,
 }: {
   rows: QueueRow[];
+  withdrawals?: WithdrawalRow[];
   filter: string;
   mediaSrc?: string;
 }) {
@@ -39,12 +41,37 @@ export function ReviewQueue({
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [takingDown, setTakingDown] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const openedRef = useRef(new Set<string>());
 
   const current = rows[Math.min(index, rows.length - 1)];
 
+  useEffect(() => {
+    if (!current || current.state !== "submitted" || opening || openedRef.current.has(current.id)) return;
+    openedRef.current.add(current.id);
+    setOpening(true);
+    setError("");
+    void fetch(`/api/reviews/${current.id}/open`, { method: "POST" }).then(async (response) => {
+      setOpening(false);
+      if (!response.ok) {
+        openedRef.current.delete(current.id);
+        const body = await response.json().catch(() => ({ error: "Could not open this review." }));
+        setError(body.error ?? "Could not open this review.");
+        return;
+      }
+      router.refresh();
+    });
+  }, [current, opening, router]);
+
   const decide = useCallback(
     async (decision: Decision) => {
-      if (!current || busy) return;
+      if (!current || busy || opening || current.state === "submitted") return;
+      const allowed =
+        (decision === "published" && current.state === "approved") ||
+        (decision === "changes_requested" && current.state === "in_review") ||
+        (["approved", "rejected"].includes(decision) &&
+          ["in_review", "changes_requested"].includes(current.state));
+      if (!allowed) return;
       if (decision === "changes_requested" && !note.trim()) {
         setError("Say what needs changing — the student only sees the note.");
         return;
@@ -69,7 +96,7 @@ export function ReviewQueue({
       setIndex((i) => Math.min(i + 1, Math.max(rows.length - 2, 0)));
       router.refresh();
     },
-    [busy, current, note, rows.length, router],
+    [busy, current, note, opening, rows.length, router],
   );
 
   // Reviewing is a two-hand job: one on the keyboard, one on the coffee.
@@ -93,7 +120,7 @@ export function ReviewQueue({
     return () => window.removeEventListener("keydown", onKey);
   }, [decide, rows.length]);
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && withdrawals.length === 0) {
     return (
       <div className="card p-8 text-center">
         <p className="text-lg font-semibold">Queue is clear</p>
@@ -108,7 +135,19 @@ export function ReviewQueue({
   const canPublish = publishable(blockers);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+    <div className="flex flex-col gap-6">
+      {withdrawals.length > 0 && (
+        <WithdrawalInbox rows={withdrawals} onSaved={() => router.refresh()} />
+      )}
+      {rows.length === 0 ? (
+        <div className="card p-8 text-center">
+          <p className="text-lg font-semibold">Review queue is clear</p>
+          <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
+            The withdrawal requests above are the only items needing action.
+          </p>
+        </div>
+      ) : (
+      <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
       {/* the queue */}
       <aside className="flex max-h-[78vh] flex-col gap-2 overflow-y-auto pr-1">
         <div className="flex items-center justify-between">
@@ -245,22 +284,22 @@ export function ReviewQueue({
             />
 
             <div className="mt-3 flex flex-wrap gap-2">
-              <button className="btn" disabled={busy} onClick={() => decide("approved")}>
+              <button className="btn" disabled={busy || opening || !["in_review", "changes_requested"].includes(current.state)} onClick={() => decide("approved")}>
                 Approve <kbd className="ml-1 font-mono text-xs opacity-60">A</kbd>
               </button>
               <button
                 className="btn btn-quiet"
-                disabled={busy}
+                disabled={busy || opening || current.state !== "in_review"}
                 onClick={() => decide("changes_requested")}
               >
                 Ask for changes <kbd className="ml-1 font-mono text-xs opacity-60">R</kbd>
               </button>
-              <button className="btn btn-quiet" disabled={busy} onClick={() => decide("rejected")}>
+              <button className="btn btn-quiet" disabled={busy || opening || !["in_review", "changes_requested"].includes(current.state)} onClick={() => decide("rejected")}>
                 Reject <kbd className="ml-1 font-mono text-xs opacity-60">X</kbd>
               </button>
               <button
                 className="btn btn-quiet"
-                disabled={busy || !canPublish}
+                disabled={busy || opening || !canPublish || current.state !== "approved"}
                 title={canPublish ? undefined : "Blocked by the consent gate"}
                 onClick={() => decide("published")}
               >
@@ -321,6 +360,64 @@ export function ReviewQueue({
           </div>
         </section>
       )}
+      </div>
+      )}
     </div>
+  );
+}
+
+export interface WithdrawalRow {
+  id: string;
+  captureId: string;
+  student: string;
+  ideaTitle: string;
+  reason: string | null;
+  requestedAt: string;
+}
+
+function WithdrawalInbox({ rows, onSaved }: { rows: WithdrawalRow[]; onSaved: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  async function decide(row: WithdrawalRow, decision: "approved" | "denied") {
+    const reason = decision === "denied"
+      ? window.prompt("Why can this not be withdrawn yet? This is shown to the student.", "")
+      : "";
+    if (reason === null || (decision === "denied" && !reason.trim())) return;
+    setBusy(row.id);
+    setError("");
+    const response = await fetch(`/api/withdrawals/${row.id}/decision`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ decision, reason: reason || undefined }),
+    });
+    setBusy(null);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "That did not save." }));
+      setError(body.error ?? "That did not save.");
+      return;
+    }
+    onSaved();
+  }
+
+  return (
+    <section className="card p-5" style={{ borderColor: "var(--clay)" }}>
+      <p className="label" style={{ color: "var(--clay)" }}>Withdrawal requests · {rows.length}</p>
+      <ul className="mt-3 flex flex-col gap-3">
+        {rows.map((row) => (
+          <li key={row.id} className="border-t pt-3 first:border-t-0 first:pt-0" style={{ borderColor: "var(--rule)" }}>
+            <p className="font-semibold">{row.student} · {row.ideaTitle}</p>
+            <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+              {row.reason || "No reason given."} · {new Date(row.requestedAt).toLocaleString()}
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button className="btn" disabled={busy === row.id} onClick={() => void decide(row, "approved")}>Approve withdrawal</button>
+              <button className="btn btn-quiet" disabled={busy === row.id} onClick={() => void decide(row, "denied")}>Keep in workflow</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-3 text-sm" style={{ color: "var(--clay)" }}>{error}</p>}
+    </section>
   );
 }

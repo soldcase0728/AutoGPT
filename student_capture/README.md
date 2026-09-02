@@ -166,6 +166,19 @@ curl -X POST https://your-app/api/assignments/run \
 
 Point cron at it for 7am in your timezone. Drop `dryRun` to actually assign.
 
+Use the same secret for the daily retention pass. Rejected and withdrawn
+captures are marked for deletion after 30 days; this endpoint removes the
+private Storage objects in batches and records the deletion in `audit_log`:
+
+```bash
+curl -X POST https://your-app/api/retention/run \
+  -H "x-capture-cron-secret: $CAPTURE_CRON_SECRET"
+```
+
+Students can withdraw an upload or an unreviewed submission immediately from
+**Yours**. Once a reviewer opens it, the same action creates a staff request;
+the media disappears from staff playback while that request is pending.
+
 ## Looking at it without a Supabase project
 
 ```bash

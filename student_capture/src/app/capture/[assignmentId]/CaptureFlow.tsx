@@ -63,6 +63,7 @@ export function CaptureFlow({
 }: Props) {
   const router = useRouter();
   const uploadRef = useRef<tus.Upload[]>([]);
+  const identityRef = useRef<{ submissionId: string; mediaIds: string[] } | null>(null);
 
   const [ticked, setTicked] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -90,6 +91,36 @@ export function CaptureFlow({
   const canSubmit =
     upload === "done" && (!captionRequired || oneLiner.trim().length > 0) && peopleDecided && !submitting;
 
+  const pendingIdentity = useCallback((mediaCount: number) => {
+    if (!identityRef.current) {
+      const key = `student-capture:pending:${assignmentId}`;
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(key) ?? "null") as {
+          submissionId?: string;
+          mediaIds?: string[];
+        } | null;
+        if (saved?.submissionId && Array.isArray(saved.mediaIds)) {
+          identityRef.current = {
+            submissionId: saved.submissionId,
+            mediaIds: saved.mediaIds,
+          };
+        }
+      } catch {
+        // A malformed local hint is safe to replace; the server still owns
+        // uniqueness and authorization.
+      }
+      identityRef.current ??= { submissionId: crypto.randomUUID(), mediaIds: [] };
+    }
+    while (identityRef.current.mediaIds.length < mediaCount) {
+      identityRef.current.mediaIds.push(crypto.randomUUID());
+    }
+    window.localStorage.setItem(
+      `student-capture:pending:${assignmentId}`,
+      JSON.stringify(identityRef.current),
+    );
+    return identityRef.current;
+  }, [assignmentId]);
+
   const startUpload = useCallback(
     async (chosenFiles: File[]) => {
       setError("");
@@ -108,6 +139,7 @@ export function CaptureFlow({
 
       let submissionId: string | null = null;
       const metadata: MediaMetadata[] = [];
+      const identity = pendingIdentity(chosenFiles.length);
       try {
         for (let index = 0; index < chosenFiles.length; index += 1) {
           const chosen = chosenFiles[index]!;
@@ -117,6 +149,8 @@ export function CaptureFlow({
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               assignmentId,
+              clientSubmissionId: identity.submissionId,
+              clientMediaId: identity.mediaIds[index],
               captureId: submissionId ?? undefined,
               filename: chosen.name,
               mime: chosen.type,
@@ -179,7 +213,7 @@ export function CaptureFlow({
         setError(uploadError instanceof Error ? uploadError.message : "The upload stopped.");
       }
     },
-    [assignmentId, supabaseUrl],
+    [assignmentId, pendingIdentity, supabaseUrl],
   );
 
   async function onPick(event: React.ChangeEvent<HTMLInputElement>) {
@@ -229,6 +263,8 @@ export function CaptureFlow({
       setError(body.error ?? "Could not send that.");
       return;
     }
+
+    window.localStorage.removeItem(`student-capture:pending:${assignmentId}`);
 
     router.push("/submissions");
     router.refresh();

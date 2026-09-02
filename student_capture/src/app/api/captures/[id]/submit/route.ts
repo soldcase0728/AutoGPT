@@ -69,7 +69,18 @@ export async function POST(
   if (!capture) return fail(404, "That capture does not exist.");
   if (capture.person_id !== person.id) return fail(403, "That capture is not yours.");
   if (capture.state !== "uploading") {
-    return fail(409, "That capture has already been submitted.");
+    if (["submitted", "in_review", "approved", "changes_requested", "rejected", "published"].includes(capture.state)) {
+      return json({ ok: true, captureId: capture.id, alreadySubmitted: true });
+    }
+    return fail(409, "That capture can no longer be submitted.");
+  }
+  if (person.participation !== "active") {
+    return fail(
+      403,
+      person.participation === "revoked"
+        ? "Your account became read-only before this upload finished. The file was not submitted."
+        : "Your account must be approved before this upload can be submitted.",
+    );
   }
 
   const { data: prompt, error: promptError } = await supabase
