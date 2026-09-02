@@ -1,39 +1,36 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm({ next }: { next: string }) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<"idle" | "signing-in" | "error">("idle");
   const [message, setMessage] = useState("");
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setStatus("sending");
+    setStatus("signing-in");
+    setMessage("");
 
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: { emailRedirectTo: redirectTo },
+      password,
     });
 
     if (error) {
       setStatus("error");
-      setMessage(error.message);
+      setMessage("The email or password is incorrect.");
       return;
     }
-    setStatus("sent");
-  }
 
-  if (status === "sent") {
-    return (
-      <p className="mt-8 text-[15px] leading-relaxed">
-        Check <strong>{email}</strong>. The link signs you straight in — open it on your
-        phone if that is where you shoot.
-      </p>
-    );
+    const destination = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    router.replace(destination);
+    router.refresh();
   }
 
   return (
@@ -53,8 +50,21 @@ export function LoginForm({ next }: { next: string }) {
         style={{ background: "var(--surface)" }}
         placeholder="you@example.edu"
       />
-      <button className="btn mt-1" disabled={status === "sending"}>
-        {status === "sending" ? "Sending…" : "Email me a link"}
+      <label className="label mt-2" htmlFor="password">
+        Password
+      </label>
+      <input
+        id="password"
+        type="password"
+        required
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className="card px-3 py-3"
+        style={{ background: "var(--surface)" }}
+      />
+      <button className="btn mt-1" disabled={status === "signing-in"}>
+        {status === "signing-in" ? "Signing in…" : "Sign in"}
       </button>
       {status === "error" && (
         <p className="text-sm" style={{ color: "var(--clay)" }}>
