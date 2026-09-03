@@ -517,9 +517,15 @@ $$;
 
 create or replace function capture_safety_ok(p_capture_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
-  with latest as (
-    select s.* from safety_screens s join captures c on c.id = s.capture_id
-     where s.capture_id = p_capture_id and s.media_revision = c.media_revision
+  with authorized_capture as (
+    select c.id, c.media_revision from captures c
+     where c.id = p_capture_id and (
+       auth.uid() is null
+       or c.person_id = app_current_person_id()
+       or (app_is_staff() and c.org_id = app_current_org_id()))
+  ), latest as (
+    select s.* from safety_screens s join authorized_capture c on c.id = s.capture_id
+     where s.media_revision = c.media_revision
      order by s.created_at desc limit 1
   )
   select coalesce((select
@@ -534,18 +540,26 @@ $$;
 
 create or replace function capture_publication_blockers(p_capture_id uuid)
 returns jsonb language plpgsql stable security definer set search_path = public, pg_temp as $$
-declare v_blockers jsonb := capture_consent_blockers(p_capture_id); v_screen safety_screens;
+declare v_blockers jsonb := '[]'::jsonb; v_screen safety_screens;
         v_capture captures; v_participation participation_state; v_deactivated timestamptz;
 begin
   select * into v_capture from captures where id = p_capture_id;
-  if found then
-    select p.participation, p.deactivated_at into v_participation, v_deactivated
-      from people p where p.id = v_capture.person_id;
+  if not found then
+    return jsonb_build_array(jsonb_build_object('reason', 'capture_not_found'));
   end if;
-  if found and (v_participation <> 'active' or v_deactivated is not null) then
+  if auth.uid() is not null and not coalesce((
+    v_capture.person_id = app_current_person_id()
+    or (app_is_staff() and v_capture.org_id = app_current_org_id())
+  ), false) then
+    raise exception 'capture does not exist' using errcode = 'insufficient_privilege';
+  end if;
+  v_blockers := capture_consent_blockers(p_capture_id);
+  select p.participation, p.deactivated_at into v_participation, v_deactivated
+    from people p where p.id = v_capture.person_id;
+  if v_participation is distinct from 'active' or v_deactivated is not null then
     v_blockers := v_blockers || jsonb_build_object('reason', 'account_restricted');
   end if;
-  if found and v_capture.takedown_at is not null then
+  if v_capture.takedown_at is not null then
     v_blockers := v_blockers || jsonb_build_object('reason', 'capture_taken_down');
   end if;
   select s.* into v_screen from safety_screens s join captures c on c.id = s.capture_id
