@@ -8,6 +8,7 @@ const PUBLIC_PREFIXES = [
   "/auth/callback",
   "/api/assignments/run", // guarded by its own shared secret
   "/api/retention/run", // guarded by the same shared secret
+  "/api/internal/safety/process", // guarded by SAFETY_WORKER_SECRET
   "/manifest.webmanifest",
   "/icon.svg",
 ];
