@@ -342,8 +342,11 @@ begin
     lease_expires_at = now() + make_interval(secs => greatest(30, p_lease_seconds))
     where id = v_job.id returning * into v_job;
   update safety_screens set status = 'processing', started_at = coalesce(started_at, now()),
+    completed_at = null, error_code = null, error_detail_safe = null,
     attempt_count = greatest(attempt_count, v_job.attempt_count)
-    where id = v_job.safety_screen_id and status = 'pending';
+    where id = v_job.safety_screen_id
+      and (status = 'pending'
+        or (status = 'screening_failed' and error_code = 'worker_unavailable'));
   return v_job;
 end;
 $$;
