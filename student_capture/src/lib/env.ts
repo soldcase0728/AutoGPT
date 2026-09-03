@@ -31,4 +31,6 @@ export const serverEnv = {
   serviceRoleKey: () =>
     required("SUPABASE_SERVICE_ROLE_KEY", process.env.SUPABASE_SERVICE_ROLE_KEY),
   cronSecret: () => required("CAPTURE_CRON_SECRET", process.env.CAPTURE_CRON_SECRET),
+  safetyWorkerSecret: () =>
+    required("SAFETY_WORKER_SECRET", process.env.SAFETY_WORKER_SECRET),
 };

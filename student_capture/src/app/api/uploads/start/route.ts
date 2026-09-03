@@ -91,7 +91,7 @@ export async function POST(request: Request) {
   if (body.captureId) {
     const { data: capture } = await supabase
       .from("captures")
-      .select("id, assignment_id, person_id, state")
+      .select("id, assignment_id, person_id, state, media_revision")
       .eq("id", body.captureId)
       .maybeSingle();
     if (!capture) return fail(404, "That submission does not exist.");
@@ -106,6 +106,7 @@ export async function POST(request: Request) {
       .from("submission_media")
       .select("id, bucket, storage_key, sort_order")
       .eq("submission_id", capture.id)
+      .eq("media_revision", capture.media_revision)
       .eq("client_media_id", body.clientMediaId)
       .maybeSingle();
     if (retriedMedia) {
@@ -122,6 +123,7 @@ export async function POST(request: Request) {
       .from("submission_media")
       .select("id, sort_order")
       .eq("submission_id", capture.id)
+      .eq("media_revision", capture.media_revision)
       .order("sort_order");
     if (mediaReadError) return fail(500, mediaReadError.message);
     if ((existing?.length ?? 0) >= prompt.max_media_count) {
@@ -144,6 +146,7 @@ export async function POST(request: Request) {
       storage_key: objectName,
       sort_order: sortOrder,
       client_media_id: body.clientMediaId,
+      media_revision: capture.media_revision,
       mime_type: body.mime || null,
       file_size: body.bytes,
     });

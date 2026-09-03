@@ -13,6 +13,11 @@ export type MediaObjectType = "video" | "photo";
 export type PromptOrientation = "portrait" | "landscape" | "square" | "any";
 export type PromptRepeatPolicy = "ONCE" | "MULTIPLE";
 export type ScanState = "pending" | "clean" | "infected" | "failed";
+export type SafetyScreenStatus =
+  | "pending" | "processing" | "no_flags" | "flags_detected"
+  | "screening_failed" | "cancelled" | "superseded";
+export type SafetySeverity = "low" | "medium" | "high";
+export type SafetyResolution = "unreviewed" | "accepted_context" | "false_positive" | "addressed";
 export type CaptureState =
   | "uploading"
   | "submitted"
@@ -132,6 +137,7 @@ export interface QueueRow {
   org_id: string;
   person_id: string;
   student: string;
+  student_participation: ParticipationState;
   state: CaptureState;
   kind: CaptureKind;
   mime: string | null;
@@ -171,4 +177,32 @@ export interface QueueRow {
     mime_type: string | null;
     file_size: number | null;
   }>;
+}
+
+export interface SafetyFinding {
+  id: string;
+  safety_screen_id: string;
+  submission_media_id: string;
+  category: string;
+  severity: SafetySeverity;
+  confidence: number;
+  description: string;
+  start_ms: number | null;
+  end_ms: number | null;
+  bounding_box: { x: number; y: number; width: number; height: number } | null;
+  detector: string;
+  resolution_status: SafetyResolution;
+  resolution_reason: string | null;
+}
+
+export interface CaptureSafetyReview {
+  capture_id: string;
+  safety_screen_id: string;
+  safety_status: SafetyScreenStatus;
+  overall_risk_level: SafetySeverity | null;
+  error_code: string | null;
+  finding_count: number;
+  unresolved_finding_count: number;
+  failed_scan_overridden: boolean;
+  findings: SafetyFinding[];
 }

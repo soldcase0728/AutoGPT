@@ -13,10 +13,13 @@ export const dynamic = "force-dynamic";
 
 export default async function CapturePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ assignmentId: string }>;
+  searchParams: Promise<{ resubmit?: string }>;
 }) {
   const { assignmentId } = await params;
+  const { resubmit } = await searchParams;
   const person = await requirePerson();
   if (person.role === "student" && !(await hasSignedRelease(person.id, RELEASE_VERSION))) {
     redirect("/consent");
@@ -70,6 +73,7 @@ export default async function CapturePage({
           campaign={idea.campaigns?.name}
         />
         <CaptureFlow
+          initialCaptureId={resubmit}
           assignmentId={assignment.id}
           ideaId={idea.id}
           spec={idea.format_spec}

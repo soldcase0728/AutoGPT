@@ -57,12 +57,15 @@ export async function POST(request: Request) {
 
   const { data: rows, error } = await query;
   if (error) return fail(500, error.message);
-  if (!rows?.length) return json({ exported: 0, results: [] });
+  const eligibleRows = state === "published" ? (rows ?? []) : (await Promise.all(
+    (rows ?? []).map(async (row) => ({ row, result: await supabase.rpc("capture_ready_to_post", { p_capture_id: row.id }) })),
+  )).filter(({ result }) => result.data === true).map(({ row }) => row);
+  if (!eligibleRows.length) return json({ exported: 0, results: [] });
 
   const admin = createAdminClient();
   const results: Array<Record<string, unknown>> = [];
 
-  for (const row of rows) {
+  for (const row of eligibleRows) {
     try {
       const { data: signed, error: signError } = await admin.storage
         .from(row.bucket)

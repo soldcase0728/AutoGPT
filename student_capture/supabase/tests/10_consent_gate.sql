@@ -85,6 +85,10 @@ select t_assert((select state from captures
                 'blocked capture must not have changed state');
 
 -- 7. A clear capture publishes.
+insert into safety_screens(org_id, capture_id, media_revision, media_manifest,
+                           media_manifest_hash, status, completed_at)
+values (:'org', 'c0000000-0000-0000-0000-000000000001', 1, '[]',
+        'consent-test-clean', 'no_flags', now());
 update captures set state = 'published'
  where id = 'c0000000-0000-0000-0000-000000000001';
 

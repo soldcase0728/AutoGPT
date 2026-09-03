@@ -1,7 +1,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { createClient } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/session";
-import type { QueueRow } from "@/lib/types";
+import type { CaptureSafetyReview, QueueRow, SafetyFinding } from "@/lib/types";
 import { ReviewQueue, type WithdrawalRow } from "./ReviewQueue";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +34,27 @@ export default async function ReviewPage({
       .order("requested_at", { ascending: true })
       .limit(100),
   ]);
+
+  const captureIds = (data ?? []).map((row) => row.id);
+  const { data: safetySummaries } = captureIds.length
+    ? await supabase.from("review_safety_summary").select("*").in("capture_id", captureIds)
+    : { data: [] };
+  const screenIds = (safetySummaries ?? []).map((row) => row.safety_screen_id);
+  const { data: safetyFindings } = screenIds.length
+    ? await supabase.from("safety_findings")
+        .select("id,safety_screen_id,submission_media_id,category,severity,confidence,description,start_ms,end_ms,bounding_box,detector,resolution_status,resolution_reason")
+        .in("safety_screen_id", screenIds).order("created_at")
+    : { data: [] };
+  const findingsByScreen = new Map<string, SafetyFinding[]>();
+  for (const finding of (safetyFindings ?? []) as SafetyFinding[]) {
+    findingsByScreen.set(finding.safety_screen_id, [...(findingsByScreen.get(finding.safety_screen_id) ?? []), finding]);
+  }
+  const safetyReviews = (safetySummaries ?? []).map((summary) => ({
+    ...summary,
+    finding_count: Number(summary.finding_count),
+    unresolved_finding_count: Number(summary.unresolved_finding_count),
+    findings: findingsByScreen.get(summary.safety_screen_id) ?? [],
+  })) as CaptureSafetyReview[];
 
   const withdrawalCaptureIds = (withdrawalRequests ?? []).map((row) => row.capture_id);
   const { data: withdrawalCaptures } = withdrawalCaptureIds.length
@@ -69,6 +90,7 @@ export default async function ReviewPage({
           <ReviewQueue
             rows={(data ?? []) as QueueRow[]}
             withdrawals={withdrawals}
+            safetyReviews={safetyReviews}
             filter={state ?? "open"}
           />
         )}

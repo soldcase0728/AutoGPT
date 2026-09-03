@@ -81,6 +81,21 @@ export function SubmissionsView({ person, rows }: { person: Person; rows: Submis
     router.refresh();
   }
 
+  async function resubmit(row: SubmissionRow) {
+    if (!row.captureId || !row.actionHref || busy) return;
+    setBusy(row.id);
+    setError("");
+    const response = await fetch(`/api/captures/${row.captureId}/resubmit`, { method: "POST" });
+    setBusy(null);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Could not start the reshoot." }));
+      setError(body.error ?? "Could not start the reshoot.");
+      return;
+    }
+    router.push(row.actionHref);
+    router.refresh();
+  }
+
   return (
     <>
       <AppHeader person={person} />
@@ -115,7 +130,9 @@ export function SubmissionsView({ person, rows }: { person: Person; rows: Submis
                 )}
                 {(row.actionHref || row.withdrawMode) && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {row.actionHref && <Link className="btn" href={row.actionHref}>Capture this</Link>}
+                    {row.actionHref && row.captureId
+                      ? <button className="btn" disabled={busy === row.id} onClick={() => void resubmit(row)}>Reshoot this</button>
+                      : row.actionHref && <Link className="btn" href={row.actionHref}>Capture this</Link>}
                     {row.withdrawMode && (
                       <button className="btn btn-quiet" type="button" disabled={busy === row.id} onClick={() => void withdraw(row)}>
                         {busy === row.id

@@ -62,7 +62,7 @@ export async function POST(
 
   const { data: capture } = await supabase
     .from("captures")
-    .select("id, person_id, assignment_id, prompt_id, bucket, storage_key, state")
+    .select("id, person_id, assignment_id, prompt_id, bucket, storage_key, state, media_revision")
     .eq("id", id)
     .maybeSingle();
 
@@ -106,6 +106,7 @@ export async function POST(
       "id, submission_id, media_type, bucket, storage_key, sort_order, width, height, duration, mime_type, file_size",
     )
     .eq("submission_id", capture.id)
+    .eq("media_revision", capture.media_revision)
     .order("sort_order");
   if (mediaReadError) return fail(500, mediaReadError.message);
   if (!mediaRows?.length) return fail(409, "This submission has no media.");
@@ -234,6 +235,9 @@ export async function POST(
       orientation: detectedOrientation(primary.width, primary.height),
       mime: primary.mimeType ?? null,
       master_bytes: primary.fileSize ?? null,
+      bucket: primary.row.bucket,
+      storage_key: primary.row.storage_key,
+      kind: primary.row.media_type === "photo" ? "photo" : "video",
       exif_stripped: promptContract.media_type === "video" ? false : true,
       captured_at: body?.capturedAt ?? new Date().toISOString(),
       checklist_ticked: body?.checklistTicked ?? [],

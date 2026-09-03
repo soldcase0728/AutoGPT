@@ -80,7 +80,8 @@ export default async function Submissions() {
     oneLiner: row.capture_context?.one_liner ?? null,
     reviewNote: latestWithdrawalDecision.get(row.id) ?? latestNote.get(row.id) ?? null,
     source: row.prompt?.capture_mode === "OPEN_MOMENT" ? "Open Moment" : "Assigned",
-    actionHref: null,
+    actionHref: row.state === "changes_requested" && row.assignment_id
+      ? `/capture/${row.assignment_id}?resubmit=${row.id}` : null,
     withdrawMode:
       row.state === "uploading" || row.state === "submitted"
         ? "direct"

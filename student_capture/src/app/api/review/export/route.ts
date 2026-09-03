@@ -4,7 +4,7 @@ import { currentPerson } from "@/lib/session";
 import { fail, json } from "@/lib/http";
 
 const SIGNED_URL_SECONDS = 60 * 60 * 6;
-const EXPORTABLE = ["submitted", "in_review", "approved", "published"];
+const EXPORTABLE = ["approved", "published"];
 
 /**
  * Bulk handoff. Returns signed URLs for every approved master, either as JSON
@@ -35,9 +35,12 @@ export async function GET(request: Request) {
 
   if (error) return fail(500, error.message);
 
+  const eligibleRows = state === "published" ? (rows ?? []) : (await Promise.all(
+    (rows ?? []).map(async (row) => ({ row, result: await supabase.rpc("capture_ready_to_post", { p_capture_id: row.id }) })),
+  )).filter(({ result }) => result.data === true).map(({ row }) => row);
   const admin = createAdminClient();
   const items = await Promise.all(
-    (rows ?? []).map(async (row) => {
+    eligibleRows.map(async (row) => {
       const filename = row.storage_key.split("/").pop() ?? "capture";
       const { data } = await admin.storage
         .from(row.bucket)

@@ -25,9 +25,9 @@ anything can be published.
 
 ### Deliberately not here yet
 
-Transcripts, caption drafting, streaks and leaderboards, SMS nudges, transcoded
-proxies, scheduled posting, analytics. All phase 2 or 3. Adding any of them now
-buys nothing until the loop itself is proven.
+Caption drafting, streaks and leaderboards, SMS nudges, transcoded proxies,
+scheduled posting, and general product analytics. Safety transcription exists
+only inside the private automated-review pipeline and is not a caption feature.
 
 ## Kill rules
 
@@ -108,6 +108,35 @@ capture that person appears in back to `approved` and writes an audit row.
 Where the gate sits matters. It is between **approval and publication**, not
 between capture and submission — a student can always shoot and send, and it is
 the posting that waits.
+
+## Automated safety review
+
+Every submitted media revision creates a separate `safety_screens` lifecycle
+and durable `safety_jobs`. Human review remains available while the scan is
+pending. Photos are inspected individually; videos are sampled at about one
+frame per second and their audio is transcribed. Findings reference the exact
+`submission_media.id`, and video findings retain extractor-owned timestamps.
+
+AI findings are advisory: they never approve, reject, quarantine, delete, or
+publish media. `capture_ready_to_post()` is the second key in the database gate.
+A human-approved capture is postable only after a valid clean screen, resolution
+of every finding, or an audited staff override of a failed scan, and only when
+the existing consent/account requirements also pass.
+
+Required server-only Vercel variables are documented in `.env.example`. After
+deploying the worker route, configure the durable one-minute wake-up and stale
+job watchdog:
+
+```bash
+export DATABASE_URL='postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres'
+export SAFETY_WORKER_URL='https://your-app/api/internal/safety/process'
+export SAFETY_WORKER_SECRET='the-same-random-secret-configured-in-vercel'
+./scripts/configure-safety-scheduler.sh
+```
+
+The scheduler stores both values in Supabase Vault. `pg_net` is only a wake-up;
+the database queue remains the source of truth if an HTTP call or Vercel
+invocation fails. The worker never logs images, OCR text, transcripts, or keys.
 
 ## Setup
 

@@ -32,6 +32,7 @@ type MediaMetadata = {
 
 interface Props {
   assignmentId: string;
+  initialCaptureId?: string;
   ideaId?: string;
   spec: FormatSpec;
   mediaType: PromptMediaType;
@@ -48,6 +49,7 @@ interface Props {
 
 export function CaptureFlow({
   assignmentId,
+  initialCaptureId,
   ideaId,
   spec,
   mediaType,
@@ -71,7 +73,7 @@ export function CaptureFlow({
   const [mediaMetadata, setMediaMetadata] = useState<MediaMetadata[]>([]);
   const [probe, setProbe] = useState<Probe>({});
   const [findings, setFindings] = useState<FormatFinding[]>([]);
-  const [captureId, setCaptureId] = useState<string | null>(null);
+  const [captureId, setCaptureId] = useState<string | null>(initialCaptureId ?? null);
   const [upload, setUpload] = useState<UploadState>("idle");
   const [progress, setProgress] = useState(0);
   const [oneLiner, setOneLiner] = useState("");
@@ -137,7 +139,7 @@ export function CaptureFlow({
         return;
       }
 
-      let submissionId: string | null = null;
+      let submissionId: string | null = initialCaptureId ?? null;
       const metadata: MediaMetadata[] = [];
       const identity = pendingIdentity(chosenFiles.length);
       try {
@@ -213,7 +215,7 @@ export function CaptureFlow({
         setError(uploadError instanceof Error ? uploadError.message : "The upload stopped.");
       }
     },
-    [assignmentId, pendingIdentity, supabaseUrl],
+    [assignmentId, initialCaptureId, pendingIdentity, supabaseUrl],
   );
 
   async function onPick(event: React.ChangeEvent<HTMLInputElement>) {

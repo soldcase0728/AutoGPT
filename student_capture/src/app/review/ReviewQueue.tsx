@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Chip } from "@/components/Chip";
 import { describeBlocker, publishable } from "@/lib/consent";
 import { formatBytes } from "@/lib/format-spec";
-import type { CaptureState, QueueRow } from "@/lib/types";
+import { AutomatedSafetyReview } from "@/components/AutomatedSafetyReview";
+import type { CaptureSafetyReview, CaptureState, QueueRow } from "@/lib/types";
 
 type Decision = Extract<
   CaptureState,
@@ -22,6 +23,7 @@ const KEYS: Record<string, Decision> = {
 export function ReviewQueue({
   rows,
   withdrawals = [],
+  safetyReviews = [],
   filter,
   /**
    * Plays this file for every row instead of each capture's own signed URL.
@@ -32,6 +34,7 @@ export function ReviewQueue({
 }: {
   rows: QueueRow[];
   withdrawals?: WithdrawalRow[];
+  safetyReviews?: CaptureSafetyReview[];
   filter: string;
   mediaSrc?: string;
 }) {
@@ -43,8 +46,12 @@ export function ReviewQueue({
   const [takingDown, setTakingDown] = useState(false);
   const [opening, setOpening] = useState(false);
   const openedRef = useRef(new Set<string>());
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const current = rows[Math.min(index, rows.length - 1)];
+  const currentSafety = current
+    ? safetyReviews.find((review) => review.capture_id === current.id)
+    : undefined;
 
   useEffect(() => {
     if (!current || current.state !== "submitted" || opening || openedRef.current.has(current.id)) return;
@@ -132,7 +139,11 @@ export function ReviewQueue({
   }
 
   const blockers = current?.consent_blockers ?? [];
-  const canPublish = publishable(blockers);
+  const safetyCleared = currentSafety?.safety_status === "no_flags"
+    || (currentSafety?.safety_status === "flags_detected" && currentSafety.unresolved_finding_count === 0)
+    || (currentSafety?.safety_status === "screening_failed" && currentSafety.failed_scan_overridden);
+  const canPublish = publishable(blockers) && Boolean(safetyCleared)
+    && current?.student_participation === "active";
 
   return (
     <div className="flex flex-col gap-6">
@@ -158,8 +169,12 @@ export function ReviewQueue({
             Export
           </a>
         </div>
-        {rows.map((row, i) => (
-          <button
+        {rows.map((row, i) => {
+          const rowSafety = safetyReviews.find((review) => review.capture_id === row.id);
+          const rowSafetyReady = rowSafety?.safety_status === "no_flags"
+            || (rowSafety?.safety_status === "flags_detected" && rowSafety.unresolved_finding_count === 0)
+            || (rowSafety?.safety_status === "screening_failed" && rowSafety.failed_scan_overridden);
+          return <button
             key={row.id}
             onClick={() => setIndex(i)}
             className="card p-3 text-left"
@@ -175,9 +190,15 @@ export function ReviewQueue({
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Chip>{row.state.replace("_", " ")}</Chip>
               {row.consent_blockers?.length > 0 && <Chip tone="bad">held</Chip>}
+              {row.student_participation !== "active" && <Chip tone="bad">account {row.student_participation}</Chip>}
+              {rowSafety?.unresolved_finding_count ? (
+                <Chip tone="bad">safety hold</Chip>
+              ) : row.state === "approved" && rowSafetyReady && !(row.consent_blockers?.length) ? (
+                <Chip tone="good">ready to post</Chip>
+              ) : row.state === "approved" && !rowSafetyReady ? <Chip>safety pending</Chip> : null}
             </div>
           </button>
-        ))}
+        })}
       </aside>
 
       {/* the capture */}
@@ -196,25 +217,27 @@ export function ReviewQueue({
           >
             {current.media_type !== "video" ? (
               <div className={(current.media_items?.length ?? 0) > 1 ? "grid gap-2 sm:grid-cols-2" : ""}>
-                {(current.media_items?.length ? current.media_items : [{ id: "primary" }]).map(
+                {(current.media_items?.length ? current.media_items : [{ id: "primary", width: null, height: null }]).map(
                   (media, mediaIndex) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={media.id}
-                      src={
-                        mediaSrc ??
-                        `/api/captures/${current.id}/media${
-                          media.id === "primary" ? "" : `?mediaId=${media.id}`
-                        }`
-                      }
-                      alt={`${current.one_liner ?? current.idea_title} — photo ${mediaIndex + 1}`}
-                      className="max-h-[60vh] w-full bg-black object-contain"
-                    />
+                    <div key={media.id} className="relative overflow-hidden bg-black"
+                      style={media.width && media.height ? { aspectRatio: `${media.width}/${media.height}` } : undefined}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={mediaSrc ?? `/api/captures/${current.id}/media${media.id === "primary" ? "" : `?mediaId=${media.id}`}`}
+                        alt={`${current.one_liner ?? current.idea_title} — photo ${mediaIndex + 1}`}
+                        className="h-full max-h-[60vh] w-full object-contain" />
+                      {currentSafety?.findings.filter((finding) => finding.submission_media_id === media.id && finding.bounding_box).map((finding) => (
+                        <span key={finding.id} className="pointer-events-none absolute border-2"
+                          style={{ borderColor: "var(--clay)", left: `${finding.bounding_box!.x * 100}%`,
+                            top: `${finding.bounding_box!.y * 100}%`, width: `${finding.bounding_box!.width * 100}%`,
+                            height: `${finding.bounding_box!.height * 100}%` }} />
+                      ))}
+                    </div>
                   ),
                 )}
               </div>
             ) : (
               <video
+                ref={videoRef}
                 key={current.id}
                 src={mediaSrc ?? `/api/captures/${current.id}/media`}
                 controls
@@ -239,7 +262,9 @@ export function ReviewQueue({
                 </Chip>
               )}
               {current.master_bytes && <Chip>{formatBytes(current.master_bytes)}</Chip>}
-              {current.scan_status === "pending" && <Chip>not yet scanned</Chip>}
+              {current.student_participation !== "active" && <Chip tone="bad">account {current.student_participation}</Chip>}
+              {current.state === "approved" && canPublish && <Chip tone="good">ready to post</Chip>}
+              {current.state === "approved" && !canPublish && <Chip tone="bad">not ready to post</Chip>}
               {!current.exif_stripped && <Chip>location not stripped</Chip>}
             </div>
 
@@ -274,6 +299,10 @@ export function ReviewQueue({
               </p>
             )}
 
+            <AutomatedSafetyReview captureId={current.id} review={currentSafety}
+              mediaIds={(current.media_items?.length ? current.media_items : [{ id: "primary" }]).map((media) => media.id)}
+              onSeek={(seconds) => { if (videoRef.current) { videoRef.current.currentTime = seconds; void videoRef.current.play(); } }} />
+
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -300,7 +329,7 @@ export function ReviewQueue({
               <button
                 className="btn btn-quiet"
                 disabled={busy || opening || !canPublish || current.state !== "approved"}
-                title={canPublish ? undefined : "Blocked by the consent gate"}
+                title={canPublish ? undefined : "Blocked until consent and automated safety review are clear"}
                 onClick={() => decide("published")}
               >
                 Mark posted <kbd className="ml-1 font-mono text-xs opacity-60">P</kbd>

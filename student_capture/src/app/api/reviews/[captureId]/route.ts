@@ -45,7 +45,7 @@ export async function POST(
   });
 
   if (stateError) {
-    const { data: blockers } = await supabase.rpc("capture_consent_blockers", {
+    const { data: blockers } = await supabase.rpc("capture_publication_blockers", {
       p_capture_id: captureId,
     });
     if (blockers && Array.isArray(blockers) && blockers.length > 0) {

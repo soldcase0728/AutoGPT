@@ -169,6 +169,7 @@ export const SUBMISSIONS: SubmissionRow[] = [
 
 const baseRow = {
   org_id: STUDENT.org_id,
+  student_participation: "active" as const,
   // Photos rather than video: the preview has no real files, and a still lets
   // the player show a frame instead of an empty box.
   kind: "photo" as const,

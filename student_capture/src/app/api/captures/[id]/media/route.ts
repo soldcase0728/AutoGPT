@@ -25,7 +25,7 @@ export async function GET(
   const supabase = await createClient();
   const { data: capture } = await supabase
     .from("captures")
-    .select("id, person_id, state, bucket, storage_key, proxy_key, mime")
+    .select("id, person_id, state, bucket, storage_key, proxy_key, mime, media_revision")
     .eq("id", id)
     .maybeSingle();
 
@@ -49,17 +49,30 @@ export async function GET(
       .select("id, submission_id, bucket, storage_key")
       .eq("id", mediaId)
       .eq("submission_id", capture.id)
+      .eq("media_revision", capture.media_revision)
       .maybeSingle();
     if (!media) return fail(404, "That media item does not exist.");
     bucket = media.bucket;
     storageKey = media.storage_key;
+  } else {
+    const { data: primary } = await supabase
+      .from("submission_media")
+      .select("bucket, storage_key")
+      .eq("submission_id", capture.id)
+      .eq("media_revision", capture.media_revision)
+      .eq("sort_order", 0)
+      .maybeSingle();
+    if (primary) {
+      bucket = primary.bucket;
+      storageKey = primary.storage_key;
+    }
   }
 
   // Reviewing plays the proxy when one exists; downloading always takes the master.
   const key = mediaId
     ? storageKey
     : wantsDownload
-      ? capture.storage_key
+      ? storageKey
       : capture.proxy_key ?? capture.storage_key;
 
   const admin = createAdminClient();
