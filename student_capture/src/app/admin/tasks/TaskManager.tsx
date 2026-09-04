@@ -43,7 +43,7 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks }
   const [orientation, setOrientation] = useState<PromptOrientation>("any");
   const [startsOn, setStartsOn] = useState(today);
   const [endsOn, setEndsOn] = useState(today);
-  const [selectedStudents, setSelectedStudents] = useState(() => activeStudents.map((student) => student.id));
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedGuidelines, setSelectedGuidelines] = useState(() => guidelineSets.filter((set) => set.kind === "brand").map((set) => set.id));
   const [minCount, setMinCount] = useState(1);
   const [maxCount, setMaxCount] = useState(1);
