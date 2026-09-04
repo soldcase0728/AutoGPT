@@ -20,6 +20,13 @@ posted), mixed video/photo-series preview, the consent state of every capture
 shown inline, and a bulk export of
 signed master URLs.
 
+**Administrator side.** `/admin/tasks` creates an assigned photo, photo-series,
+or video prompt and schedules it for selected active students. Use the same
+first and last date for one day, or a date range to repeat the task across a
+week. Existing student/date assignments are never overwritten; occupied slots
+are reported as skipped. Recent prompts can be copied back into the form as a
+template.
+
 **Consent.** Captured at onboarding and enforced by the database before
 anything can be published.
 

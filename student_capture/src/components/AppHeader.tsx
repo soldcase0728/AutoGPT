@@ -19,6 +19,11 @@ export function AppHeader({ person }: { person: Person }) {
               Queue
             </Link>
           )}
+          {person.role === "admin" && (
+            <Link href="/admin/tasks" style={{ color: "var(--muted)" }}>
+              Tasks
+            </Link>
+          )}
           <span className="label hidden sm:inline">{person.display_name}</span>
         </nav>
       </div>

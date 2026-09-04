@@ -31,6 +31,12 @@ export async function requireStaff(): Promise<Person> {
   return person;
 }
 
+export async function requireAdmin(): Promise<Person> {
+  const person = await requirePerson();
+  if (person.role !== "admin") redirect("/");
+  return person;
+}
+
 /**
  * The onboarding gate, asked per version of the wording.
  *
