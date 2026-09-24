@@ -27,6 +27,8 @@ export default async function Today() {
     )
     .eq("person_id", person.id)
     .eq("due_on", today)
+    // A paused or cancelled task is not today's prompt.
+    .eq("ideas.active", true)
     .maybeSingle();
 
   const idea = (assignment?.ideas ?? null) as unknown as

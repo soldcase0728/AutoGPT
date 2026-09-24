@@ -189,6 +189,24 @@ claims the row whose email matches. Someone who authenticates without one gets
 told they are not on a roster. Edit the addresses in `supabase/seed.sql` before
 seeding anything real.
 
+### Upgrading an existing project
+
+A project set up before September 24, 2026 needs four more migrations. Paste
+each file into Supabase ▸ SQL Editor and run it, in this order. Each one is safe
+to run twice. (Don't use `pnpm db:apply` on an existing project: it re-runs the
+original migrations, which are not.)
+
+| Migration | What it adds |
+| --- | --- |
+| `20260924120000_restore_student_withdrawal.sql` | Students can withdraw again (the safety migration had blocked it) |
+| `20260924120100_post_links.sql` | Post links on posted items ("See your post") |
+| `20260924130000_review_messages.sql` | Staff-only internal notes; a student message on takedowns |
+| `20260924140000_tasks_and_groups.sql` | Task pause and cancel, and student groups |
+
+Apply them before deploying this version. The review queue's decisions,
+takedowns, post links, task pages and groups call what they add; until they are
+applied those actions fail with a database error.
+
 ### The daily job
 
 Assignments are materialised by a scheduled `POST`, and the unique constraint on
