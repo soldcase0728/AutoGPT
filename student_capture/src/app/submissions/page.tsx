@@ -13,7 +13,7 @@ export default async function Submissions() {
     supabase
       .from("captures")
       .select(
-        "id, assignment_id, state, kind, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
+        "id, assignment_id, state, kind, takedown_at, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
       )
       .eq("person_id", person.id)
       .order("created_at", { ascending: false })
@@ -31,6 +31,7 @@ export default async function Submissions() {
     assignment_id: string | null;
     state: CaptureState;
     kind: "photo" | "video" | null;
+    takedown_at: string | null;
     created_at: string;
     submitted_at: string | null;
     state_changed_at: string;
@@ -96,7 +97,7 @@ export default async function Submissions() {
   const rows: SubmissionRow[] = visibleCaptures.map((row) => ({
     id: `capture:${row.id}`,
     captureId: row.id,
-    state: row.state,
+    state: row.state === "rejected" && row.takedown_at ? "taken_down" : row.state,
     occurredAt: row.submitted_at ?? row.state_changed_at ?? row.created_at,
     ideaTitle: row.prompt?.title ?? "Prompt",
     oneLiner: row.capture_context?.one_liner ?? null,

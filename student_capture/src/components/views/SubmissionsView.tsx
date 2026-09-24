@@ -8,7 +8,7 @@ import { Chip } from "@/components/Chip";
 import { Thumbnail } from "@/components/Thumbnail";
 import type { CaptureState, Person } from "@/lib/types";
 
-type YoursState = CaptureState | "assigned" | "expired";
+type YoursState = CaptureState | "assigned" | "expired" | "taken_down";
 type Tone = "muted" | "good" | "bad" | "accent";
 
 const TONE: Record<YoursState, Tone> = {
@@ -23,6 +23,7 @@ const TONE: Record<YoursState, Tone> = {
   changes_requested: "accent",
   rejected: "bad",
   published: "good",
+  taken_down: "bad",
 };
 
 const SAID: Record<YoursState, string> = {
@@ -37,6 +38,7 @@ const SAID: Record<YoursState, string> = {
   changes_requested: "Reshoot requested",
   rejected: "Not accepted",
   published: "Posted",
+  taken_down: "Taken down",
 };
 
 const ACTION_LABEL = {
