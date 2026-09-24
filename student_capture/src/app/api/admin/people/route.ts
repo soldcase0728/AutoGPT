@@ -55,14 +55,34 @@ export async function POST(request: Request) {
     email_confirm: true,
   });
   if (authError) {
-    // The roster row stays; a login that already exists can be reset from the list.
+    if (!/already|registered|exists/i.test(authError.message)) {
+      return json({
+        ok: true,
+        id: row.id,
+        password: null,
+        warning: `They're on the roster, but the login couldn't be created: ${authError.message}`,
+      });
+    }
+    // A login with this email already exists: link it and give it a fresh
+    // temporary password, so the admin can finish onboarding here.
+    const { data: linkedId, error: linkError } = await supabase.rpc("link_person_login", {
+      p_person_id: row.id,
+    });
+    if (linkError || !linkedId) {
+      return json({
+        ok: true,
+        id: row.id,
+        password: null,
+        warning: "They're on the roster, but a login with that email belongs to someone else on the roster, so it can't be linked.",
+      });
+    }
+    const { error: resetError } = await admin.auth.admin.updateUserById(linkedId as string, { password });
+    if (resetError) return fail(500, resetError.message);
     return json({
       ok: true,
       id: row.id,
-      password: null,
-      warning: /already|registered|exists/i.test(authError.message)
-        ? "They're on the roster, but a login with that email already exists. Use Reset password on their row."
-        : `They're on the roster, but the login couldn't be created: ${authError.message}`,
+      password,
+      warning: "They already had a login with this email. It's now linked, and the password below replaces their old one.",
     });
   }
   return json({ ok: true, id: row.id, password });

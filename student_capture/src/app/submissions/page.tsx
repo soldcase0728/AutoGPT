@@ -13,7 +13,7 @@ export default async function Submissions() {
     supabase
       .from("captures")
       .select(
-        "id, assignment_id, state, kind, takedown_at, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
+        "id, assignment_id, state, kind, takedown_at, media_revision, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
       )
       .eq("person_id", person.id)
       .order("created_at", { ascending: false })
@@ -32,6 +32,7 @@ export default async function Submissions() {
     state: CaptureState;
     kind: "photo" | "video" | null;
     takedown_at: string | null;
+    media_revision: number;
     created_at: string;
     submitted_at: string | null;
     state_changed_at: string;
@@ -42,7 +43,7 @@ export default async function Submissions() {
   // An attempt withdrawn before it was ever sent was replaced by a retake; it
   // is not something the student sent, so it does not belong in the list.
   const visibleCaptures = captureRows.filter(
-    (row) => !(row.state === "withdrawn" && !row.submitted_at),
+    (row) => !(row.state === "withdrawn" && !row.submitted_at && row.media_revision <= 1),
   );
   const captureIds = visibleCaptures.map((row) => row.id);
 

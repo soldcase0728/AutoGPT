@@ -105,8 +105,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     case "reset_password": {
       const password = temporaryPassword();
       const admin = createAdminClient();
-      if (target.auth_user_id) {
-        const { error } = await admin.auth.admin.updateUserById(target.auth_user_id, { password });
+      let authUserId = target.auth_user_id as string | null;
+      if (!authUserId) {
+        // A login may already exist under this email; link it rather than
+        // trying (and failing) to create a second one.
+        const { data: linkedId } = await supabase.rpc("link_person_login", { p_person_id: id });
+        authUserId = (linkedId as string | null) ?? null;
+      }
+      if (authUserId) {
+        const { error } = await admin.auth.admin.updateUserById(authUserId, { password });
         if (error) return fail(500, error.message);
       } else {
         const { error } = await admin.auth.admin.createUser({
@@ -118,7 +125,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           return fail(
             409,
             /already|registered|exists/i.test(error.message)
-              ? "A login with this email exists but isn't linked to this roster row. Run the linking step in capture-test-accounts.sql or ask for help."
+              ? "A login with this email belongs to someone else on the roster, so it can't be linked here."
               : error.message,
           );
         }

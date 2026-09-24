@@ -85,7 +85,9 @@ export default async function CapturePage({
     resume = {
       captureId: pending.id,
       startedAt: pending.created_at,
-      isResubmission: Boolean(pending.submitted_at),
+      // A reshoot reopens the same capture at a new media revision (and clears
+      // submitted_at), so the revision is what marks it as one.
+      isResubmission: pending.media_revision > 1,
       complete:
         rows.length >= Math.max(idea.min_media_count, 1) && landed.every(Boolean),
       media: rows.map((row) => ({

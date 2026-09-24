@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const [{ data: campaign }, { data: students }, { data: guidelineSets }] = await Promise.all([
     admin.from("campaigns").select("id").eq("id", input.campaignId).eq("org_id", person.org_id).eq("active", true).maybeSingle(),
-    admin.from("people").select("id, display_name").eq("org_id", person.org_id).eq("role", "student").is("deactivated_at", null).in("id", input.studentIds),
+    admin.from("people").select("id, display_name").eq("org_id", person.org_id).eq("role", "student").eq("participation", "active").is("deactivated_at", null).in("id", input.studentIds),
     input.guidelineSetIds.length
       ? admin.from("guideline_sets").select("id").eq("org_id", person.org_id).in("id", input.guidelineSetIds)
       : Promise.resolve({ data: [] as Array<{ id: string }> }),
