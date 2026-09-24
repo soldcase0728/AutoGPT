@@ -26,6 +26,9 @@ create trigger captures_post_url_guard
   before insert or update of post_url on captures
   for each row execute function guard_capture_post_url();
 
+-- Trigger function only; nobody should call it through the API.
+revoke execute on function guard_capture_post_url() from public, anon, authenticated;
+
 create or replace function set_capture_post_url(p_capture_id uuid, p_url text)
 returns void language plpgsql security definer set search_path = public, pg_temp as $$
 declare
