@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { hasSignedRelease, requirePerson } from "@/lib/session";
 import { buildChecklist } from "@/lib/guidelines";
 import { publicEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { objectLanded } from "@/lib/storage-landed";
 import type { GuidelineVersion, Idea } from "@/lib/types";
 import { RELEASE_VERSION } from "@/app/consent/version";
-import { CaptureFlow } from "./CaptureFlow";
+import { CaptureFlow, type ResumeState } from "./CaptureFlow";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,47 @@ export default async function CapturePage({
   if (assignment.completed_at) redirect("/submissions");
 
   const idea = assignment.ideas as unknown as Idea & { campaigns?: { name: string } };
+
+  // An earlier attempt that never reached "Send it": pick it back up instead of
+  // starting a second submission beside it.
+  const { data: pending } = await supabase
+    .from("captures")
+    .select("id, submitted_at, media_revision, created_at")
+    .eq("assignment_id", assignment.id)
+    .eq("person_id", person.id)
+    .eq("state", "uploading")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let resume: ResumeState | undefined;
+  if (pending) {
+    const { data: mediaRows } = await supabase
+      .from("submission_media")
+      .select("id, media_type, bucket, storage_key, mime_type, file_size, client_media_id")
+      .eq("submission_id", pending.id)
+      .eq("media_revision", pending.media_revision)
+      .order("sort_order");
+    const rows = mediaRows ?? [];
+    const admin = createAdminClient();
+    const landed = await Promise.all(
+      rows.map((row) => objectLanded(admin, row.bucket, row.storage_key)),
+    );
+    resume = {
+      captureId: pending.id,
+      startedAt: pending.created_at,
+      isResubmission: Boolean(pending.submitted_at),
+      complete:
+        rows.length >= Math.max(idea.min_media_count, 1) && landed.every(Boolean),
+      media: rows.map((row) => ({
+        id: row.id,
+        kind: row.media_type === "video" ? "video" : "photo",
+        mimeType: row.mime_type ?? "",
+        fileSize: Number(row.file_size ?? 0),
+        clientMediaId: row.client_media_id,
+      })),
+    };
+  }
 
   const { data: versionRows } = await supabase
     .from("guideline_versions")
@@ -73,7 +116,8 @@ export default async function CapturePage({
           campaign={idea.campaigns?.name}
         />
         <CaptureFlow
-          initialCaptureId={resubmit}
+          initialCaptureId={resume?.isResubmission ? resume.captureId : resubmit}
+          resume={resume}
           assignmentId={assignment.id}
           ideaId={idea.id}
           spec={idea.format_spec}

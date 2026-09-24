@@ -59,7 +59,6 @@ export default async function PreviewScreen({
           person={STUDENT}
           assignment={{ id: "assignment-1", completed_at: null }}
           idea={IDEA}
-          checklist={CHECKLIST}
           today={FIXED_DAY}
         />
       );
@@ -70,7 +69,6 @@ export default async function PreviewScreen({
           person={STUDENT}
           assignment={{ id: "assignment-1", completed_at: "2026-09-01T14:02:00Z" }}
           idea={IDEA}
-          checklist={CHECKLIST}
           today={FIXED_DAY}
         />
       );

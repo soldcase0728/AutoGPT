@@ -43,6 +43,8 @@ export function ReviewQueue({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [postUrl, setPostUrl] = useState("");
+  const [linkSaved, setLinkSaved] = useState("");
   const [takingDown, setTakingDown] = useState(false);
   const [opening, setOpening] = useState(false);
   const openedRef = useRef(new Set<string>());
@@ -99,11 +101,24 @@ export function ReviewQueue({
         return;
       }
 
+      if (decision === "published" && postUrl.trim()) {
+        const linked = await fetch(`/api/captures/${current.id}/post-link`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: postUrl.trim() }),
+        });
+        if (!linked.ok) {
+          const body = await linked.json().catch(() => ({ error: "" }));
+          setError(`Marked posted, but the link didn't save: ${body.error || "try again from the Posted list."}`);
+        }
+      }
+
       setNote("");
+      setPostUrl("");
       setIndex((i) => Math.min(i + 1, Math.max(rows.length - 2, 0)));
       router.refresh();
     },
-    [busy, current, note, opening, rows.length, router],
+    [busy, current, note, opening, postUrl, rows.length, router],
   );
 
   // Reviewing is a two-hand job: one on the keyboard, one on the coffee.
@@ -311,6 +326,58 @@ export function ReviewQueue({
               className="card mt-4 w-full px-3 py-2"
               style={{ background: "var(--bg)" }}
             />
+
+            {(current.state === "approved" || current.state === "published") && (
+              <div className="mt-3 flex flex-col gap-2">
+                <label className="label" htmlFor="post-url">
+                  Link to the post {current.state === "approved" ? "(add it now or later)" : ""}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    id="post-url"
+                    type="url"
+                    inputMode="url"
+                    value={postUrl}
+                    onChange={(e) => {
+                      setPostUrl(e.target.value);
+                      setLinkSaved("");
+                    }}
+                    placeholder="https://www.instagram.com/p/…"
+                    className="card min-w-0 flex-1 px-3 py-2"
+                    style={{ background: "var(--bg)" }}
+                  />
+                  {current.state === "published" && (
+                    <button
+                      className="btn btn-quiet"
+                      type="button"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        setError("");
+                        const response = await fetch(`/api/captures/${current.id}/post-link`, {
+                          method: "POST",
+                          headers: { "content-type": "application/json" },
+                          body: JSON.stringify({ url: postUrl.trim() }),
+                        });
+                        setBusy(false);
+                        if (!response.ok) {
+                          const body = await response.json().catch(() => ({ error: "" }));
+                          setError(body.error || "The link didn't save.");
+                          return;
+                        }
+                        setLinkSaved(postUrl.trim() ? "Link saved. The student can see it now." : "Link removed.");
+                        router.refresh();
+                      }}
+                    >
+                      Save link
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm" style={{ color: "var(--muted)" }}>
+                  {linkSaved || "The student sees this as \u201cSee your post\u201d."}
+                </p>
+              </div>
+            )}
 
             <div className="mt-3 flex flex-wrap gap-2">
               <button className="btn" disabled={busy || opening || !["in_review", "changes_requested"].includes(current.state)} onClick={() => decide("approved")}>

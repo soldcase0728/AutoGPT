@@ -13,7 +13,7 @@ export default async function Submissions() {
     supabase
       .from("captures")
       .select(
-        "id, assignment_id, state, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
+        "id, assignment_id, state, kind, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
       )
       .eq("person_id", person.id)
       .order("created_at", { ascending: false })
@@ -30,6 +30,7 @@ export default async function Submissions() {
     id: string;
     assignment_id: string | null;
     state: CaptureState;
+    kind: "photo" | "video" | null;
     created_at: string;
     submitted_at: string | null;
     state_changed_at: string;
@@ -37,7 +38,28 @@ export default async function Submissions() {
     capture_context: { one_liner: string } | null;
     prompt: { title: string; capture_mode: PromptCaptureMode };
   }>;
-  const captureIds = captureRows.map((row) => row.id);
+  // An attempt withdrawn before it was ever sent was replaced by a retake; it
+  // is not something the student sent, so it does not belong in the list.
+  const visibleCaptures = captureRows.filter(
+    (row) => !(row.state === "withdrawn" && !row.submitted_at),
+  );
+  const captureIds = visibleCaptures.map((row) => row.id);
+
+  // Read separately so the list still renders if the post-link migration has
+  // not been applied yet.
+  const publishedIds = visibleCaptures.filter((row) => row.state === "published").map((row) => row.id);
+  const postUrls = new Map<string, string>();
+  if (publishedIds.length) {
+    const { data: links, error: linkError } = await supabase
+      .from("captures")
+      .select("id, post_url")
+      .in("id", publishedIds);
+    if (!linkError) {
+      for (const link of (links ?? []) as Array<{ id: string; post_url: string | null }>) {
+        if (link.post_url) postUrls.set(link.id, link.post_url);
+      }
+    }
+  }
   const [{ data: reviews }, { data: withdrawalDecisions }] = captureIds.length
     ? await Promise.all([
         supabase
@@ -71,7 +93,7 @@ export default async function Submissions() {
     );
   }
 
-  const rows: SubmissionRow[] = captureRows.map((row) => ({
+  const rows: SubmissionRow[] = visibleCaptures.map((row) => ({
     id: `capture:${row.id}`,
     captureId: row.id,
     state: row.state,
@@ -80,8 +102,14 @@ export default async function Submissions() {
     oneLiner: row.capture_context?.one_liner ?? null,
     reviewNote: latestWithdrawalDecision.get(row.id) ?? latestNote.get(row.id) ?? null,
     source: row.prompt?.capture_mode === "OPEN_MOMENT" ? "Open Moment" : "Assigned",
-    actionHref: row.state === "changes_requested" && row.assignment_id
-      ? `/capture/${row.assignment_id}?resubmit=${row.id}` : null,
+    thumbnail: { src: `/api/captures/${row.id}/media`, kind: row.kind === "video" ? "video" : "photo" },
+    postUrl: row.state === "published" ? (postUrls.get(row.id) ?? null) : null,
+    action:
+      row.state === "changes_requested" && row.assignment_id
+        ? { kind: "reshoot", href: `/capture/${row.assignment_id}?resubmit=${row.id}` }
+        : row.state === "uploading" && row.assignment_id
+          ? { kind: "finish", href: `/capture/${row.assignment_id}` }
+          : null,
     withdrawMode:
       row.state === "uploading" || row.state === "submitted"
         ? "direct"
@@ -91,7 +119,7 @@ export default async function Submissions() {
   }));
 
   const representedAssignments = new Set(
-    captureRows.flatMap((row) => (row.assignment_id ? [row.assignment_id] : [])),
+    visibleCaptures.flatMap((row) => (row.assignment_id ? [row.assignment_id] : [])),
   );
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -114,7 +142,9 @@ export default async function Submissions() {
       oneLiner: null,
       reviewNote: null,
       source: "Assigned",
-      actionHref: expired ? null : `/capture/${assignment.id}`,
+      thumbnail: null,
+      postUrl: null,
+      action: expired ? null : { kind: "capture", href: `/capture/${assignment.id}` },
       withdrawMode: null,
     });
   }

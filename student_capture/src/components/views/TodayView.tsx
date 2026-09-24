@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { PromptCard } from "@/components/PromptCard";
 import { Chip } from "@/components/Chip";
-import type { Checklist } from "@/lib/guidelines";
 import type { Idea, Person } from "@/lib/types";
 
 export interface TodayViewProps {
@@ -10,7 +9,6 @@ export interface TodayViewProps {
   /** Null when the morning job has not assigned anything for today. */
   assignment: { id: string; completed_at: string | null } | null;
   idea: (Idea & { campaigns?: { name: string } }) | null;
-  checklist: Checklist;
   /** Injected so the view renders identically whatever day it is screenshotted. */
   today?: Date;
 }
@@ -19,7 +17,6 @@ export function TodayView({
   person,
   assignment,
   idea,
-  checklist,
   today = new Date(),
 }: TodayViewProps) {
   const isStaff = person.role === "reviewer" || person.role === "admin";
@@ -62,22 +59,6 @@ export function TodayView({
               maxDurationSeconds={idea.max_duration_seconds}
               campaign={idea.campaigns?.name}
             />
-
-            {checklist.items.length > 0 && (
-              <section className="card p-5">
-                <p className="label">Before you shoot</p>
-                <ul className="mt-3 flex flex-col gap-2 text-[15px]">
-                  {checklist.items.slice(0, 6).map((item) => (
-                    <li key={item.id} className="flex gap-3">
-                      <span aria-hidden style={{ color: "var(--accent)" }}>
-                        —
-                      </span>
-                      <span>{item.text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
 
             {assignment.completed_at ? (
               <div className="card flex items-center justify-between gap-4 p-5">

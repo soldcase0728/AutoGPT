@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { TodayView } from "@/components/views/TodayView";
 import { createClient } from "@/lib/supabase/server";
 import { hasSignedRelease, requirePerson } from "@/lib/session";
-import { buildChecklist } from "@/lib/guidelines";
-import type { GuidelineVersion, Idea } from "@/lib/types";
+import type { Idea } from "@/lib/types";
 import { isoDate } from "@/lib/assign";
 import { RELEASE_VERSION } from "@/app/consent/version";
 
@@ -32,22 +31,11 @@ export default async function Today() {
     | (Idea & { campaigns?: { name: string } })
     | null;
 
-  let versions: GuidelineVersion[] = [];
-  if (idea?.guideline_set_ids?.length) {
-    const { data } = await supabase
-      .from("guideline_versions")
-      .select("id, set_id, version, body")
-      .in("set_id", idea.guideline_set_ids)
-      .is("superseded_at", null);
-    versions = (data ?? []) as GuidelineVersion[];
-  }
-
   return (
     <TodayView
       person={person}
       assignment={assignment ? { id: assignment.id, completed_at: assignment.completed_at } : null}
       idea={idea}
-      checklist={buildChecklist(versions)}
     />
   );
 }
