@@ -314,3 +314,27 @@ export const SAFETY_REPORTS = [
     ideaTitle: "The path to practice",
   },
 ];
+
+export const PEOPLE_ROWS = [
+  {
+    id: "61111111-1111-1111-1111-111111111111", role: "admin" as const, name: "Dana Reyes",
+    email: "dana@example.edu", birthYear: 1988, participation: "active" as const,
+    hasLogin: true, isMe: true, postedCount: 0,
+    consents: [],
+  },
+  {
+    id: STUDENT.id, role: "student" as const, name: "Ali Haddad", email: "ali@example.edu",
+    birthYear: 2005, participation: "active" as const, hasLogin: true, isMe: false, postedCount: 2,
+    consents: [{ type: "media_release" as const, document_version: "release-2026-01", signed_at: "2026-08-20T10:00:00Z", signed_by: "Ali Haddad", expires_at: null, revoked_at: null }],
+  },
+  {
+    id: MINOR.id, role: "student" as const, name: "Jo Mercer", email: "jo@example.edu",
+    birthYear: 2010, participation: "active" as const, hasLogin: true, isMe: false, postedCount: 0,
+    consents: [{ type: "media_release" as const, document_version: "release-2026-01", signed_at: "2026-08-21T10:00:00Z", signed_by: "Jo Mercer", expires_at: null, revoked_at: null }],
+  },
+  {
+    id: "66666666-6666-6666-6666-666666666666", role: "student" as const, name: "Lia Novak",
+    email: "lia@example.edu", birthYear: null, participation: "pending" as const,
+    hasLogin: false, isMe: false, postedCount: 0, consents: [],
+  },
+];

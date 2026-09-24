@@ -6,6 +6,7 @@ import { ConsentView } from "@/components/views/ConsentView";
 import { CaptureFlow } from "@/app/capture/[assignmentId]/CaptureFlow";
 import { ReviewQueue } from "@/app/review/ReviewQueue";
 import { PosterView } from "@/components/views/PosterView";
+import { PeopleManager } from "@/app/admin/people/PeopleManager";
 import QRCode from "qrcode";
 import { RELEASE_VERSION } from "@/app/consent/version";
 import {
@@ -15,6 +16,7 @@ import {
   PEOPLE,
   QUEUE,
   QUEUE_EXTRAS,
+  PEOPLE_ROWS,
   SAFETY_REPORTS,
   REVIEWER,
   STUDENT,
@@ -41,6 +43,7 @@ const SCREENS = [
   "submissions",
   "review",
   "poster",
+  "people",
 ] as const;
 
 export default async function PreviewScreen({
@@ -121,6 +124,13 @@ export default async function PreviewScreen({
             safetyReports={SAFETY_REPORTS}
             mediaSrc="/preview-frame.svg"
           />
+        </main>
+      );
+
+    case "people":
+      return (
+        <main className="mx-auto max-w-5xl px-5 py-8">
+          <PeopleManager rows={PEOPLE_ROWS} releaseVersion={RELEASE_VERSION} today="2026-09-01" />
         </main>
       );
 
