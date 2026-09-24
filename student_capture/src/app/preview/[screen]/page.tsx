@@ -6,6 +6,8 @@ import { ConsentView } from "@/components/views/ConsentView";
 import { CaptureFlow } from "@/app/capture/[assignmentId]/CaptureFlow";
 import { ReviewQueue } from "@/app/review/ReviewQueue";
 import { PosterView } from "@/components/views/PosterView";
+import { PeopleManager } from "@/app/admin/people/PeopleManager";
+import { TaskManager } from "@/app/admin/tasks/TaskManager";
 import QRCode from "qrcode";
 import { RELEASE_VERSION } from "@/app/consent/version";
 import {
@@ -14,6 +16,9 @@ import {
   MINOR,
   PEOPLE,
   QUEUE,
+  QUEUE_EXTRAS,
+  PEOPLE_ROWS,
+  SAFETY_REPORTS,
   REVIEWER,
   STUDENT,
   SUBMISSIONS,
@@ -25,6 +30,12 @@ import {
  * the same view components the real pages use — not a parallel mock-up — so a
  * change to the app shows up here.
  */
+
+const TASK_TEMPLATE = {
+  title: "Hallway energy between classes", brief: "Stand in one safe place and capture the five minutes between bells.",
+  campaign: "Fall semester", mediaType: "video" as const, orientation: "portrait" as const, minMediaCount: 1, maxMediaCount: 1,
+  minDurationSeconds: 10, maxDurationSeconds: 30, captionRequired: true, guidelineSetIds: ["g1"], active: true,
+};
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +50,8 @@ const SCREENS = [
   "submissions",
   "review",
   "poster",
+  "people",
+  "tasks",
 ] as const;
 
 export default async function PreviewScreen({
@@ -59,7 +72,6 @@ export default async function PreviewScreen({
           person={STUDENT}
           assignment={{ id: "assignment-1", completed_at: null }}
           idea={IDEA}
-          checklist={CHECKLIST}
           today={FIXED_DAY}
         />
       );
@@ -70,7 +82,6 @@ export default async function PreviewScreen({
           person={STUDENT}
           assignment={{ id: "assignment-1", completed_at: "2026-09-01T14:02:00Z" }}
           idea={IDEA}
-          checklist={CHECKLIST}
           today={FIXED_DAY}
         />
       );
@@ -112,9 +123,47 @@ export default async function PreviewScreen({
     case "review":
       return (
         <main className="mx-auto max-w-6xl px-5 py-6">
-          <ReviewQueue rows={QUEUE} filter="open" mediaSrc="/preview-frame.svg" />
+          <ReviewQueue
+            rows={QUEUE}
+            tab="review"
+            counts={{ review: 3, waiting: 1, ready: 2, posted: 14, rejected: 3 }}
+            search=""
+            extras={QUEUE_EXTRAS}
+            safetyReports={SAFETY_REPORTS}
+            mediaSrc="/preview-frame.svg"
+          />
         </main>
       );
+
+    case "people":
+      return (
+        <main className="mx-auto max-w-5xl px-5 py-8">
+          <PeopleManager rows={PEOPLE_ROWS} releaseVersion={RELEASE_VERSION} today="2026-09-01" />
+        </main>
+      );
+
+    case "tasks": {
+      const names = ["Ava Kowalski", "Ben Ortiz", "Cam Nguyen", "Dani Reyes", "Eli Brooks", "Fay Mercer", "Gus Patel", "Hana Lee"];
+      const students = names.map((name, i) => ({
+        id: `7${i}000000-0000-0000-0000-000000000000`,
+        display_name: name,
+        email: `${name.split(" ")[0]!.toLowerCase()}@example.edu`,
+        participation: i === 3 ? "pending" : "active",
+      }));
+      return (
+        <main className="mx-auto max-w-5xl px-5 py-8">
+          <TaskManager
+            today="2026-09-01"
+            campaigns={[{ id: "c1", name: "Fall semester", starts_on: "2026-08-20", ends_on: null }]}
+            students={students}
+            guidelineSets={[{ id: "g1", name: "Northside brand rules", kind: "brand" }]}
+            guidelineText={{ g1: ["No alcohol, vaping, or gambling in frame.", "No grades, schedules, rosters, or ID cards visible."] }}
+            groups={[{ id: "gr1", name: "Varsity soccer", kind: "team", memberIds: students.slice(0, 4).map((s) => s.id) }]}
+            tasks={[{ ...TASK_TEMPLATE, id: "t1", assignmentCount: 20, dueCount: 12, sentCount: 9, firstDueOn: "2026-08-24", lastDueOn: "2026-09-04" }]}
+          />
+        </main>
+      );
+    }
 
     case "poster": {
       // Only ever encode a web address — a printed code must not be able to

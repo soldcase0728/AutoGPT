@@ -45,3 +45,8 @@ language sql immutable as $$
 $$;
 
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
+
+-- Supabase installs pgcrypto into the `extensions` schema; the safety migration
+-- calls extensions.digest().
+create schema if not exists extensions;
+create extension if not exists pgcrypto schema extensions;

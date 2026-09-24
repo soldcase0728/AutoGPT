@@ -10,6 +10,8 @@ const SCREENS = [
   ["submissions", "Student · what they have sent"],
   ["review", "Marketing · the review queue"],
   ["poster", "Print · the QR poster for a locker room wall"],
+  ["people", "Admin · people, access and releases"],
+  ["tasks", "Admin · creating and tracking tasks"],
 ];
 
 export default function PreviewIndex() {

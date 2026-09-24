@@ -1,17 +1,18 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as tus from "tus-js-client";
 import { createClient } from "@/lib/supabase/client";
-import {
-  checklistSatisfied,
-  requiredIds,
-  safetyItems,
-  type Checklist,
-} from "@/lib/guidelines";
+import { safetyItems, type Checklist } from "@/lib/guidelines";
 import { blocks, checkFormat, formatBytes, type FormatFinding } from "@/lib/format-spec";
-import { mediaKind, probeMedia, type Probe } from "@/lib/probe";
+import { mediaKind, probeMedia, probeUrl, type Probe } from "@/lib/probe";
+import {
+  UploadStepError,
+  describeUploadFailure,
+  sendBlockers,
+  type UploadState,
+} from "@/lib/capture-status";
 import type { FormatSpec, PromptMediaType, PromptOrientation } from "@/lib/types";
 import { Chip } from "@/components/Chip";
 import { SafetyReport } from "@/components/SafetyReport";
@@ -20,7 +21,6 @@ import { PhotoCamera } from "./PhotoCamera";
 // Supabase's resumable endpoint requires exactly this chunk size.
 const CHUNK_SIZE = 6 * 1024 * 1024;
 
-type UploadState = "idle" | "uploading" | "done" | "failed";
 type MediaMetadata = {
   id: string;
   width?: number;
@@ -30,9 +30,27 @@ type MediaMetadata = {
   fileSize: number;
 };
 
+/** An earlier attempt at this assignment that never reached "Send it". */
+export interface ResumeState {
+  captureId: string;
+  startedAt: string;
+  /** A reshoot of something already sent once. It cannot be thrown away and restarted. */
+  isResubmission: boolean;
+  /** Every file landed; only the details and "Send it" are left. */
+  complete: boolean;
+  media: Array<{
+    id: string;
+    kind: "photo" | "video";
+    mimeType: string;
+    fileSize: number;
+    clientMediaId: string | null;
+  }>;
+}
+
 interface Props {
   assignmentId: string;
   initialCaptureId?: string;
+  resume?: ResumeState;
   ideaId?: string;
   spec: FormatSpec;
   mediaType: PromptMediaType;
@@ -47,9 +65,14 @@ interface Props {
   supabaseUrl: string;
 }
 
+function mediaUrl(captureId: string, mediaId: string) {
+  return `/api/captures/${captureId}/media?mediaId=${mediaId}`;
+}
+
 export function CaptureFlow({
   assignmentId,
   initialCaptureId,
+  resume,
   ideaId,
   spec,
   mediaType,
@@ -64,85 +87,145 @@ export function CaptureFlow({
   supabaseUrl,
 }: Props) {
   const router = useRouter();
-  const uploadRef = useRef<tus.Upload[]>([]);
+  const storageKey = `student-capture:pending:${assignmentId}`;
   const identityRef = useRef<{ submissionId: string; mediaIds: string[] } | null>(null);
+  const lastFilesRef = useRef<File[]>([]);
+  const resumedComplete = Boolean(resume?.complete);
+  // A fresh attempt that never finished uploading is replaced, not continued.
+  const staleRef = useRef<string | null>(
+    resume && !resume.complete && !resume.isResubmission ? resume.captureId : null,
+  );
 
-  const [ticked, setTicked] = useState<string[]>([]);
+  const [resumed, setResumed] = useState(resumedComplete);
+  const [safetyAck, setSafetyAck] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-  const [mediaMetadata, setMediaMetadata] = useState<MediaMetadata[]>([]);
+  const [cameraKey, setCameraKey] = useState(0);
+  const [mediaMetadata, setMediaMetadata] = useState<MediaMetadata[]>(
+    resumedComplete
+      ? resume!.media.map((m) => ({ id: m.id, mimeType: m.mimeType, fileSize: m.fileSize }))
+      : [],
+  );
   const [probe, setProbe] = useState<Probe>({});
   const [findings, setFindings] = useState<FormatFinding[]>([]);
-  const [captureId, setCaptureId] = useState<string | null>(initialCaptureId ?? null);
-  const [upload, setUpload] = useState<UploadState>("idle");
-  const [progress, setProgress] = useState(0);
+  const [captureId, setCaptureId] = useState<string | null>(
+    resumedComplete ? resume!.captureId : (initialCaptureId ?? null),
+  );
+  const [upload, setUpload] = useState<UploadState>(resumedComplete ? "done" : "idle");
+  const [progress, setProgress] = useState(resumedComplete ? 1 : 0);
+  const [uploadError, setUploadError] = useState("");
   const [oneLiner, setOneLiner] = useState("");
   const [tagged, setTagged] = useState<string[]>([]);
   const [nobody, setNobody] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const required = useMemo(() => requiredIds(checklist), [checklist]);
   const safety = useMemo(() => safetyItems(checklist), [checklist]);
-  const ordinary = useMemo(
-    () => checklist.items.filter((i) => !i.safety),
-    [checklist],
-  );
-  const ready = checklistSatisfied(checklist, ticked);
+  const tips = useMemo(() => checklist.items.filter((i) => !i.safety), [checklist]);
+  // One acknowledgement covers every safety rule; the tips are for reading.
+  const ready = safety.length === 0 || safetyAck;
   const peopleDecided = nobody ? tagged.length === 0 : tagged.length > 0;
-  const canSubmit =
-    upload === "done" && (!captionRequired || oneLiner.trim().length > 0) && peopleDecided && !submitting;
+  const blockers = sendBlockers({ upload, captionRequired, oneLiner, peopleDecided });
+  const canSubmit = blockers.length === 0 && !submitting;
+  // A reshoot keeps its submission, so once its files land they stay.
+  const canReplace = !initialCaptureId;
+
+  // Media resumed from an earlier visit still needs its facts read for "Send it".
+  useEffect(() => {
+    if (!resumedComplete || !resume) return;
+    let cancelled = false;
+    void Promise.all(
+      resume.media.map((m) => probeUrl(mediaUrl(resume.captureId, m.id), m.kind)),
+    ).then((facts) => {
+      if (cancelled) return;
+      setProbe(facts[0] ?? {});
+      setMediaMetadata((current) =>
+        current.map((item, index) => ({ ...item, ...facts[index] })),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [resume, resumedComplete]);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   const pendingIdentity = useCallback((mediaCount: number) => {
     if (!identityRef.current) {
-      const key = `student-capture:pending:${assignmentId}`;
-      try {
-        const saved = JSON.parse(window.localStorage.getItem(key) ?? "null") as {
-          submissionId?: string;
-          mediaIds?: string[];
-        } | null;
-        if (saved?.submissionId && Array.isArray(saved.mediaIds)) {
-          identityRef.current = {
-            submissionId: saved.submissionId,
-            mediaIds: saved.mediaIds,
-          };
+      if (resume?.isResubmission) {
+        // Retrying a reshoot must reuse the media rows it already reserved.
+        identityRef.current = {
+          submissionId: resume.captureId,
+          mediaIds: resume.media.flatMap((m) => (m.clientMediaId ? [m.clientMediaId] : [])),
+        };
+      } else {
+        try {
+          const saved = JSON.parse(window.localStorage.getItem(storageKey) ?? "null") as {
+            submissionId?: string;
+            mediaIds?: string[];
+          } | null;
+          if (saved?.submissionId && Array.isArray(saved.mediaIds) && !staleRef.current) {
+            identityRef.current = { submissionId: saved.submissionId, mediaIds: saved.mediaIds };
+          }
+        } catch {
+          // A malformed local hint is safe to replace; the server still owns
+          // uniqueness and authorization.
         }
-      } catch {
-        // A malformed local hint is safe to replace; the server still owns
-        // uniqueness and authorization.
       }
       identityRef.current ??= { submissionId: crypto.randomUUID(), mediaIds: [] };
     }
     while (identityRef.current.mediaIds.length < mediaCount) {
       identityRef.current.mediaIds.push(crypto.randomUUID());
     }
-    window.localStorage.setItem(
-      `student-capture:pending:${assignmentId}`,
-      JSON.stringify(identityRef.current),
-    );
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(identityRef.current));
+    } catch {
+      // Private browsing: retries still work within this visit.
+    }
     return identityRef.current;
-  }, [assignmentId]);
+  }, [resume, storageKey]);
+
+  /** Withdraw an attempt the student is replacing, so it doesn't linger in "Yours". */
+  const discardAttempt = useCallback(async (id: string) => {
+    await fetch(`/api/captures/${id}/withdraw`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reason: "Replaced with a new shot before sending." }),
+    }).catch(() => undefined);
+    identityRef.current = null;
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Nothing stored.
+    }
+  }, [storageKey]);
 
   const startUpload = useCallback(
     async (chosenFiles: File[]) => {
+      lastFilesRef.current = chosenFiles;
       setError("");
+      setUploadError("");
       setUpload("uploading");
       setProgress(0);
 
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        setUpload("failed");
-        setError("Your session expired. Sign in again and the file is still on your phone.");
-        return;
-      }
-
-      let submissionId: string | null = initialCaptureId ?? null;
-      const metadata: MediaMetadata[] = [];
-      const identity = pendingIdentity(chosenFiles.length);
       try {
+        if (staleRef.current) {
+          await discardAttempt(staleRef.current);
+          staleRef.current = null;
+        }
+
+        const supabase = createClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session) throw new UploadStepError("Sign in first.", 401);
+
+        let submissionId: string | null = initialCaptureId ?? null;
+        const metadata: MediaMetadata[] = [];
+        const identity = pendingIdentity(chosenFiles.length);
         for (let index = 0; index < chosenFiles.length; index += 1) {
           const chosen = chosenFiles[index]!;
           const facts = await probeMedia(chosen);
@@ -161,8 +244,8 @@ export function CaptureFlow({
             }),
           });
           if (!started.ok) {
-            const body = await started.json().catch(() => ({ error: "Upload could not start." }));
-            throw new Error(body.error ?? "Upload could not start.");
+            const body = await started.json().catch(() => ({ error: "" }));
+            throw new UploadStepError(body.error || "The upload could not start.", started.status);
           }
           const reservation = (await started.json()) as {
             captureId: string;
@@ -192,7 +275,6 @@ export function CaptureFlow({
               onError: reject,
               onSuccess: () => resolve(),
             });
-            uploadRef.current.push(tusUpload);
             void tusUpload.findPreviousUploads().then((previous) => {
               if (previous[0]) tusUpload.resumeFromPreviousUpload(previous[0]);
               tusUpload.start();
@@ -210,32 +292,54 @@ export function CaptureFlow({
         setMediaMetadata(metadata);
         setProgress(1);
         setUpload("done");
-      } catch (uploadError) {
+      } catch (cause) {
+        const largest = Math.max(0, ...chosenFiles.map((f) => f.size));
         setUpload("failed");
-        setError(uploadError instanceof Error ? uploadError.message : "The upload stopped.");
+        setUploadError(
+          describeUploadFailure(cause, {
+            online: typeof navigator === "undefined" ? true : navigator.onLine,
+            fileBytes: largest || undefined,
+            maxBytes,
+          }).message,
+        );
       }
     },
-    [assignmentId, initialCaptureId, pendingIdentity, supabaseUrl],
+    [assignmentId, discardAttempt, initialCaptureId, maxBytes, pendingIdentity, supabaseUrl],
   );
 
   async function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const chosen = event.target.files?.[0];
+    event.target.value = "";
     if (!chosen) return;
 
     const facts = await probeMedia(chosen);
-    const result = checkFormat(
-      spec,
-      { kind: mediaKind(chosen), bytes: chosen.size, ...facts },
-      maxBytes,
-    );
-
     setFile(chosen);
+    setPreviewUrl(URL.createObjectURL(chosen));
     setProbe(facts);
-    setFindings(result);
+    setFindings(checkFormat(spec, { kind: mediaKind(chosen), bytes: chosen.size, ...facts }, maxBytes));
+    setUpload("idle");
+    setUploadError("");
+  }
 
-    // Warnings are advice, not a wall — only a blocking finding stops the upload.
-    if (!blocks(result)) void startUpload([chosen]);
-    else setUpload("idle");
+  /** Throw away the current shot and go back to the camera. */
+  async function replace() {
+    if (captureId && canReplace && (upload === "done" || upload === "failed")) {
+      setUpload("uploading");
+      await discardAttempt(captureId);
+      setCaptureId(null);
+    }
+    staleRef.current = null;
+    setResumed(false);
+    setFile(null);
+    setPreviewUrl(null);
+    setProbe({});
+    setFindings([]);
+    setPhotoFiles([]);
+    setMediaMetadata([]);
+    setCameraKey((k) => k + 1);
+    setUpload("idle");
+    setProgress(0);
+    setUploadError("");
   }
 
   async function submit() {
@@ -254,144 +358,178 @@ export function CaptureFlow({
         width: probe.width,
         height: probe.height,
         media: mediaMetadata,
-        checklistTicked: ticked,
+        // Only what the student actually confirmed: the safety acknowledgement.
+        checklistTicked: safetyAck ? safety.map((item) => item.id) : [],
         guidelineVersionIds: checklist.versionIds,
       }),
     });
 
     if (!response.ok) {
-      const body = await response.json().catch(() => ({ error: "Could not send that." }));
+      const body = await response.json().catch(() => ({ error: "" }));
       setSubmitting(false);
-      setError(body.error ?? "Could not send that.");
+      setError(
+        response.status === 401
+          ? "You were signed out. Sign in again in a new tab, then tap Send it again."
+          : body.error || "That didn't send. Tap Send it again.",
+      );
       return;
     }
 
-    window.localStorage.removeItem(`student-capture:pending:${assignmentId}`);
-
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Nothing stored.
+    }
     router.push("/submissions");
     router.refresh();
   }
 
   function toggle(id: string) {
-    setTagged((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
-    );
+    setTagged((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
     setNobody(false);
   }
 
+  const blocking = blocks(findings);
+  const shotLocked = upload === "uploading" || upload === "done";
+
   return (
     <div className="flex flex-col gap-5">
-      {/* 1a — safety, set apart because ignoring it hurts someone */}
+      {resume && !resume.complete && (
+        <p className="card p-4 text-[15px]" style={{ borderColor: "var(--accent)" }}>
+          Your last try at this, from {new Date(resume.startedAt).toLocaleString()}, didn&rsquo;t
+          finish uploading. Choose the shot again to send it.
+        </p>
+      )}
+      {resumed && (
+        <p className="card p-4 text-[15px]" style={{ borderColor: "var(--moss)" }}>
+          Your shot from {new Date(resume!.startedAt).toLocaleString()} is uploaded. Add the
+          details below and tap Send it.
+        </p>
+      )}
+
+      {/* 1 — safety: the only thing that stands between the student and the camera */}
       {safety.length > 0 && (
         <section
           className="card p-5"
           style={{ borderColor: "var(--clay)", borderWidth: 2, background: "var(--sunk)" }}
         >
           <p className="label" style={{ color: "var(--clay)" }}>
-            Safety — not optional
+            Safety first
           </p>
-          <ul className="mt-3 flex flex-col gap-3">
+          <ul className="mt-3 flex flex-col gap-2 text-[16px] font-semibold">
             {safety.map((item) => (
-              <li key={item.id}>
-                <label className="flex cursor-pointer items-start gap-3 text-[16px] font-semibold">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0"
-                    checked={ticked.includes(item.id)}
-                    onChange={(e) =>
-                      setTicked((prev) =>
-                        e.target.checked
-                          ? [...prev, item.id]
-                          : prev.filter((t) => t !== item.id),
-                      )
-                    }
-                  />
-                  <span>{item.text}</span>
-                </label>
-              </li>
+              <li key={item.id}>{item.text}</li>
             ))}
           </ul>
+          <label className="mt-4 flex cursor-pointer items-start gap-3 text-[16px]">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0"
+              checked={safetyAck}
+              onChange={(e) => setSafetyAck(e.target.checked)}
+            />
+            <span>I&rsquo;ll shoot this safely.</span>
+          </label>
           <p className="mt-3 text-[15px]" style={{ color: "var(--clay)" }}>
-            No shot is worth a hallway, a staircase, traffic, or an injury. If a
-            prompt cannot be done safely, do not shoot it — report it instead.
+            If a prompt can&rsquo;t be done safely, don&rsquo;t shoot it. Report it instead.
           </p>
           <SafetyReport ideaId={ideaId} />
         </section>
       )}
 
-      {/* 1b — the rest of the rules, at the moment they matter */}
-      <section className="card p-5">
-        <p className="label">Tick these off</p>
-        <ul className="mt-3 flex flex-col gap-3">
-          {ordinary.map((item) => (
-            <li key={item.id}>
-              <label className="flex cursor-pointer items-start gap-3 text-[15px]">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 shrink-0"
-                  checked={ticked.includes(item.id)}
-                  onChange={(e) =>
-                    setTicked((prev) =>
-                      e.target.checked
-                        ? [...prev, item.id]
-                        : prev.filter((t) => t !== item.id),
-                    )
-                  }
-                />
-                <span>
-                  {item.text}
-                  {!item.required && (
-                    <span className="ml-2 text-xs" style={{ color: "var(--muted)" }}>
-                      optional
-                    </span>
-                  )}
+      {/* 2 — the rest of the rules, to read; the format checks catch mistakes */}
+      {tips.length > 0 && (
+        <section className="card p-5">
+          <p className="label">For a usable shot</p>
+          <ul className="mt-3 flex flex-col gap-2 text-[15px]">
+            {tips.map((item) => (
+              <li key={item.id} className="flex gap-3">
+                <span aria-hidden style={{ color: "var(--accent)" }}>
+                  —
                 </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-        {!ready && required.length > 0 && (
-          <p className="mt-4 text-sm" style={{ color: "var(--muted)" }}>
-            Tick the required lines to unlock the camera.
-          </p>
-        )}
-      </section>
+                <span>{item.text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-      {/* 2 — the camera */}
+      {/* 3 — the shot: choose, look at it, then send it up */}
       <section className="card p-5">
         <p className="label">The shot</p>
+
+        {resumed && upload === "done" && (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {resume!.media.map((m) =>
+              m.kind === "video" ? (
+                <video
+                  key={m.id}
+                  src={`${mediaUrl(resume!.captureId, m.id)}#t=0.1`}
+                  controls
+                  playsInline
+                  muted
+                  preload="metadata"
+                  className="col-span-2 max-h-[50vh] w-full rounded-sm bg-black"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={m.id}
+                  src={mediaUrl(resume!.captureId, m.id)}
+                  alt="Your uploaded photo"
+                  className="aspect-square w-full rounded-sm object-cover"
+                />
+              ),
+            )}
+          </div>
+        )}
+
         {mediaType === "video" ? (
-          <label
-            className={`btn mt-3 block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
-          >
-            {file ? "Choose a different file" : "Open camera"}
-            <input
-              type="file"
-              className="sr-only"
-              accept="video/*"
-              capture="environment"
-              disabled={!ready}
-              onChange={onPick}
-            />
-          </label>
-        ) : (
           <>
-            <PhotoCamera
-              orientation={orientation}
-              maxCount={maxMediaCount}
-              disabled={!ready || upload === "uploading" || upload === "done"}
-              onChange={setPhotoFiles}
-            />
-            {photoFiles.length >= minMediaCount && upload === "idle" && (
-              <button className="btn mt-3" type="button" onClick={() => void startUpload(photoFiles)}>
-                Use {photoFiles.length === 1 ? "this photo" : `these ${photoFiles.length} photos`}
-              </button>
+            {!file && !resumed && (
+              <label
+                className={`btn mt-3 block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
+              >
+                Open camera
+                <input
+                  type="file"
+                  className="sr-only"
+                  accept="video/*"
+                  capture="environment"
+                  disabled={!ready}
+                  onChange={onPick}
+                />
+              </label>
+            )}
+            {file && previewUrl && (
+              <video
+                src={previewUrl}
+                controls
+                playsInline
+                className="mt-3 max-h-[50vh] w-full rounded-sm bg-black"
+              />
             )}
           </>
+        ) : (
+          !resumed && (
+            <PhotoCamera
+              key={cameraKey}
+              orientation={orientation}
+              maxCount={maxMediaCount}
+              disabled={!ready || shotLocked}
+              onChange={setPhotoFiles}
+            />
+          )
+        )}
+
+        {!ready && (
+          <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
+            Tick &ldquo;I&rsquo;ll shoot this safely&rdquo; to open the camera.
+          </p>
         )}
 
         {file && (
-          <div className="mt-4 flex flex-col gap-2 text-sm">
+          <div className="mt-3 flex flex-col gap-2 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <Chip>{formatBytes(file.size)}</Chip>
               {probe.durationSeconds && <Chip>{Math.round(probe.durationSeconds)}s</Chip>}
@@ -412,6 +550,39 @@ export function CaptureFlow({
           </div>
         )}
 
+        {/* Review before upload */}
+        {upload === "idle" && (file || photoFiles.length >= minMediaCount) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              className="btn"
+              type="button"
+              disabled={Boolean(file) && blocking}
+              onClick={() => void startUpload(file ? [file] : photoFiles)}
+            >
+              {file
+                ? "Use this"
+                : `Use ${photoFiles.length === 1 ? "this photo" : `these ${photoFiles.length} photos`}`}
+            </button>
+            {file && (
+              <label className="btn btn-quiet cursor-pointer">
+                Retake
+                <input
+                  type="file"
+                  className="sr-only"
+                  accept="video/*"
+                  capture="environment"
+                  onChange={onPick}
+                />
+              </label>
+            )}
+          </div>
+        )}
+        {upload === "idle" && file && blocking && (
+          <p className="mt-2 text-sm" style={{ color: "var(--clay)" }}>
+            This one can&rsquo;t be sent as it is. Retake it.
+          </p>
+        )}
+
         {upload !== "idle" && (
           <div className="mt-4">
             <div
@@ -426,26 +597,46 @@ export function CaptureFlow({
                 }}
               />
             </div>
-            <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
+            <p className="mt-2 text-sm" style={{ color: "var(--muted)" }} role="status">
               {upload === "uploading" &&
-                `Uploading ${Math.round(progress * 100)}% — keep this screen open.`}
+                `Uploading ${Math.round(progress * 100)}%. Keep this screen open.`}
               {upload === "done" && "Uploaded. Now tell us what it is."}
-              {upload === "failed" && "Upload stopped."}
             </p>
-            {upload === "failed" && (file || photoFiles.length > 0) && (
+            {upload === "failed" && (
+              <>
+                <p className="mt-2 text-sm" style={{ color: "var(--clay)" }} role="alert">
+                  {uploadError}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => void startUpload(lastFilesRef.current)}
+                  >
+                    Try again
+                  </button>
+                  {canReplace && (
+                    <button className="btn btn-quiet" type="button" onClick={() => void replace()}>
+                      Choose a different shot
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+            {upload === "done" && canReplace && (
               <button
                 className="btn btn-quiet mt-3"
-                onClick={() => window.location.reload()}
                 type="button"
+                onClick={() => void replace()}
               >
-                Start over safely
+                Retake
               </button>
             )}
           </div>
         )}
       </section>
 
-      {/* 3 — the context marketing needs, and nothing more */}
+      {/* 4 — the context marketing needs, and nothing more */}
       <section className="card p-5">
         {captionRequired && (
           <>
@@ -499,22 +690,25 @@ export function CaptureFlow({
           />
           <span>Nobody is recognisable in this one.</span>
         </label>
-        {!peopleDecided && (
-          <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
-            Tag everyone we could recognise, or tick the box. We cannot post it
-            otherwise.
-          </p>
-        )}
       </section>
 
-      <button className="btn" disabled={!canSubmit} onClick={submit} type="button">
-        {submitting ? "Sending…" : "Send it"}
-      </button>
-      {error && (
-        <p className="text-sm" style={{ color: "var(--clay)" }}>
-          {error}
-        </p>
-      )}
+      <div className="flex flex-col gap-2">
+        <button className="btn" disabled={!canSubmit} onClick={submit} type="button">
+          {submitting ? "Sending…" : "Send it"}
+        </button>
+        {blockers.length > 0 && (
+          <ul className="flex flex-col gap-1 text-sm" style={{ color: "var(--muted)" }} aria-live="polite">
+            {blockers.map((reason) => (
+              <li key={reason}>To send: {reason}</li>
+            ))}
+          </ul>
+        )}
+        {error && (
+          <p className="text-sm" style={{ color: "var(--clay)" }} role="alert">
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

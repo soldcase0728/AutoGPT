@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { TodayView } from "@/components/views/TodayView";
 import { createClient } from "@/lib/supabase/server";
 import { hasSignedRelease, requirePerson } from "@/lib/session";
-import { buildChecklist } from "@/lib/guidelines";
-import type { GuidelineVersion, Idea } from "@/lib/types";
+import type { Idea } from "@/lib/types";
 import { isoDate } from "@/lib/assign";
 import { RELEASE_VERSION } from "@/app/consent/version";
 
@@ -11,6 +10,8 @@ export const dynamic = "force-dynamic";
 
 export default async function Today() {
   const person = await requirePerson();
+  // Staff have nothing to shoot; their work starts in the queue.
+  if (person.role === "reviewer" || person.role === "admin") redirect("/review");
 
   if (person.role === "student" && !(await hasSignedRelease(person.id, RELEASE_VERSION))) {
     redirect("/consent");
@@ -26,28 +27,19 @@ export default async function Today() {
     )
     .eq("person_id", person.id)
     .eq("due_on", today)
+    // A paused or cancelled task is not today's prompt.
+    .eq("ideas.active", true)
     .maybeSingle();
 
   const idea = (assignment?.ideas ?? null) as unknown as
     | (Idea & { campaigns?: { name: string } })
     | null;
 
-  let versions: GuidelineVersion[] = [];
-  if (idea?.guideline_set_ids?.length) {
-    const { data } = await supabase
-      .from("guideline_versions")
-      .select("id, set_id, version, body")
-      .in("set_id", idea.guideline_set_ids)
-      .is("superseded_at", null);
-    versions = (data ?? []) as GuidelineVersion[];
-  }
-
   return (
     <TodayView
       person={person}
       assignment={assignment ? { id: assignment.id, completed_at: assignment.completed_at } : null}
       idea={idea}
-      checklist={buildChecklist(versions)}
     />
   );
 }

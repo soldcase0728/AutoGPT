@@ -24,7 +24,13 @@ insert into auth.users (id, email) values
 
 insert into assignments (id, idea_id, person_id, due_on) values
   ('b0000000-0000-0000-0000-000000000001', :'idea',
-   '71111111-1111-1111-1111-111111111111', current_date);
+   '71111111-1111-1111-1111-111111111111', current_date),
+  -- Pat and Robin each hold their own assignment, so the only thing that can
+  -- refuse their captures below is their participation state.
+  ('b0000000-0000-0000-0000-000000000002', :'idea',
+   '72222222-2222-2222-2222-222222222222', current_date),
+  ('b0000000-0000-0000-0000-000000000003', :'idea',
+   '73333333-3333-3333-3333-333333333333', current_date);
 
 insert into captures (id, assignment_id, person_id, org_id, bucket, storage_key, state)
 values ('f0000000-0000-0000-0000-000000000001',
@@ -86,7 +92,7 @@ begin
     perform set_config('request.jwt.claim.sub',
                        'e0000000-0000-0000-0000-000000000002', true);  -- pending
     insert into captures (assignment_id, person_id, org_id, bucket, storage_key)
-    values ('b0000000-0000-0000-0000-000000000001',
+    values ('b0000000-0000-0000-0000-000000000002',
             '72222222-2222-2222-2222-222222222222',
             '11111111-1111-1111-1111-111111111111', 'captures', 'pat/x/clip.mp4');
     reset role;
@@ -103,7 +109,7 @@ begin
     perform set_config('request.jwt.claim.sub',
                        'e0000000-0000-0000-0000-000000000003', true);  -- revoked
     insert into captures (assignment_id, person_id, org_id, bucket, storage_key)
-    values ('b0000000-0000-0000-0000-000000000001',
+    values ('b0000000-0000-0000-0000-000000000003',
             '73333333-3333-3333-3333-333333333333',
             '11111111-1111-1111-1111-111111111111', 'captures', 'robin/x/clip.mp4');
     reset role;

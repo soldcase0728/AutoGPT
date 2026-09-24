@@ -126,7 +126,9 @@ export const SUBMISSIONS: SubmissionRow[] = [
     oneLiner: "How to tape an ankle in under a minute",
     reviewNote: null,
     source: "Assigned",
-    actionHref: null,
+    thumbnail: { src: "/preview-frame.svg", kind: "photo" },
+    postUrl: "https://www.instagram.com/p/example/",
+    action: null,
     withdrawMode: "request",
   },
   {
@@ -138,7 +140,9 @@ export const SUBMISSIONS: SubmissionRow[] = [
     oneLiner: "Six in the morning, still dark, everyone silent on the bus",
     reviewNote: null,
     source: "Open Moment",
-    actionHref: null,
+    thumbnail: { src: "/preview-frame.svg", kind: "photo" },
+    postUrl: null,
+    action: null,
     withdrawMode: "request",
   },
   {
@@ -150,7 +154,9 @@ export const SUBMISSIONS: SubmissionRow[] = [
     oneLiner: "Three things, one of them is a rubber duck",
     reviewNote: "The ID card is readable. Please reshoot with it out of frame.",
     source: "Assigned",
-    actionHref: null,
+    thumbnail: { src: "/preview-frame.svg", kind: "photo" },
+    postUrl: null,
+    action: { kind: "reshoot", href: "/preview/capture" },
     withdrawMode: "request",
   },
   {
@@ -162,7 +168,23 @@ export const SUBMISSIONS: SubmissionRow[] = [
     oneLiner: "Nobody talks in here before a game",
     reviewNote: null,
     source: "Assigned",
-    actionHref: null,
+    thumbnail: { src: "/preview-frame.svg", kind: "photo" },
+    postUrl: null,
+    action: null,
+    withdrawMode: "direct",
+  },
+  {
+    id: "capture:c5",
+    captureId: "c5",
+    state: "uploading",
+    occurredAt: "2026-09-01T07:40:00Z",
+    ideaTitle: "The path to practice",
+    oneLiner: null,
+    reviewNote: null,
+    source: "Assigned",
+    thumbnail: { src: "/missing-preview.jpg", kind: "video" },
+    postUrl: null,
+    action: { kind: "finish", href: "/preview/capture" },
     withdrawMode: "direct",
   },
 ];
@@ -250,5 +272,69 @@ export const QUEUE: QueueRow[] = [
         reason: "age_unknown",
       },
     ],
+  },
+];
+
+/** What the queue page loads beside each row: tags, history, who opened it. */
+export const QUEUE_EXTRAS = {
+  "a1b2c3d4-0000-0000-0000-000000000001": {
+    tagged: [{ personId: STUDENT.id, name: "Ali Haddad" }],
+    messages: [],
+    internalNotes: [],
+    openedBy: null,
+    postUrl: null,
+    scanTiming: { createdAt: "2026-09-01T14:02:00Z", startedAt: null },
+  },
+  "a1b2c3d4-0000-0000-0000-000000000002": {
+    tagged: [
+      { personId: MINOR.id, name: "Jo Mercer" },
+      { personId: STUDENT.id, name: "Ali Haddad" },
+    ],
+    messages: [],
+    internalNotes: [{ note: "Great energy. Chase Jo's parental form.", at: "2026-09-01T15:00:00Z", author: "Dana Reyes" }],
+    openedBy: null,
+    postUrl: null,
+  },
+  "a1b2c3d4-0000-0000-0000-000000000003": {
+    tagged: [{ personId: "65555555-5555-5555-5555-555555555555", name: "Sam Okafor" }],
+    messages: [],
+    internalNotes: [],
+    openedBy: "Dana Reyes",
+    postUrl: null,
+  },
+};
+
+export const SAFETY_REPORTS = [
+  {
+    id: "f1a90000-0000-0000-0000-000000000001",
+    kind: "unsafe_filming",
+    detail: "The walk-to-practice prompt means crossing the parking lot while filming.",
+    createdAt: "2026-09-01T13:10:00Z",
+    reporter: "Sam Okafor",
+    ideaTitle: "The path to practice",
+  },
+];
+
+export const PEOPLE_ROWS = [
+  {
+    id: "61111111-1111-1111-1111-111111111111", role: "admin" as const, name: "Dana Reyes",
+    email: "dana@example.edu", birthYear: 1988, participation: "active" as const,
+    hasLogin: true, isMe: true, postedCount: 0,
+    consents: [],
+  },
+  {
+    id: STUDENT.id, role: "student" as const, name: "Ali Haddad", email: "ali@example.edu",
+    birthYear: 2005, participation: "active" as const, hasLogin: true, isMe: false, postedCount: 2,
+    consents: [{ type: "media_release" as const, document_version: "release-2026-01", signed_at: "2026-08-20T10:00:00Z", signed_by: "Ali Haddad", expires_at: null, revoked_at: null }],
+  },
+  {
+    id: MINOR.id, role: "student" as const, name: "Jo Mercer", email: "jo@example.edu",
+    birthYear: 2010, participation: "active" as const, hasLogin: true, isMe: false, postedCount: 0,
+    consents: [{ type: "media_release" as const, document_version: "release-2026-01", signed_at: "2026-08-21T10:00:00Z", signed_by: "Jo Mercer", expires_at: null, revoked_at: null }],
+  },
+  {
+    id: "66666666-6666-6666-6666-666666666666", role: "student" as const, name: "Lia Novak",
+    email: "lia@example.edu", birthYear: null, participation: "pending" as const,
+    hasLogin: false, isMe: false, postedCount: 0, consents: [],
   },
 ];
