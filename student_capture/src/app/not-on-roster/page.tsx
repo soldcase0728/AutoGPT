@@ -1,3 +1,5 @@
+import { SignOutButton } from "@/components/SignOutButton";
+
 export default function NotOnRoster() {
   return (
     <main className="mx-auto max-w-md px-5 py-20">
@@ -6,6 +8,7 @@ export default function NotOnRoster() {
         You signed in, but this address is not on any programme roster. Ask whoever
         invited you to add it, then sign in again — nothing else is needed.
       </p>
+      <SignOutButton className="mt-6" />
     </main>
   );
 }
