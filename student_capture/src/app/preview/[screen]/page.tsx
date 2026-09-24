@@ -14,6 +14,8 @@ import {
   MINOR,
   PEOPLE,
   QUEUE,
+  QUEUE_EXTRAS,
+  SAFETY_REPORTS,
   REVIEWER,
   STUDENT,
   SUBMISSIONS,
@@ -110,7 +112,15 @@ export default async function PreviewScreen({
     case "review":
       return (
         <main className="mx-auto max-w-6xl px-5 py-6">
-          <ReviewQueue rows={QUEUE} filter="open" mediaSrc="/preview-frame.svg" />
+          <ReviewQueue
+            rows={QUEUE}
+            tab="review"
+            counts={{ review: 3, waiting: 1, ready: 2, posted: 14, rejected: 3 }}
+            search=""
+            extras={QUEUE_EXTRAS}
+            safetyReports={SAFETY_REPORTS}
+            mediaSrc="/preview-frame.svg"
+          />
         </main>
       );
 

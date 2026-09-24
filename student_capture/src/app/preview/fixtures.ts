@@ -274,3 +274,43 @@ export const QUEUE: QueueRow[] = [
     ],
   },
 ];
+
+/** What the queue page loads beside each row: tags, history, who opened it. */
+export const QUEUE_EXTRAS = {
+  "a1b2c3d4-0000-0000-0000-000000000001": {
+    tagged: [{ personId: STUDENT.id, name: "Ali Haddad" }],
+    messages: [],
+    internalNotes: [],
+    openedBy: null,
+    postUrl: null,
+    scanTiming: { createdAt: "2026-09-01T14:02:00Z", startedAt: null },
+  },
+  "a1b2c3d4-0000-0000-0000-000000000002": {
+    tagged: [
+      { personId: MINOR.id, name: "Jo Mercer" },
+      { personId: STUDENT.id, name: "Ali Haddad" },
+    ],
+    messages: [],
+    internalNotes: [{ note: "Great energy. Chase Jo's parental form.", at: "2026-09-01T15:00:00Z", author: "Dana Reyes" }],
+    openedBy: null,
+    postUrl: null,
+  },
+  "a1b2c3d4-0000-0000-0000-000000000003": {
+    tagged: [{ personId: "65555555-5555-5555-5555-555555555555", name: "Sam Okafor" }],
+    messages: [],
+    internalNotes: [],
+    openedBy: "Dana Reyes",
+    postUrl: null,
+  },
+};
+
+export const SAFETY_REPORTS = [
+  {
+    id: "f1a90000-0000-0000-0000-000000000001",
+    kind: "unsafe_filming",
+    detail: "The walk-to-practice prompt means crossing the parking lot while filming.",
+    createdAt: "2026-09-01T13:10:00Z",
+    reporter: "Sam Okafor",
+    ideaTitle: "The path to practice",
+  },
+];
