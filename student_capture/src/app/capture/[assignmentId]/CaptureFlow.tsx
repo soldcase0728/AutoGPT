@@ -440,7 +440,7 @@ export function CaptureFlow({
       {/* 2 — the rest of the rules, to read; the format checks catch mistakes */}
       {tips.length > 0 && (
         <section className="card p-5">
-          <p className="label">For a usable shot</p>
+          <p className="label">Before you shoot</p>
           <ul className="mt-3 flex flex-col gap-2 text-[15px]">
             {tips.map((item) => (
               <li key={item.id} className="flex gap-3">
