@@ -56,6 +56,8 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks, 
   const router = useRouter();
   const activeStudents = useMemo(() => students.filter((student) => student.participation === "active"), [students]);
   const activeIds = useMemo(() => new Set(activeStudents.map((s) => s.id)), [activeStudents]);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const cancelledCount = tasks.filter((task) => task.cancelled).length;
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
@@ -268,8 +270,15 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks, 
       </form>
 
       <section>
-        <h2 className="text-xl font-semibold">Tasks</h2>
-        <div className="mt-4 grid gap-3">{tasks.map((task) => {
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-xl font-semibold">Tasks</h2>
+          {cancelledCount > 0 && (
+            <button type="button" className="text-sm underline underline-offset-4" onClick={() => setShowCancelled((v) => !v)}>
+              {showCancelled ? "Hide cancelled" : `Show cancelled (${cancelledCount})`}
+            </button>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3">{tasks.filter((task) => showCancelled || !task.cancelled).map((task) => {
           const due = task.dueCount ?? 0;
           const sent = task.sentCount ?? 0;
           return (

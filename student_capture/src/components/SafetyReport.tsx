@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { REPORT_KINDS, type ReportKind } from "@/lib/safety-report";
 
-const KINDS = [
-  { id: "unsafe_filming", label: "Unsafe to film" },
-  { id: "protected_material", label: "Private student info in frame" },
-  { id: "prohibited_content", label: "Alcohol, vaping or gambling in frame" },
-  { id: "other", label: "Something else" },
-];
 
 /**
  * Rule 6: anyone must be able to say a shot is unsafe — above all the student
@@ -21,7 +16,7 @@ export function SafetyReport({
   ideaId?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState(KINDS[0]!.id);
+  const [kind, setKind] = useState<ReportKind>(REPORT_KINDS[0].id);
   const [detail, setDetail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -74,11 +69,11 @@ export function SafetyReport({
       <select
         id="safety-kind"
         value={kind}
-        onChange={(e) => setKind(e.target.value)}
+        onChange={(e) => setKind(e.target.value as ReportKind)}
         className="card px-3 py-2"
         style={{ background: "var(--bg)" }}
       >
-        {KINDS.map((k) => (
+        {REPORT_KINDS.map((k) => (
           <option key={k.id} value={k.id}>
             {k.label}
           </option>

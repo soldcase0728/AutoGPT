@@ -7,6 +7,7 @@ import { Chip } from "@/components/Chip";
 import { describeBlocker, publishable } from "@/lib/consent";
 import { formatBytes } from "@/lib/format-spec";
 import { AutomatedSafetyReview, type ScanTiming } from "@/components/AutomatedSafetyReview";
+import { reportKindLabel } from "@/lib/safety-report";
 import { MESSAGE_PRESETS, QUEUE_TABS, nextSelection, type QueueTabId } from "@/lib/queue";
 import type { CaptureSafetyReview, CaptureState, QueueRow } from "@/lib/types";
 
@@ -725,7 +726,7 @@ function SafetyReportsInbox({ rows, onSaved }: { rows: SafetyReportRow[]; onSave
         {rows.map((row) => (
           <li key={row.id} className="border-t pt-3 first:border-t-0 first:pt-0" style={{ borderColor: "var(--rule)" }}>
             <p className="font-semibold">
-              {row.kind.replaceAll("_", " ")}{row.ideaTitle ? ` · ${row.ideaTitle}` : ""}
+              {reportKindLabel(row.kind)}{row.ideaTitle ? ` · ${row.ideaTitle}` : ""}
             </p>
             <p className="mt-1 text-[15px]">{row.detail}</p>
             <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>

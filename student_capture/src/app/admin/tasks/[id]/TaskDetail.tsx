@@ -28,6 +28,8 @@ interface Task {
   guidelineSetIds: string[];
   active: boolean;
   cancelled: boolean;
+  /** Anything sent for it at all; such a task can be cancelled but not deleted. */
+  hasSubmissions: boolean;
 }
 
 const TONE: Record<AssignmentStatus, "muted" | "good" | "bad" | "accent"> = {
@@ -76,6 +78,7 @@ export function TaskDetail({
   const [captionRequired, setCaptionRequired] = useState(task.captionRequired);
   const [guidelines, setGuidelines] = useState(task.guidelineSetIds);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -102,6 +105,11 @@ export function TaskDetail({
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       setError(payload.error || "That didn't save.");
+      return;
+    }
+    if (payload.deleted) {
+      router.push("/admin/tasks");
+      router.refresh();
       return;
     }
     setNotice(
@@ -262,6 +270,27 @@ export function TaskDetail({
           )}
           {error && <p className="text-sm" style={{ color: "var(--clay)" }} role="alert">{error}</p>}
           {notice && <p className="text-sm" style={{ color: "var(--moss)" }} role="status">{notice}</p>}
+        </section>
+      )}
+
+      {/* Deleting is only for tasks nothing was sent for: a mistake or a duplicate. */}
+      {!task.hasSubmissions && (
+        <section className="card flex flex-col gap-3 p-5">
+          <p className="label">Delete</p>
+          <p className="text-sm" style={{ color: "var(--muted)" }}>
+            Nobody has sent anything for this task, so you can delete it outright. It disappears
+            from the list and from every student it was assigned to.
+          </p>
+          {confirmDelete ? (
+            <span className="flex flex-wrap items-center gap-2 rounded-sm border p-2" style={{ borderColor: "var(--clay)" }}>
+              <span className="text-sm">Delete &ldquo;{task.title}&rdquo; for good?</span>
+              <button className="btn" style={{ background: "var(--clay)", borderColor: "var(--clay)" }} disabled={busy} onClick={() => void act({ action: "delete" }, "Deleted.")}>Delete task</button>
+              <button className="btn btn-quiet" onClick={() => setConfirmDelete(false)}>Keep it</button>
+            </span>
+          ) : (
+            <button className="btn btn-quiet self-start" style={{ color: "var(--clay)" }} onClick={() => setConfirmDelete(true)}>Delete task…</button>
+          )}
+          {task.cancelled && error && <p className="text-sm" style={{ color: "var(--clay)" }} role="alert">{error}</p>}
         </section>
       )}
     </div>

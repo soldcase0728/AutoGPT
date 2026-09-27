@@ -15,10 +15,11 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pause") }),
   z.object({ action: z.literal("resume") }),
   z.object({ action: z.literal("cancel") }),
+  z.object({ action: z.literal("delete") }),
 ]);
 
 /**
- * Edit, pause, resume or cancel a content task. Assignments have no client
+ * Edit, pause, resume, cancel or delete a content task. Assignments have no client
  * write path (see 0002_rls.sql), so like task creation this runs as the service
  * role after checking the caller is an admin of the task's school.
  */
@@ -40,6 +41,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .eq("campaigns.org_id", person.org_id)
     .maybeSingle();
   if (!idea) return fail(404, "That task isn't in your school.");
+  if (body.action === "delete") {
+    // Only a task nobody has sent anything for. Anything a student shot keeps
+    // its task, so its history and the review trail stay whole (the database
+    // enforces this too: captures.prompt_id is ON DELETE RESTRICT).
+    const { count, error: countError } = await admin
+      .from("captures").select("id", { count: "exact", head: true }).eq("prompt_id", id);
+    if (countError) return fail(500, countError.message);
+    if (count) {
+      return fail(409, "Students have already sent something for this task, so it can't be deleted. Cancel it instead; what they sent stays.");
+    }
+    const { error } = await admin.from("ideas").delete().eq("id", id);
+    if (error) return fail(500, error.message);
+    await admin.from("audit_log").insert({
+      org_id: person.org_id,
+      actor_id: person.id,
+      action: "content_task.deleted",
+      subject_type: "idea",
+      subject_id: id,
+      detail: {},
+    });
+    return json({ ok: true, deleted: true });
+  }
   if (idea.cancelled_at && body.action !== "edit") return fail(409, "That task was cancelled.");
 
   let detail: Record<string, unknown> = {};

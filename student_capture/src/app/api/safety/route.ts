@@ -3,8 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { fail, json, readJson } from "@/lib/http";
 import { alertSafety, safetyMessage } from "@/lib/alerts";
+import { isReportKind, reportKindLabel } from "@/lib/safety-report";
 
-const KINDS = ["unsafe_filming", "protected_material", "prohibited_content", "other"];
 
 interface Body {
   kind: string;
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
 
   const body = await readJson<Body>(request);
   const detail = body?.detail?.trim();
-  if (!body?.kind || !KINDS.includes(body.kind)) {
-    return fail(400, `kind must be one of: ${KINDS.join(", ")}.`);
+  if (!isReportKind(body?.kind)) {
+    return fail(400, "Choose what is wrong from the list.");
   }
   if (!detail) return fail(400, "Tell us what happened, in a sentence.");
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   const alert = await alertSafety(
     safetyMessage({
       org: org?.name ?? "Unknown organisation",
-      kind: body.kind,
+      kind: reportKindLabel(body.kind),
       detail,
       reporter: person.display_name,
       captureId: body.captureId,

@@ -77,6 +77,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             guidelineSetIds: idea.guideline_set_ids ?? [],
             active: idea.active,
             cancelled: Boolean(idea.cancelled_at),
+            hasSubmissions: (captures ?? []).length > 0,
           }}
           progress={progress}
           rows={rows}
