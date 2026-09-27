@@ -6,7 +6,12 @@ import type { CaptureState, PromptCaptureMode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function Submissions() {
+export default async function Submissions({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
   const person = await requirePerson();
   const supabase = await createClient();
 
@@ -169,5 +174,5 @@ export default async function Submissions() {
   }
 
   rows.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  return <SubmissionsView person={person} rows={rows} progress={await progressPromise} />;
+  return <SubmissionsView person={person} rows={rows} progress={await progressPromise} initialTab={tab ?? null} />;
 }
