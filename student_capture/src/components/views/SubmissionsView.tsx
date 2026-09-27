@@ -8,6 +8,7 @@ import { Chip } from "@/components/Chip";
 import { Thumbnail } from "@/components/Thumbnail";
 import { StudentProgressCard } from "@/components/StudentProgressCard";
 import { shotsHeading } from "@/lib/names";
+import { resolveShotsTab, splitShots, type ShotsTab } from "@/lib/my-shots";
 import type { StudentProgress } from "@/lib/student-progress";
 import type { CaptureState, Person } from "@/lib/types";
 
@@ -73,9 +74,12 @@ export function SubmissionsView({
   person,
   rows,
   progress = null,
+  initialTab = null,
 }: {
   person: Person;
   rows: SubmissionRow[];
+  /** From ?tab=; otherwise open tasks if there are any. */
+  initialTab?: string | null;
   /** The record strip. The latest post is already in the list, so it is left out here. */
   progress?: StudentProgress | null;
 }) {
@@ -125,176 +129,235 @@ export function SubmissionsView({
     router.refresh();
   }
 
+  const split = splitShots(rows);
+  const [tab, setTab] = useState<ShotsTab>(() => resolveShotsTab(initialTab, split.open.length));
+
+  function chooseTab(next: ShotsTab) {
+    setTab(next);
+    // Keep the tab in the address so a refresh or the back button returns here.
+    window.history.replaceState(null, "", `/submissions?tab=${next}`);
+  }
+
+  function renderRow(row: SubmissionRow) {
+    return (
+        <li key={row.id} className="card p-4">
+          <div className="flex gap-4">
+            <Thumbnail
+              src={row.thumbnail?.src ?? null}
+              kind={row.thumbnail?.kind ?? "photo"}
+              label={`${row.ideaTitle}${row.oneLiner ? `: ${row.oneLiner}` : ""}`}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Chip tone={TONE[row.state]}>{SAID[row.state]}</Chip>
+                  {row.awardedOn && (
+                    <span
+                      className="inline-block rounded-sm px-2 py-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.1em]"
+                      style={{ background: "var(--brand)", color: "#fff" }}
+                      title={`Shot of the Day, ${row.awardedOn}`}
+                    >
+                      ★ Shot of the Day
+                    </span>
+                  )}
+                  <Chip>{row.source}</Chip>
+                </div>
+                <span className="label">{new Date(row.occurredAt).toLocaleDateString()}</span>
+              </div>
+              <p className="mt-2 text-[15px] font-semibold">{row.ideaTitle}</p>
+              {row.oneLiner && (
+                <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
+                  &ldquo;{row.oneLiner}&rdquo;
+                </p>
+              )}
+              {row.state === "published" && (
+                <p className="mt-2 text-[15px]">
+                  {row.postUrl ? (
+                    <a
+                      href={row.postUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline underline-offset-4"
+                      style={{ color: "var(--moss)" }}
+                    >
+                      See your post
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--muted)" }}>
+                      It&rsquo;s live. The marketing desk hasn&rsquo;t added the link yet.
+                    </span>
+                  )}
+                </p>
+              )}
+              {row.state === "uploading" && (
+                <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+                  You started this but didn&rsquo;t tap Send it. Nobody can see it yet.
+                </p>
+              )}
+            </div>
+          </div>
+    
+          {row.reviewNote && (
+            <p className="mt-3 rounded-sm border p-3 text-sm" style={{ borderColor: "var(--rule)", background: "var(--sunk)" }}>
+              <span className="font-semibold">Marketing desk:</span> {row.reviewNote}
+            </p>
+          )}
+    
+          {withdrawing === row.id ? (
+            <form
+              className="mt-3 flex flex-col gap-2 rounded-sm border p-3"
+              style={{ borderColor: "var(--rule)" }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void withdraw(row);
+              }}
+            >
+              <p className="text-[15px] font-semibold">
+                {row.withdrawMode === "direct" ? "Withdraw this?" : "Ask to withdraw this?"}
+              </p>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>
+                {row.withdrawMode === "direct"
+                  ? "It's removed straight away. Nobody at the marketing desk has seen it."
+                  : row.state === "published"
+                    ? "The marketing desk will take the post down and remove it. They'll reply here."
+                    : "The marketing desk has already seen it, so they'll confirm. They'll reply here."}
+              </p>
+              <label className="label mt-1" htmlFor={`reason-${row.id}`}>
+                {row.withdrawMode === "direct" ? "Why? (optional)" : "Why? This helps them act quickly"}
+              </label>
+              <textarea
+                id={`reason-${row.id}`}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                maxLength={500}
+                className="card px-3 py-2 text-[15px]"
+                style={{ background: "var(--bg)" }}
+                placeholder="Someone in it asked me to take it down"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button className="btn" type="submit" disabled={busy === row.id}>
+                  {busy === row.id
+                    ? "Sending…"
+                    : row.withdrawMode === "direct"
+                      ? "Withdraw it"
+                      : "Send request"}
+                </button>
+                <button
+                  className="btn btn-quiet"
+                  type="button"
+                  disabled={busy === row.id}
+                  onClick={() => setWithdrawing(null)}
+                >
+                  Keep it
+                </button>
+              </div>
+            </form>
+          ) : (
+            (row.action || row.withdrawMode) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {row.action?.kind === "reshoot" ? (
+                  <button className="btn" disabled={busy === row.id} onClick={() => void reshoot(row)}>
+                    {ACTION_LABEL.reshoot}
+                  </button>
+                ) : (
+                  row.action && (
+                    <Link className="btn" href={row.action.href}>
+                      {ACTION_LABEL[row.action.kind]}
+                    </Link>
+                  )
+                )}
+                {row.withdrawMode && (
+                  <button
+                    className="btn btn-quiet"
+                    type="button"
+                    disabled={busy === row.id}
+                    onClick={() => openWithdraw(row)}
+                  >
+                    {row.withdrawMode === "direct" ? "Withdraw" : "Request withdrawal"}
+                  </button>
+                )}
+              </div>
+            )
+          )}
+          {error?.rowId === row.id && (
+            <p className="mt-2 text-sm" style={{ color: "var(--clay)" }} role="alert">
+              {error.message}
+            </p>
+          )}
+        </li>
+    );
+  }
+
   return (
     <>
       <AppHeader person={person} />
       <main className="mx-auto max-w-3xl px-5 py-8">
         <h1 className="text-2xl font-bold tracking-tight">{shotsHeading(person.display_name)}</h1>
         <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
-          Assignments, uploads, and review outcomes in one place.
+          What you&rsquo;ve sent, and what&rsquo;s still to do.
         </p>
-
-        {progress && (
-          <div className="mt-4">
-            <StudentProgressCard progress={{ ...progress, recent: null }} />
-          </div>
-        )}
 
         {rows.length === 0 ? (
           <p className="mt-4 text-[15px]" style={{ color: "var(--muted)" }}>
             Nothing here yet. <Link href="/" className="underline underline-offset-4">Today&rsquo;s prompt</Link> will appear here when it is assigned.
           </p>
         ) : (
-          <ul className="mt-5 flex flex-col gap-3">
-            {rows.map((row) => (
-              <li key={row.id} className="card p-4">
-                <div className="flex gap-4">
-                  <Thumbnail
-                    src={row.thumbnail?.src ?? null}
-                    kind={row.thumbnail?.kind ?? "photo"}
-                    label={`${row.ideaTitle}${row.oneLiner ? `: ${row.oneLiner}` : ""}`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Chip tone={TONE[row.state]}>{SAID[row.state]}</Chip>
-                        {row.awardedOn && (
-                          <span
-                            className="inline-block rounded-sm px-2 py-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.1em]"
-                            style={{ background: "var(--brand)", color: "#fff" }}
-                            title={`Shot of the Day, ${row.awardedOn}`}
-                          >
-                            ★ Shot of the Day
-                          </span>
-                        )}
-                        <Chip>{row.source}</Chip>
-                      </div>
-                      <span className="label">{new Date(row.occurredAt).toLocaleDateString()}</span>
-                    </div>
-                    <p className="mt-2 text-[15px] font-semibold">{row.ideaTitle}</p>
-                    {row.oneLiner && (
-                      <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
-                        &ldquo;{row.oneLiner}&rdquo;
-                      </p>
-                    )}
-                    {row.state === "published" && (
-                      <p className="mt-2 text-[15px]">
-                        {row.postUrl ? (
-                          <a
-                            href={row.postUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-semibold underline underline-offset-4"
-                            style={{ color: "var(--moss)" }}
-                          >
-                            See your post
-                          </a>
-                        ) : (
-                          <span style={{ color: "var(--muted)" }}>
-                            It&rsquo;s live. The marketing desk hasn&rsquo;t added the link yet.
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    {row.state === "uploading" && (
-                      <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-                        You started this but didn&rsquo;t tap Send it. Nobody can see it yet.
-                      </p>
-                    )}
+          <>
+            <nav className="mt-5 flex gap-2 border-b" style={{ borderColor: "var(--rule)" }} aria-label="My shots">
+              {([
+                ["done", "My shots", split.done.length],
+                ["open", "Open tasks", split.open.length],
+              ] as const).map(([id, label, count]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => chooseTab(id)}
+                  aria-current={tab === id ? "page" : undefined}
+                  className="-mb-px border-b-2 px-3 py-2 text-[15px] font-semibold"
+                  style={{
+                    borderColor: tab === id ? "var(--brand)" : "transparent",
+                    color: tab === id ? "var(--ink)" : "var(--muted)",
+                  }}
+                >
+                  {label} <span className="font-mono text-xs tabular-nums">{count}</span>
+                </button>
+              ))}
+            </nav>
+
+            {tab === "done" ? (
+              <>
+                {progress && (
+                  <div className="mt-4">
+                    <StudentProgressCard progress={{ ...progress, recent: null }} />
                   </div>
-                </div>
-
-                {row.reviewNote && (
-                  <p className="mt-3 rounded-sm border p-3 text-sm" style={{ borderColor: "var(--rule)", background: "var(--sunk)" }}>
-                    <span className="font-semibold">Marketing desk:</span> {row.reviewNote}
-                  </p>
                 )}
-
-                {withdrawing === row.id ? (
-                  <form
-                    className="mt-3 flex flex-col gap-2 rounded-sm border p-3"
-                    style={{ borderColor: "var(--rule)" }}
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void withdraw(row);
-                    }}
-                  >
-                    <p className="text-[15px] font-semibold">
-                      {row.withdrawMode === "direct" ? "Withdraw this?" : "Ask to withdraw this?"}
-                    </p>
-                    <p className="text-sm" style={{ color: "var(--muted)" }}>
-                      {row.withdrawMode === "direct"
-                        ? "It's removed straight away. Nobody at the marketing desk has seen it."
-                        : row.state === "published"
-                          ? "The marketing desk will take the post down and remove it. They'll reply here."
-                          : "The marketing desk has already seen it, so they'll confirm. They'll reply here."}
-                    </p>
-                    <label className="label mt-1" htmlFor={`reason-${row.id}`}>
-                      {row.withdrawMode === "direct" ? "Why? (optional)" : "Why? This helps them act quickly"}
-                    </label>
-                    <textarea
-                      id={`reason-${row.id}`}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      rows={2}
-                      maxLength={500}
-                      className="card px-3 py-2 text-[15px]"
-                      style={{ background: "var(--bg)" }}
-                      placeholder="Someone in it asked me to take it down"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <button className="btn" type="submit" disabled={busy === row.id}>
-                        {busy === row.id
-                          ? "Sending…"
-                          : row.withdrawMode === "direct"
-                            ? "Withdraw it"
-                            : "Send request"}
-                      </button>
-                      <button
-                        className="btn btn-quiet"
-                        type="button"
-                        disabled={busy === row.id}
-                        onClick={() => setWithdrawing(null)}
-                      >
-                        Keep it
-                      </button>
-                    </div>
-                  </form>
+                {split.done.length ? (
+                  <ul className="mt-4 flex flex-col gap-3">{split.done.map(renderRow)}</ul>
                 ) : (
-                  (row.action || row.withdrawMode) && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {row.action?.kind === "reshoot" ? (
-                        <button className="btn" disabled={busy === row.id} onClick={() => void reshoot(row)}>
-                          {ACTION_LABEL.reshoot}
-                        </button>
-                      ) : (
-                        row.action && (
-                          <Link className="btn" href={row.action.href}>
-                            {ACTION_LABEL[row.action.kind]}
-                          </Link>
-                        )
-                      )}
-                      {row.withdrawMode && (
-                        <button
-                          className="btn btn-quiet"
-                          type="button"
-                          disabled={busy === row.id}
-                          onClick={() => openWithdraw(row)}
-                        >
-                          {row.withdrawMode === "direct" ? "Withdraw" : "Request withdrawal"}
-                        </button>
-                      )}
-                    </div>
-                  )
-                )}
-                {error?.rowId === row.id && (
-                  <p className="mt-2 text-sm" style={{ color: "var(--clay)" }} role="alert">
-                    {error.message}
+                  <p className="mt-4 text-[15px]" style={{ color: "var(--muted)" }}>
+                    Nothing sent yet. Your shots show up here once you send them.
                   </p>
                 )}
-              </li>
-            ))}
-          </ul>
+              </>
+            ) : (
+              <>
+                {split.open.length ? (
+                  <ul className="mt-4 flex flex-col gap-3">{split.open.map(renderRow)}</ul>
+                ) : (
+                  <p className="mt-4 text-[15px]" style={{ color: "var(--muted)" }}>
+                    You&rsquo;re all caught up. New tasks show up here when they&rsquo;re assigned.
+                  </p>
+                )}
+                {split.missed.length > 0 && (
+                  <>
+                    <p className="label mt-6">Missed</p>
+                    <ul className="mt-2 flex flex-col gap-3 opacity-70">{split.missed.map(renderRow)}</ul>
+                  </>
+                )}
+              </>
+            )}
+          </>
         )}
       </main>
     </>
