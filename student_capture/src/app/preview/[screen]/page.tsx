@@ -44,6 +44,16 @@ export const dynamic = "force-dynamic";
 // Screenshots must not drift every time the date changes.
 const FIXED_DAY = new Date("2026-09-01T09:00:00Z");
 
+const PROGRESS = {
+  record: { streak: 4, sent: 11, posted: 3 },
+  recent: { id: "p1", title: "Teach us one thing", postedAt: "2026-08-31T16:00:00Z", postUrl: "https://www.instagram.com/p/example/" },
+  community: {
+    weekPosted: 23,
+    weekContributors: 41,
+    groups: [{ name: "Varsity soccer", kind: "team", members: 18, weekSent: 14 }],
+  },
+};
+
 const SCREENS = [
   "today",
   "today-done",
@@ -75,6 +85,7 @@ export default async function PreviewScreen({
           assignment={{ id: "assignment-1", completed_at: null }}
           idea={IDEA}
           today={FIXED_DAY}
+          progress={{ ...PROGRESS, recent: null }}
         />
       );
 
@@ -85,6 +96,7 @@ export default async function PreviewScreen({
           assignment={{ id: "assignment-1", completed_at: "2026-09-01T14:02:00Z" }}
           idea={IDEA}
           today={FIXED_DAY}
+          progress={PROGRESS}
         />
       );
 
@@ -120,7 +132,7 @@ export default async function PreviewScreen({
       );
 
     case "submissions":
-      return <SubmissionsView person={STUDENT} rows={SUBMISSIONS} />;
+      return <SubmissionsView person={STUDENT} rows={SUBMISSIONS} progress={PROGRESS} />;
 
     case "review":
       return (

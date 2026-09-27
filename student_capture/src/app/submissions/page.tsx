@@ -1,6 +1,7 @@
 import { SubmissionsView, type SubmissionRow } from "@/components/views/SubmissionsView";
 import { createClient } from "@/lib/supabase/server";
 import { requirePerson } from "@/lib/session";
+import { loadStudentProgress } from "@/lib/student-progress";
 import type { CaptureState, PromptCaptureMode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export default async function Submissions() {
   const person = await requirePerson();
   const supabase = await createClient();
 
+  const progressPromise = person.role === "student" ? loadStudentProgress(supabase, person.id) : Promise.resolve(null);
   const [{ data: captures }, { data: assignments }] = await Promise.all([
     supabase
       .from("captures")
@@ -152,5 +154,5 @@ export default async function Submissions() {
   }
 
   rows.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  return <SubmissionsView person={person} rows={rows} />;
+  return <SubmissionsView person={person} rows={rows} progress={await progressPromise} />;
 }

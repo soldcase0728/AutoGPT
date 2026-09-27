@@ -191,7 +191,7 @@ seeding anything real.
 
 ### Upgrading an existing project
 
-A project set up before September 24, 2026 needs five more migrations. Paste
+A project set up before September 24, 2026 needs six more migrations. Paste
 each file into Supabase ▸ SQL Editor and run it, in this order. Each one is safe
 to run twice. (Don't use `pnpm db:apply` on an existing project: it re-runs the
 original migrations, which are not.)
@@ -203,6 +203,7 @@ original migrations, which are not.)
 | `20260924130000_review_messages.sql` | Staff-only internal notes; a student message on takedowns |
 | `20260924140000_tasks_and_groups.sql` | Task pause and cancel, and student groups |
 | `20260924150000_link_existing_login.sql` | People can link someone to a login that already exists |
+| `20260927120000_community_stats.sql` | School and team totals on a student's record (counts only) |
 
 Apply them before deploying this version. The review queue's decisions,
 takedowns, post links, task pages and groups call what they add; until they are

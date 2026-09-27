@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { Chip } from "@/components/Chip";
 import { Thumbnail } from "@/components/Thumbnail";
+import { StudentProgressCard } from "@/components/StudentProgressCard";
+import type { StudentProgress } from "@/lib/student-progress";
 import type { CaptureState, Person } from "@/lib/types";
 
 type YoursState = CaptureState | "assigned" | "expired" | "taken_down";
@@ -64,7 +66,16 @@ export interface SubmissionRow {
   withdrawMode: "direct" | "request" | null;
 }
 
-export function SubmissionsView({ person, rows }: { person: Person; rows: SubmissionRow[] }) {
+export function SubmissionsView({
+  person,
+  rows,
+  progress = null,
+}: {
+  person: Person;
+  rows: SubmissionRow[];
+  /** The record strip. The latest post is already in the list, so it is left out here. */
+  progress?: StudentProgress | null;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<{ rowId: string; message: string } | null>(null);
@@ -119,6 +130,12 @@ export function SubmissionsView({ person, rows }: { person: Person; rows: Submis
         <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
           Assignments, uploads, and review outcomes in one place.
         </p>
+
+        {progress && (
+          <div className="mt-4">
+            <StudentProgressCard progress={{ ...progress, recent: null }} />
+          </div>
+        )}
 
         {rows.length === 0 ? (
           <p className="mt-4 text-[15px]" style={{ color: "var(--muted)" }}>

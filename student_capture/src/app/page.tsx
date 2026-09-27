@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hasSignedRelease, requirePerson } from "@/lib/session";
 import type { Idea } from "@/lib/types";
 import { isoDate } from "@/lib/assign";
+import { loadStudentProgress } from "@/lib/student-progress";
 import { RELEASE_VERSION } from "@/app/consent/version";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function Today() {
   const supabase = await createClient();
   const today = isoDate(new Date());
 
+  const progressPromise = person.role === "student" ? loadStudentProgress(supabase, person.id) : Promise.resolve(null);
   const { data: assignment } = await supabase
     .from("assignments")
     .select(
@@ -41,6 +43,7 @@ export default async function Today() {
       person={person}
       assignment={assignment ? { id: assignment.id, completed_at: assignment.completed_at } : null}
       idea={idea}
+      progress={await progressPromise}
     />
   );
 }

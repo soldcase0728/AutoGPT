@@ -2,6 +2,8 @@ import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { PromptCard } from "@/components/PromptCard";
 import { Chip } from "@/components/Chip";
+import { StudentProgressCard } from "@/components/StudentProgressCard";
+import type { StudentProgress } from "@/lib/student-progress";
 import type { Idea, Person } from "@/lib/types";
 
 export interface TodayViewProps {
@@ -11,6 +13,8 @@ export interface TodayViewProps {
   idea: (Idea & { campaigns?: { name: string } }) | null;
   /** Injected so the view renders identically whatever day it is screenshotted. */
   today?: Date;
+  /** Students only: their record and what went live. */
+  progress?: StudentProgress | null;
 }
 
 export function TodayView({
@@ -18,6 +22,7 @@ export function TodayView({
   assignment,
   idea,
   today = new Date(),
+  progress = null,
 }: TodayViewProps) {
   const isStaff = person.role === "reviewer" || person.role === "admin";
 
@@ -65,7 +70,7 @@ export function TodayView({
                 <div>
                   <Chip tone="good">Sent</Chip>
                   <p className="mt-2 text-[15px]">
-                    That is today done. We will tell you if it goes out.
+                    That is today done. When it goes live, it shows up here.
                   </p>
                 </div>
                 <Link href="/submissions" className="btn btn-quiet whitespace-nowrap">
@@ -77,6 +82,12 @@ export function TodayView({
                 Shoot it
               </Link>
             )}
+          </div>
+        )}
+
+        {progress && (
+          <div className="mt-5">
+            <StudentProgressCard progress={progress} />
           </div>
         )}
       </main>
