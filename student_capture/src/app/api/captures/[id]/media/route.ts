@@ -30,6 +30,10 @@ export async function GET(
     .maybeSingle();
 
   if (!capture) return fail(404, "That capture does not exist.");
+  // Drafts are the student's alone (RLS hides them from staff too).
+  if (capture.person_id !== person.id && capture.state === "uploading") {
+    return fail(404, "That capture does not exist.");
+  }
   if (
     capture.person_id !== person.id &&
     (capture.state === "withdrawal_requested" || capture.state === "withdrawn")
@@ -49,7 +53,7 @@ export async function GET(
       .select("id, submission_id, bucket, storage_key")
       .eq("id", mediaId)
       .eq("submission_id", capture.id)
-      .eq("media_revision", capture.media_revision)
+      // Any take of this capture: a reshoot shows its student the returned take.
       .maybeSingle();
     if (!media) return fail(404, "That media item does not exist.");
     bucket = media.bucket;

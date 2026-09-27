@@ -5,6 +5,7 @@ import { SubmissionsView } from "@/components/views/SubmissionsView";
 import { ConsentView } from "@/components/views/ConsentView";
 import { ConsentForm } from "@/app/consent/ConsentForm";
 import { CaptureFlow } from "@/app/capture/[assignmentId]/CaptureFlow";
+import { SentBackCard } from "@/app/capture/[assignmentId]/SentBackCard";
 import { ReviewQueue } from "@/app/review/ReviewQueue";
 import { PosterView } from "@/components/views/PosterView";
 import { PeopleManager } from "@/app/admin/people/PeopleManager";
@@ -93,11 +94,18 @@ export default async function PreviewScreen({
   searchParams,
 }: {
   params: Promise<{ screen: string }>;
-  searchParams: Promise<{ url?: string; headline?: string; org?: string; note?: string; media?: string }>;
+  searchParams: Promise<{ url?: string; headline?: string; org?: string; note?: string; media?: string; reshoot?: string }>;
 }) {
   if (!demoScreensEnabled()) notFound();
   const { screen } = await params;
-  const { url: urlParam, headline, org, note, media } = await searchParams;
+  const { url: urlParam, headline, org, note, media, reshoot } = await searchParams;
+  const sentBack = reshoot
+    ? {
+        note: "An ID card, schedule or screen is readable. Please reshoot with it out of frame.",
+        at: "2026-09-01T12:00:00Z",
+        previous: { captureId: "c3", mediaId: "m3", kind: "photo" as const },
+      }
+    : undefined;
 
   switch (screen) {
     case "today":
@@ -119,13 +127,16 @@ export default async function PreviewScreen({
           idea={IDEA}
           today={FIXED_DAY}
           progress={PROGRESS}
+          sentBack={reshoot ? { assignmentId: "assignment-1", title: IDEA.title, note: sentBack!.note } : null}
         />
       );
 
     case "capture":
       return (
         <main className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-8">
+          {sentBack && <SentBackCard sentBack={sentBack} />}
           <CaptureFlow
+            sentBack={sentBack}
             assignmentId="assignment-1"
             ideaId={IDEA.id}
             spec={IDEA.format_spec}

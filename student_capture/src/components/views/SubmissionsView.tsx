@@ -8,6 +8,7 @@ import { Chip } from "@/components/Chip";
 import { Thumbnail } from "@/components/Thumbnail";
 import { StudentProgressCard } from "@/components/StudentProgressCard";
 import { shotsHeading } from "@/lib/names";
+import { shortDate } from "@/lib/dates";
 import { resolveShotsTab, splitShots, type ShotsTab } from "@/lib/my-shots";
 import type { StudentProgress } from "@/lib/student-progress";
 import type { CaptureState, Person } from "@/lib/types";
@@ -41,17 +42,17 @@ const SAID: Record<YoursState, string> = {
   withdrawal_requested: "Withdrawal requested",
   withdrawn: "Withdrawn",
   approved: "Accepted",
-  changes_requested: "Reshoot needed",
-  reshooting: "Reshoot not sent yet",
+  changes_requested: "Sent back",
+  reshooting: "Sent back",
   rejected: "Not accepted",
   published: "Posted",
   taken_down: "Taken down",
 };
 
 const ACTION_LABEL = {
-  reshoot: "Reshoot this",
+  reshoot: "Reshoot",
   finish: "Finish sending",
-  finishReshoot: "Finish reshoot",
+  finishReshoot: "Reshoot",
   capture: "Capture this",
 } as const;
 
@@ -60,10 +61,15 @@ const ACTION_LABEL = {
  * redone, or won't be used. They show a status tile instead of the media.
  */
 const STATUS_TILE: Partial<Record<YoursState, { text: string; tone: "bad" | "accent" }>> = {
-  reshooting: { text: "Reshoot", tone: "accent" },
+  changes_requested: { text: "Sent back", tone: "accent" },
+  reshooting: { text: "Sent back", tone: "accent" },
   rejected: { text: "Not accepted", tone: "bad" },
   taken_down: { text: "Taken down", tone: "bad" },
 };
+
+function isSentBack(state: YoursState) {
+  return state === "changes_requested" || state === "reshooting";
+}
 
 /** What the reviewer's message is, in this state. */
 function noteLabel(state: YoursState): string {
@@ -185,9 +191,14 @@ export function SubmissionsView({
                   )}
                   <Chip>{row.source}</Chip>
                 </div>
-                <span className="label">{new Date(row.occurredAt).toLocaleDateString()}</span>
+                <span className="label">{shortDate(row.occurredAt)}</span>
               </div>
-              <p className="mt-2 text-[15px] font-semibold">{row.ideaTitle}</p>
+              {isSentBack(row.state) && row.reviewNote && (
+                <p className="mt-2 text-[15px] font-semibold leading-snug">{row.reviewNote}</p>
+              )}
+              <p className={`mt-2 text-[15px] ${isSentBack(row.state) ? "" : "font-semibold"}`} style={isSentBack(row.state) ? { color: "var(--muted)" } : undefined}>
+                {row.ideaTitle}
+              </p>
               {row.oneLiner && (
                 <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
                   &ldquo;{row.oneLiner}&rdquo;
@@ -217,20 +228,11 @@ export function SubmissionsView({
                   You started this but didn&rsquo;t tap Send it. Nobody can see it yet.
                 </p>
               )}
-              {row.state === "reshooting" && (
-                <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-                  You&rsquo;re redoing this one. Shoot it again, then tap Send it.
-                </p>
-              )}
-              {row.state === "changes_requested" && (
-                <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-                  The marketing desk sent this back. Fix what they asked and send it again.
-                </p>
-              )}
+
             </div>
           </div>
     
-          {row.reviewNote && (
+          {row.reviewNote && !isSentBack(row.state) && (
             <p
               className="mt-3 rounded-sm border p-3 text-sm"
               style={{

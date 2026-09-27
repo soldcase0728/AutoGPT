@@ -17,6 +17,7 @@ import type { FormatSpec, PromptMediaType, PromptOrientation } from "@/lib/types
 import { Chip } from "@/components/Chip";
 import { SafetyReport } from "@/components/SafetyReport";
 import { PhotoCamera } from "./PhotoCamera";
+import { dateTime } from "@/lib/dates";
 
 // Supabase's resumable endpoint requires exactly this chunk size.
 const CHUNK_SIZE = 6 * 1024 * 1024;
@@ -47,8 +48,16 @@ export interface ResumeState {
   }>;
 }
 
+/** A shot the desk returned: their note, when, and the take they saw. */
+export interface SentBack {
+  note: string | null;
+  at: string;
+  previous: { captureId: string; mediaId: string; kind: "photo" | "video" } | null;
+}
+
 interface Props {
   assignmentId: string;
+  sentBack?: SentBack;
   initialCaptureId?: string;
   resume?: ResumeState;
   ideaId?: string;
@@ -73,6 +82,7 @@ export function CaptureFlow({
   assignmentId,
   initialCaptureId,
   resume,
+  sentBack,
   ideaId,
   spec,
   mediaType,
@@ -120,6 +130,8 @@ export function CaptureFlow({
   const [nobody, setNobody] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [resumedUnreadable, setResumedUnreadable] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(true);
 
   const safety = useMemo(() => safetyItems(checklist), [checklist]);
   const tips = useMemo(() => checklist.items.filter((i) => !i.safety), [checklist]);
@@ -127,9 +139,21 @@ export function CaptureFlow({
   const ready = safety.length === 0 || safetyAck;
   const peopleDecided = nobody ? tagged.length === 0 : tagged.length > 0;
   const blockers = sendBlockers({ upload, captionRequired, oneLiner, peopleDecided });
-  const canSubmit = blockers.length === 0 && !submitting;
-  // A reshoot keeps its submission, so once its files land they stay.
-  const canReplace = !initialCaptureId;
+  const canSubmit = blockers.length === 0 && !submitting && !resumedUnreadable;
+  // A reshoot keeps its submission; retaking one throws away only the new take.
+  const isReshoot = Boolean(sentBack || resume?.isResubmission);
+  const canReplace = !initialCaptureId || isReshoot;
+  const rulesKey = `olsm:rules-seen:${mediaType === "video" ? "video" : "photo"}`;
+
+  // "Before you shoot" is read once per kind of prompt, then stays folded.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(rulesKey)) setRulesOpen(false);
+      else window.localStorage.setItem(rulesKey, "1");
+    } catch {
+      // No storage: leave the rules open.
+    }
+  }, [rulesKey]);
 
   // Media resumed from an earlier visit still needs its facts read for "Send it".
   useEffect(() => {
@@ -140,6 +164,10 @@ export function CaptureFlow({
     ).then((facts) => {
       if (cancelled) return;
       setProbe(facts[0] ?? {});
+      // A clip whose length can't be read can't be checked, so it isn't sent.
+      setResumedUnreadable(
+        resume.media.some((m, index) => m.kind === "video" && !facts[index]?.durationSeconds),
+      );
       setMediaMetadata((current) =>
         current.map((item, index) => ({ ...item, ...facts[index] })),
       );
@@ -313,6 +341,11 @@ export function CaptureFlow({
     if (!chosen) return;
 
     const facts = await probeMedia(chosen);
+    // A different clip needs its own answer to "who is in it?".
+    if (file) {
+      setTagged([]);
+      setNobody(false);
+    }
     setFile(chosen);
     setPreviewUrl(URL.createObjectURL(chosen));
     setProbe(facts);
@@ -325,9 +358,19 @@ export function CaptureFlow({
   async function replace() {
     if (captureId && canReplace && (upload === "done" || upload === "failed")) {
       setUpload("uploading");
-      await discardAttempt(captureId);
-      setCaptureId(null);
+      if (isReshoot) {
+        // Keep the submission and its history; drop only the new take.
+        await fetch(`/api/captures/${captureId}/discard-take`, { method: "POST" }).catch(() => undefined);
+        identityRef.current = { submissionId: captureId, mediaIds: [] };
+      } else {
+        await discardAttempt(captureId);
+        setCaptureId(null);
+      }
     }
+    // Consent belongs to a clip: a new one is asked again.
+    setTagged([]);
+    setNobody(false);
+    setResumedUnreadable(false);
     staleRef.current = null;
     setResumed(false);
     setFile(null);
@@ -396,51 +439,25 @@ export function CaptureFlow({
     <div className="flex flex-col gap-5">
       {resume && !resume.complete && (
         <p className="card p-4 text-[15px]" style={{ borderColor: "var(--accent)" }}>
-          Your last try at this, from {new Date(resume.startedAt).toLocaleString()}, didn&rsquo;t
+          Your last try at this, from {dateTime(resume.startedAt)}, didn&rsquo;t
           finish uploading. Choose the shot again to send it.
         </p>
       )}
       {resumed && (
         <p className="card p-4 text-[15px]" style={{ borderColor: "var(--moss)" }}>
-          Your shot from {new Date(resume!.startedAt).toLocaleString()} is uploaded. Add the
-          details below and tap Send it.
+          {isReshoot ? "Your new take" : `Your shot from ${dateTime(resume!.startedAt)}`} is uploaded. Add the
+          details below and tap Send it, or retake it.
         </p>
-      )}
-
-      {/* 1 — safety: the only thing that stands between the student and the camera */}
-      {safety.length > 0 && (
-        <section
-          className="card p-5"
-          style={{ borderColor: "var(--clay)", borderWidth: 2, background: "var(--sunk)" }}
-        >
-          <p className="label" style={{ color: "var(--clay)" }}>
-            Safety first
-          </p>
-          <ul className="mt-3 flex flex-col gap-2 text-[16px] font-semibold">
-            {safety.map((item) => (
-              <li key={item.id}>{item.text}</li>
-            ))}
-          </ul>
-          <label className="mt-4 flex cursor-pointer items-start gap-3 text-[16px]">
-            <input
-              type="checkbox"
-              className="mt-1 h-5 w-5 shrink-0"
-              checked={safetyAck}
-              onChange={(e) => setSafetyAck(e.target.checked)}
-            />
-            <span>I&rsquo;ll shoot this safely.</span>
-          </label>
-          <p className="mt-3 text-[15px]" style={{ color: "var(--clay)" }}>
-            If a prompt can&rsquo;t be done safely, don&rsquo;t shoot it. Report it instead.
-          </p>
-          <SafetyReport ideaId={ideaId} />
-        </section>
       )}
 
       {/* 2 — the rest of the rules, to read; the format checks catch mistakes */}
       {tips.length > 0 && (
-        <section className="card p-5">
-          <p className="label">Before you shoot</p>
+        <details
+          className="card p-5"
+          open={rulesOpen}
+          onToggle={(event) => setRulesOpen((event.target as HTMLDetailsElement).open)}
+        >
+          <summary className="label cursor-pointer">Before you shoot</summary>
           <ul className="mt-3 flex flex-col gap-2 text-[15px]">
             {tips.map((item) => (
               <li key={item.id} className="flex gap-3">
@@ -451,12 +468,33 @@ export function CaptureFlow({
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
 
       {/* 3 — the shot: choose, look at it, then send it up */}
       <section className="card p-5">
         <p className="label">The shot</p>
+
+        {/* Safety sits right above the buttons it unlocks. */}
+        {safety.length > 0 && !resumed && !file && upload === "idle" && photoFiles.length === 0 && (
+          <div className="mt-3 rounded-sm border-2 p-4" style={{ borderColor: "var(--clay)", background: "var(--sunk)" }}>
+            <p className="label" style={{ color: "var(--clay)" }}>Safety first</p>
+            <ul className="mt-2 flex flex-col gap-1 text-[15px] font-semibold">
+              {safety.map((item) => (
+                <li key={item.id}>{item.text}</li>
+              ))}
+            </ul>
+            <label className="mt-3 flex cursor-pointer items-start gap-3 text-[16px]">
+              <input
+                type="checkbox"
+                className="mt-1 h-5 w-5 shrink-0"
+                checked={safetyAck}
+                onChange={(e) => setSafetyAck(e.target.checked)}
+              />
+              <span>I&rsquo;ll shoot this safely.</span>
+            </label>
+          </div>
+        )}
 
         {resumed && upload === "done" && (
           <div className="mt-3 grid grid-cols-2 gap-3">
@@ -537,9 +575,14 @@ export function CaptureFlow({
           )
         )}
 
-        {!ready && (
+        {!ready && !file && !resumed && photoFiles.length === 0 && upload === "idle" && (
           <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
             Tick &ldquo;I&rsquo;ll shoot this safely&rdquo; to record or choose your shot.
+          </p>
+        )}
+        {resumedUnreadable && (
+          <p className="mt-3 text-sm" style={{ color: "var(--clay)" }} role="alert">
+            We couldn&rsquo;t read this video. Retake it.
           </p>
         )}
 
@@ -656,6 +699,13 @@ export function CaptureFlow({
           </div>
         )}
       </section>
+
+      <div className="flex flex-col gap-1 text-sm">
+        <p style={{ color: "var(--muted)" }}>
+          If a prompt can&rsquo;t be done safely, don&rsquo;t shoot it. Report it instead.
+        </p>
+        <SafetyReport ideaId={ideaId} />
+      </div>
 
       {/* 4 — the context marketing needs, and nothing more */}
       <section className="card p-5">

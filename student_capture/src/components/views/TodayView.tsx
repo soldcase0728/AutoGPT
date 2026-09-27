@@ -7,6 +7,14 @@ import type { StudentProgress } from "@/lib/student-progress";
 import { firstName } from "@/lib/names";
 import { Greeting } from "@/components/Greeting";
 import type { Idea, Person } from "@/lib/types";
+import { dayLabel } from "@/lib/dates";
+
+/** A shot the desk returned; it leads Today until it's reshot. */
+export interface TodaySentBack {
+  assignmentId: string;
+  title: string;
+  note: string | null;
+}
 
 export interface TodayViewProps {
   person: Person;
@@ -17,6 +25,7 @@ export interface TodayViewProps {
   today?: Date;
   /** Students only: their record and what went live. */
   progress?: StudentProgress | null;
+  sentBack?: TodaySentBack | null;
 }
 
 export function TodayView({
@@ -25,7 +34,9 @@ export function TodayView({
   idea,
   today = new Date(),
   progress = null,
+  sentBack = null,
 }: TodayViewProps) {
+  const todayIsSentBack = Boolean(sentBack && assignment && sentBack.assignmentId === assignment.id);
   const isStaff = person.role === "reviewer" || person.role === "admin";
 
   return (
@@ -36,14 +47,25 @@ export function TodayView({
           <Greeting name={firstName(person.display_name)} />
         )}
         <p className="label">
-          {today.toLocaleDateString(undefined, {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
+          {dayLabel(today)}
         </p>
 
-        {!idea || !assignment ? (
+        {sentBack && (
+          <section className="card mt-4 p-5" style={{ borderColor: "var(--accent)", borderWidth: 2 }} aria-label="Sent back">
+            <Chip tone="accent">Sent back</Chip>
+            <p className="mt-3 text-[17px] font-semibold leading-snug">
+              {sentBack.note ?? "The marketing desk asked for a new take."}
+            </p>
+            <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+              {sentBack.title} · from the marketing desk
+            </p>
+            <Link href={`/capture/${sentBack.assignmentId}`} className="btn mt-4 block text-center">
+              Reshoot
+            </Link>
+          </section>
+        )}
+
+        {todayIsSentBack ? null : !idea || !assignment ? (
           <div className="card mt-4 p-5">
             <h1 className="text-xl font-bold tracking-tight">Nothing to shoot today</h1>
             <p className="mt-2 text-[15px]" style={{ color: "var(--muted)" }}>
