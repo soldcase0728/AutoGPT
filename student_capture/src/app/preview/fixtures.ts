@@ -128,6 +128,7 @@ export const SUBMISSIONS: SubmissionRow[] = [
     source: "Assigned",
     thumbnail: { src: "/preview-frame.svg", kind: "photo" },
     postUrl: "https://www.instagram.com/p/example/",
+    awardedOn: "2026-08-28",
     action: null,
     withdrawMode: "request",
   },

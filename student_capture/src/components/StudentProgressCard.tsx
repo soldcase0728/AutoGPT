@@ -1,6 +1,8 @@
 import { Chip } from "./Chip";
 import { TeamBoard } from "./TeamBoard";
 import type { StudentProgress } from "@/lib/student-progress";
+import { awardDateLabel, recentAwards } from "@/lib/shot-of-the-day";
+import { isoDate } from "@/lib/assign";
 
 function Stat({ value, label }: { value: number; label: string }) {
   return (
@@ -17,12 +19,43 @@ function Stat({ value, label }: { value: number; label: string }) {
  * Team and school figures are counts only; nobody else is named.
  */
 export function StudentProgressCard({ progress }: { progress: StudentProgress }) {
-  const { record, recent, community, board } = progress;
+  const { record, recent, community, board, awards } = progress;
+  const [latestAward] = recentAwards(awards, isoDate(new Date()));
   const showCommunity = community && (community.weekPosted > 0 || community.weekContributors > 0 || community.groups.length > 0);
 
   return (
     <div className="flex flex-col gap-3">
-      {recent && (
+      {latestAward && (
+        <section
+          className="card p-4"
+          style={{ borderLeft: "3px solid var(--brand)", borderColor: "var(--brand)" }}
+          aria-label="Shot of the Day"
+        >
+          <p className="text-sm font-bold uppercase tracking-[0.12em]" style={{ color: "var(--brand-ink)" }}>
+            ★ Shot of the Day
+          </p>
+          <p className="mt-2 text-[15px]">
+            Your shot for <span className="font-semibold">&ldquo;{latestAward.title}&rdquo;</span> was picked
+            as the Shot of the Day for {awardDateLabel(latestAward.awardedOn)}.
+          </p>
+          {latestAward.note && (
+            <p className="mt-2 text-[15px] italic">&ldquo;{latestAward.note}&rdquo; — the marketing desk</p>
+          )}
+          {latestAward.postUrl && (
+            <a
+              href={latestAward.postUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block text-[15px] font-semibold underline underline-offset-4"
+              style={{ color: "var(--brand-ink)" }}
+            >
+              See it posted
+            </a>
+          )}
+        </section>
+      )}
+
+      {recent && recent.id !== latestAward?.captureId && (
         <section className="card p-4" style={{ borderLeft: "3px solid var(--moss)" }} aria-label="Your latest post">
           <Chip tone="good">Posted</Chip>
           <p className="mt-2 text-[15px]">
@@ -49,10 +82,11 @@ export function StudentProgressCard({ progress }: { progress: StudentProgress })
       <section className="card p-4" aria-label="Your record">
         <p className="label">Your record</p>
         {record.sent ? (
-          <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className={`mt-3 grid gap-3 ${awards.length ? "grid-cols-4" : "grid-cols-3"}`}>
             <Stat value={record.streak} label="in a row" />
             <Stat value={record.sent} label="sent" />
             <Stat value={record.posted} label="posted" />
+            {awards.length > 0 && <Stat value={awards.length} label={awards.length === 1 ? "shot of the day" : "shots of the day"} />}
           </div>
         ) : (
           <p className="mt-2 text-[15px]" style={{ color: "var(--muted)" }}>

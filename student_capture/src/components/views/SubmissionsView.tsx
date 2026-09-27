@@ -63,6 +63,8 @@ export interface SubmissionRow {
   thumbnail: { src: string; kind: "photo" | "video" } | null;
   /** Where a posted item lives, when the marketing desk recorded it. */
   postUrl: string | null;
+  /** The date it was Shot of the Day, if it was. */
+  awardedOn?: string | null;
   action: { kind: keyof typeof ACTION_LABEL; href: string } | null;
   withdrawMode: "direct" | "request" | null;
 }
@@ -156,6 +158,15 @@ export function SubmissionsView({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <Chip tone={TONE[row.state]}>{SAID[row.state]}</Chip>
+                        {row.awardedOn && (
+                          <span
+                            className="inline-block rounded-sm px-2 py-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.1em]"
+                            style={{ background: "var(--brand)", color: "#fff" }}
+                            title={`Shot of the Day, ${row.awardedOn}`}
+                          >
+                            ★ Shot of the Day
+                          </span>
+                        )}
                         <Chip>{row.source}</Chip>
                       </div>
                       <span className="label">{new Date(row.occurredAt).toLocaleDateString()}</span>

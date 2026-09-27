@@ -13,8 +13,19 @@ import {
 } from "./student-record";
 import type { CaptureState } from "./types";
 
+export interface StudentAward {
+  id: string;
+  captureId: string;
+  awardedOn: string;
+  note: string | null;
+  title: string;
+  postUrl: string | null;
+}
+
 export interface StudentProgress {
   record: StudentRecord;
+  /** Shot of the Day awards on shots the school still has, newest first. */
+  awards: StudentAward[];
   recent: PostedCapture | null;
   community: CommunityStats | null;
   /** Null until the team-board migration is applied. */
@@ -27,7 +38,7 @@ export async function loadStudentProgress(
   personId: string,
   now = new Date(),
 ): Promise<StudentProgress> {
-  const [{ data: assignmentRows }, { data: captureRows }, community, board] = await Promise.all([
+  const [{ data: assignmentRows }, { data: captureRows }, community, board, awardRows] = await Promise.all([
     supabase
       .from("assignments")
       .select("id, due_on")
@@ -49,6 +60,17 @@ export async function loadStudentProgress(
       ({ data, error }) => (error ? null : parseTeamBoard(data)),
       () => null,
     ),
+    // Absent until the Shot of the Day migration is applied.
+    supabase
+      .from("shot_awards")
+      .select("id, capture_id, awarded_on, note")
+      .order("awarded_on", { ascending: false })
+      .limit(50)
+      .then(
+        ({ data, error }) =>
+          error ? [] : ((data ?? []) as Array<{ id: string; capture_id: string; awarded_on: string; note: string | null }>),
+        () => [],
+      ),
   ]);
 
   const assignments: TaskAssignment[] = ((assignmentRows ?? []) as Array<{ id: string; due_on: string }>).map(
@@ -78,14 +100,36 @@ export async function loadStudentProgress(
     published.map((c) => ({ id: c.id, title: c.prompt?.title ?? "your prompt", postedAt: c.state_changed_at, postUrl: null })),
     now,
   );
-  // Read separately so this still works before the post-link migration.
-  if (newest) {
-    const { data: link, error } = await supabase.from("captures").select("post_url").eq("id", newest.id).maybeSingle();
-    if (!error) newest.postUrl = (link as { post_url: string | null } | null)?.post_url ?? null;
+  // An award only counts while the school still has the shot.
+  const kept = new Map(published.map((c) => [c.id, c]));
+  for (const c of captures) if (c.state === "approved") kept.set(c.id, c);
+  const awardList = awardRows.filter((a) => kept.has(a.capture_id));
+
+  // Post links, read separately so this still works before the post-link migration.
+  const linkIds = [...new Set([...(newest ? [newest.id] : []), ...awardList.map((a) => a.capture_id)])];
+  const links = new Map<string, string>();
+  if (linkIds.length) {
+    const { data: linkRows, error } = await supabase.from("captures").select("id, post_url").in("id", linkIds);
+    if (!error) {
+      for (const row of (linkRows ?? []) as Array<{ id: string; post_url: string | null }>) {
+        if (row.post_url) links.set(row.id, row.post_url);
+      }
+    }
   }
+  if (newest) newest.postUrl = links.get(newest.id) ?? null;
+  const awards: StudentAward[] = awardList.map((a) => ({
+    id: a.id,
+    captureId: a.capture_id,
+    awardedOn: a.awarded_on,
+    note: a.note,
+    title: kept.get(a.capture_id)?.prompt?.title ?? "your prompt",
+    postUrl: links.get(a.capture_id) ?? null,
+  }));
+
 
   return {
     record: studentRecord(assignments, statuses, isoDate(now), published.length),
+    awards,
     recent: newest,
     community,
     board,

@@ -64,6 +64,20 @@ export default async function Submissions() {
       }
     }
   }
+  // Shot of the Day awards, read separately so the list still renders before
+  // that migration is applied.
+  const awardedOn = new Map<string, string>();
+  if (captureIds.length) {
+    const { data: awardRows, error: awardError } = await supabase
+      .from("shot_awards")
+      .select("capture_id, awarded_on")
+      .in("capture_id", captureIds);
+    if (!awardError) {
+      for (const a of (awardRows ?? []) as Array<{ capture_id: string; awarded_on: string }>) {
+        if ((awardedOn.get(a.capture_id) ?? "") < a.awarded_on) awardedOn.set(a.capture_id, a.awarded_on);
+      }
+    }
+  }
   const [{ data: reviews }, { data: withdrawalDecisions }] = captureIds.length
     ? await Promise.all([
         supabase
@@ -108,6 +122,7 @@ export default async function Submissions() {
     source: row.prompt?.capture_mode === "OPEN_MOMENT" ? "Open Moment" : "Assigned",
     thumbnail: { src: `/api/captures/${row.id}/media`, kind: row.kind === "video" ? "video" : "photo" },
     postUrl: row.state === "published" ? (postUrls.get(row.id) ?? null) : null,
+    awardedOn: row.state === "published" || row.state === "approved" ? (awardedOn.get(row.id) ?? null) : null,
     action:
       row.state === "changes_requested" && row.assignment_id
         ? { kind: "reshoot", href: `/capture/${row.assignment_id}?resubmit=${row.id}` }

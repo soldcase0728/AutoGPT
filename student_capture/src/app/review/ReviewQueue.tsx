@@ -8,6 +8,8 @@ import { describeBlocker, publishable } from "@/lib/consent";
 import { formatBytes } from "@/lib/format-spec";
 import { AutomatedSafetyReview, type ScanTiming } from "@/components/AutomatedSafetyReview";
 import { reportKindLabel } from "@/lib/safety-report";
+import { ShotOfTheDayControl } from "@/components/ShotOfTheDayControl";
+import type { ShotAward } from "@/lib/shot-of-the-day";
 import { MESSAGE_PRESETS, QUEUE_TABS, nextSelection, type QueueTabId } from "@/lib/queue";
 import type { CaptureSafetyReview, CaptureState, QueueRow } from "@/lib/types";
 
@@ -36,6 +38,8 @@ export interface CaptureExtras {
   openedBy: string | null;
   postUrl: string | null;
   scanTiming?: ScanTiming;
+  /** Its Shot of the Day award, if it has one. */
+  award?: ShotAward | null;
 }
 
 export interface WithdrawalRow {
@@ -85,6 +89,8 @@ export function ReviewQueue({
    * server/client boundary have to serialise.
    */
   mediaSrc,
+  canAward = false,
+  todaysPick = null,
 }: {
   rows: QueueRow[];
   tab: QueueTabId;
@@ -96,6 +102,9 @@ export function ReviewQueue({
   safetyReports?: SafetyReportRow[];
   safetyReviews?: CaptureSafetyReview[];
   mediaSrc?: string;
+  /** Admins pick Shot of the Day from the queue. */
+  canAward?: boolean;
+  todaysPick?: { captureId: string; student: string; title: string } | null;
 }) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(rows[0]?.id ?? null);
@@ -377,6 +386,7 @@ export function ReviewQueue({
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Chip>{STATE_LABEL[row.state] ?? row.state}</Chip>
               {row.consent_blockers?.length > 0 && <Chip tone="bad">consent missing</Chip>}
+              {extras[row.id]?.award && <Chip tone="accent">★ shot of the day</Chip>}
               {row.student_participation !== "active" && <Chip tone="bad">account {row.student_participation}</Chip>}
               {rowSafety?.unresolved_finding_count ? (
                 <Chip tone="bad">safety: check</Chip>
@@ -550,6 +560,15 @@ export function ReviewQueue({
                       {linkSaved || "The student sees this as “See your post”."}
                     </p>
                   </div>
+                )}
+
+                {canAward && (current.state === "approved" || current.state === "published") && (
+                  <ShotOfTheDayControl
+                    key={current.id}
+                    captureId={current.id}
+                    award={extras[current.id]?.award ?? null}
+                    todaysPick={todaysPick && todaysPick.captureId !== current.id ? todaysPick : null}
+                  />
                 )}
 
                 <div className="flex flex-wrap gap-2">

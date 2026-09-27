@@ -28,6 +28,8 @@ export interface DashboardViewProps {
   participation: DayParticipation[];
   upcoming: UpcomingDay[];
   quiet: Array<QuietStudent & { email: string }>;
+  /** Today's Shot of the Day, or null if nobody has picked one. */
+  shotOfTheDay?: { student: string; title: string; note: string | null } | null;
 }
 
 function shortDay(date: string) {
@@ -176,6 +178,7 @@ export function DashboardView({
   participation,
   upcoming,
   quiet,
+  shotOfTheDay = null,
 }: DashboardViewProps) {
   const quietEmails = quiet.map((s) => s.email);
   const nudge = `mailto:?bcc=${encodeURIComponent(quietEmails.join(","))}&subject=${encodeURIComponent("We miss your clips")}&body=${encodeURIComponent(
@@ -226,6 +229,31 @@ export function DashboardView({
             value={queue.postedThisWeek}
             note="In the last 7 days"
           />
+        </section>
+
+        <section
+          className="card flex flex-wrap items-center justify-between gap-3 p-4"
+          style={{ borderLeft: "3px solid var(--brand)" }}
+          aria-labelledby="sotd"
+        >
+          <div className="min-w-0 flex-1 basis-64">
+            <p id="sotd" className="text-sm font-bold uppercase tracking-[0.12em]" style={{ color: "var(--brand-ink)" }}>
+              ★ Shot of the Day
+            </p>
+            {shotOfTheDay ? (
+              <p className="mt-1 text-[15px]">
+                <span className="font-semibold">{shotOfTheDay.student}</span>, &ldquo;{shotOfTheDay.title}&rdquo;
+                {shotOfTheDay.note && <span style={{ color: "var(--muted)" }}> · {shotOfTheDay.note}</span>}
+              </p>
+            ) : (
+              <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
+                Not picked yet today. Open an approved or posted shot and tap &ldquo;Make it Shot of the Day&rdquo;.
+              </p>
+            )}
+          </div>
+          <Link href="/review?tab=posted" className="rounded-sm border px-3 py-2 text-sm font-semibold" style={{ borderColor: "var(--ink)" }}>
+            {shotOfTheDay ? "Change pick" : "Pick one"}
+          </Link>
         </section>
 
         <section aria-labelledby="attention">

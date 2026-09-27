@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/session";
 import { QUEUE_TABS, resolveTab, searchTerm, type QueueTabId } from "@/lib/queue";
 import type { CaptureSafetyReview, QueueRow, SafetyFinding } from "@/lib/types";
+import type { ShotAward } from "@/lib/shot-of-the-day";
 import {
   ReviewQueue,
   type CaptureExtras,
@@ -153,6 +154,33 @@ export default async function ReviewPage({
     }
   }
 
+  // Shot of the Day: awards on the shots in view, and today's pick (read
+  // separately so the queue still loads before that migration).
+  const awards = new Map<string, ShotAward>();
+  let todaysPick: { captureId: string; student: string; title: string } | null = null;
+  {
+    const today = new Date().toISOString().slice(0, 10);
+    const [{ data: awardRows, error: awardError }, { data: pickRow }] = await Promise.all([
+      captureIds.length
+        ? supabase.from("shot_awards").select("id, capture_id, awarded_on, note").in("capture_id", captureIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabase.from("shot_awards").select("capture_id").eq("awarded_on", today).maybeSingle(),
+    ]);
+    if (!awardError) {
+      for (const a of (awardRows ?? []) as Array<{ id: string; capture_id: string; awarded_on: string; note: string | null }>) {
+        const seen = awards.get(a.capture_id);
+        if (!seen || a.awarded_on > seen.awardedOn) {
+          awards.set(a.capture_id, { id: a.id, captureId: a.capture_id, awardedOn: a.awarded_on, note: a.note });
+        }
+      }
+    }
+    const pickId = (pickRow as { capture_id: string } | null)?.capture_id;
+    if (pickId) {
+      const { data: pick } = await supabase.from("review_queue").select("student, idea_title").eq("id", pickId).maybeSingle();
+      if (pick) todaysPick = { captureId: pickId, student: pick.student, title: pick.idea_title };
+    }
+  }
+
   const extras: Record<string, CaptureExtras> = {};
   for (const row of rows) {
     const summary = safetyReviews.find((review) => review.capture_id === row.id);
@@ -172,6 +200,7 @@ export default async function ReviewPage({
           : (openerNames.get(row.review_started_by) ?? "another reviewer")
         : null,
       postUrl: postUrls.get(row.id) ?? null,
+      award: awards.get(row.id) ?? null,
       scanTiming: summary ? screenTiming.get(summary.safety_screen_id) as ScanTiming | undefined : undefined,
     };
   }
@@ -232,6 +261,8 @@ export default async function ReviewPage({
             withdrawals={withdrawals}
             safetyReports={safetyReports}
             safetyReviews={safetyReviews}
+            canAward={person.role === "admin"}
+            todaysPick={todaysPick}
           />
         )}
       </main>

@@ -47,6 +47,15 @@ const FIXED_DAY = new Date("2026-09-01T09:00:00Z");
 
 const PROGRESS = {
   record: { streak: 4, sent: 11, posted: 3 },
+  // Dated today so the "recent award" card always shows in the preview.
+  awards: [{
+    id: "award-1",
+    captureId: "p1",
+    awardedOn: new Date().toISOString().slice(0, 10),
+    note: "Perfect light, and you held it steady the whole way through.",
+    title: "Teach us one thing",
+    postUrl: "https://www.instagram.com/p/example/",
+  }],
   recent: { id: "p1", title: "Teach us one thing", postedAt: "2026-08-31T16:00:00Z", postUrl: "https://www.instagram.com/p/example/" },
   community: {
     weekPosted: 23,
@@ -179,6 +188,7 @@ export default async function PreviewScreen({
       return (
         <DashboardView
           person={{ ...REVIEWER, role: "admin", display_name: "Dana Reyes" }}
+          shotOfTheDay={{ student: "Ali Haddad", title: "Teach us one thing", note: "Perfect light." }}
           today="2026-09-01"
           now={now}
           sentToday={{ due: 20, sent: 11 }}

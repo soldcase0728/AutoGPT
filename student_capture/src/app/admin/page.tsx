@@ -191,8 +191,19 @@ export default async function AdminOverviewPage() {
     nextGap: upcoming.find((d) => d.gap)?.date ?? null,
   });
 
+  // Today's Shot of the Day, if one has been picked (absent before that migration).
+  let shotOfTheDay: { student: string; title: string; note: string | null } | null = null;
+  const { data: award } = await supabase
+    .from("shot_awards").select("capture_id, note").eq("awarded_on", today).maybeSingle();
+  if (award) {
+    const { data: shot } = await supabase
+      .from("review_queue").select("student, idea_title").eq("id", award.capture_id).maybeSingle();
+    if (shot) shotOfTheDay = { student: shot.student, title: shot.idea_title, note: award.note };
+  }
+
   return (
     <DashboardView
+      shotOfTheDay={shotOfTheDay}
       person={person}
       today={today}
       now={now}
