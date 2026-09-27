@@ -280,7 +280,11 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks, 
                   <h3 className="mt-1 text-lg font-semibold"><Link href={`/admin/tasks/${task.id}`} className="underline-offset-4 hover:underline">{task.title}</Link></h3>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {task.cancelled ? <Chip tone="bad">Cancelled</Chip> : !task.active ? <Chip tone="accent">Paused</Chip> : null}
-                    <Chip tone={due && sent === due ? "good" : "muted"}>{due ? `${sent} of ${due} sent` : "Not due yet"}</Chip>
+                    {task.assignmentCount === 0 && !task.cancelled ? (
+                      <Chip tone="accent">Nobody assigned</Chip>
+                    ) : (
+                      <Chip tone={due && sent === due ? "good" : "muted"}>{due ? `${sent} of ${due} sent` : "Not due yet"}</Chip>
+                    )}
                   </div>
                   <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>{task.assignmentCount} assignment{task.assignmentCount === 1 ? "" : "s"}{task.firstDueOn ? ` · ${task.firstDueOn}${task.lastDueOn !== task.firstDueOn ? ` to ${task.lastDueOn}` : ""}` : ""}</p>
                 </div>

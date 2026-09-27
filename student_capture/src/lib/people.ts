@@ -83,3 +83,12 @@ export function temporaryPassword(random: (n: number) => Uint8Array = (n) => cry
   }
   return out;
 }
+
+export type PeopleFilter = "all" | "pending" | "parental" | "revoked" | "staff";
+
+const PEOPLE_FILTERS: PeopleFilter[] = ["all", "pending", "parental", "revoked", "staff"];
+
+/** The People filter a link asked for, e.g. from the overview; "all" otherwise. */
+export function resolvePeopleFilter(raw?: string | null): PeopleFilter {
+  return PEOPLE_FILTERS.find((id) => id === raw) ?? "all";
+}

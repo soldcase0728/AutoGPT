@@ -8,6 +8,7 @@ import {
   needsParentalRelease,
   releaseStatus,
   type ConsentRecord,
+  type PeopleFilter,
   type ReleaseStatus,
 } from "@/lib/people";
 
@@ -25,7 +26,7 @@ export interface PersonRow {
   consents: ConsentRecord[];
 }
 
-type Filter = "all" | "pending" | "parental" | "revoked" | "staff";
+type Filter = PeopleFilter;
 
 const STATUS_TONE = { pending: "accent", active: "good", revoked: "bad" } as const;
 const STATUS_LABEL = { pending: "Waiting to be activated", active: "Active", revoked: "Access revoked" };
@@ -49,12 +50,14 @@ export function PeopleManager({
   rows,
   releaseVersion,
   today,
+  initialFilter = "all",
 }: {
   rows: PersonRow[];
   releaseVersion: string;
   today: string;
+  initialFilter?: Filter;
 }) {
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);

@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 
 export default async function Today() {
   const person = await requirePerson();
-  // Staff have nothing to shoot; their work starts in the queue.
-  if (person.role === "reviewer" || person.role === "admin") redirect("/review");
+  // Staff have nothing to shoot: admins start on the overview, reviewers in the queue.
+  if (person.role === "admin") redirect("/admin");
+  if (person.role === "reviewer") redirect("/review");
 
   if (person.role === "student" && !(await hasSignedRelease(person.id, RELEASE_VERSION))) {
     redirect("/consent");

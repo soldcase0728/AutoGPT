@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SAFETY_CATEGORY_LABELS, type SafetyCategory } from "@/lib/safety/categories";
 import type { CaptureSafetyReview, SafetyFinding } from "@/lib/types";
+import { elapsed } from "@/lib/dashboard";
 
 function timecode(milliseconds: number) {
   const total = Math.floor(milliseconds / 1000);
@@ -19,7 +20,7 @@ function scanTiming(timing: ScanTiming | undefined, now: number): string {
   if (!timing) return "The scan starts within a minute or two of upload.";
   const waited = minutesSince(timing.createdAt, now);
   if (waited >= 10) {
-    return `Queued ${waited} minutes ago, which is longer than usual. If this doesn't clear, ask your admin to check the safety scanner is running.`;
+    return `Queued ${elapsed(timing.createdAt, new Date(now))} ago, which is longer than usual. If this doesn't clear, ask your admin to check the safety scanner is running.`;
   }
   return timing.startedAt
     ? "Scanning now. Usually done within a minute."

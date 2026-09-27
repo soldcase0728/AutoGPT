@@ -8,6 +8,8 @@ import { ReviewQueue } from "@/app/review/ReviewQueue";
 import { PosterView } from "@/components/views/PosterView";
 import { PeopleManager } from "@/app/admin/people/PeopleManager";
 import { TaskManager } from "@/app/admin/tasks/TaskManager";
+import { DashboardView } from "@/components/views/DashboardView";
+import { attentionItems, daysAfter, daysEnding, upcomingDays } from "@/lib/dashboard";
 import QRCode from "qrcode";
 import { RELEASE_VERSION } from "@/app/consent/version";
 import {
@@ -141,6 +143,50 @@ export default async function PreviewScreen({
           <PeopleManager rows={PEOPLE_ROWS} releaseVersion={RELEASE_VERSION} today="2026-09-01" />
         </main>
       );
+
+    case "dashboard": {
+      const now = new Date("2026-09-01T19:30:00Z");
+      const due = [0, 0, 18, 18, 18, 18, 18, 0, 0, 20, 20, 20, 20, 20];
+      const sent = [0, 0, 11, 13, 12, 9, 14, 0, 0, 15, 16, 12, 17, 11];
+      const upcoming = upcomingDays(
+        daysAfter("2026-09-01", 7),
+        new Map([["2026-09-02", 20], ["2026-09-03", 20], ["2026-09-04", 20], ["2026-09-08", 20]]),
+      );
+      return (
+        <DashboardView
+          person={{ ...REVIEWER, role: "admin", display_name: "Dana Reyes" }}
+          today="2026-09-01"
+          now={now}
+          sentToday={{ due: 20, sent: 11 }}
+          queue={{
+            toReview: 7,
+            oldestToReviewSince: "2026-09-01T15:10:00Z",
+            waitingOnStudent: 2,
+            readyToPost: 4,
+            readyBlocked: 1,
+            postedThisWeek: 23,
+          }}
+          attention={attentionItems({
+            now,
+            oldestScanQueuedAt: "2026-09-01T17:05:00Z",
+            queuedScans: 3,
+            safetyReports: 1,
+            withdrawalRequests: 1,
+            approvedBlockedByRelease: 1,
+            studentsAwaitingActivation: 2,
+            studentsNeedingParentRelease: 4,
+            tasksWithNobodyAssigned: 1,
+            nextGap: upcoming.find((d) => d.gap)?.date ?? null,
+          })}
+          participation={daysEnding("2026-09-01", 14).map((date, i) => ({ date, due: due[i]!, sent: sent[i]! }))}
+          upcoming={upcoming}
+          quiet={[
+            { personId: "q1", name: "Sam Okafor", missed: 4, lastSentOn: "2026-08-21", email: "sam@example.edu" },
+            { personId: "q2", name: "Jo Mercer", missed: 3, lastSentOn: null, email: "jo@example.edu" },
+          ]}
+        />
+      );
+    }
 
     case "tasks": {
       const names = ["Ava Kowalski", "Ben Ortiz", "Cam Nguyen", "Dani Reyes", "Eli Brooks", "Fay Mercer", "Gus Patel", "Hana Lee"];

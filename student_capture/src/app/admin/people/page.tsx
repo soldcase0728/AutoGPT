@@ -1,14 +1,19 @@
 import { AppHeader } from "@/components/AppHeader";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import type { ConsentRecord } from "@/lib/people";
+import { resolvePeopleFilter, type ConsentRecord } from "@/lib/people";
 import { RELEASE_VERSION } from "@/app/consent/version";
 import { PeopleManager, type PersonRow } from "./PeopleManager";
 
 export const dynamic = "force-dynamic";
 
-export default async function PeoplePage() {
+export default async function PeoplePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
   const me = await requireAdmin();
+  const { filter } = await searchParams;
   const supabase = await createClient();
 
   const { data: people } = await supabase
@@ -57,7 +62,7 @@ export default async function PeoplePage() {
     <>
       <AppHeader person={me} />
       <main className="mx-auto max-w-5xl px-5 py-8">
-        <PeopleManager rows={rows} releaseVersion={RELEASE_VERSION} today={new Date().toISOString().slice(0, 10)} />
+        <PeopleManager rows={rows} releaseVersion={RELEASE_VERSION} today={new Date().toISOString().slice(0, 10)} initialFilter={resolvePeopleFilter(filter)} />
       </main>
     </>
   );

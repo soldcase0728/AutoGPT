@@ -10,6 +10,7 @@ const SCREENS = [
   ["submissions", "Student · what they have sent"],
   ["review", "Marketing · the review queue"],
   ["poster", "Print · the QR poster for a locker room wall"],
+  ["dashboard", "Admin · the overview they land on"],
   ["people", "Admin · people, access and releases"],
   ["tasks", "Admin · creating and tracking tasks"],
 ];

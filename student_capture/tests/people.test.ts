@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   needsParentalRelease,
+  resolvePeopleFilter,
   releaseStatus,
   temporaryPassword,
   type ConsentRecord,
@@ -61,5 +62,13 @@ describe("temporaryPassword", () => {
 
   it("differs between calls", () => {
     expect(temporaryPassword()).not.toBe(temporaryPassword());
+  });
+});
+
+describe("resolvePeopleFilter", () => {
+  it("accepts a known filter and falls back to everyone", () => {
+    expect(resolvePeopleFilter("parental")).toBe("parental");
+    expect(resolvePeopleFilter("nonsense")).toBe("all");
+    expect(resolvePeopleFilter(undefined)).toBe("all");
   });
 });
