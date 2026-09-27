@@ -119,7 +119,14 @@ export default async function Submissions({
   const rows: SubmissionRow[] = visibleCaptures.map((row) => ({
     id: `capture:${row.id}`,
     captureId: row.id,
-    state: row.state === "rejected" && row.takedown_at ? "taken_down" : row.state,
+    // A reshoot the student has started is an upload in progress on a later
+    // media revision: show it as a reshoot, not as a brand-new unsent shot.
+    state:
+      row.state === "rejected" && row.takedown_at
+        ? "taken_down"
+        : row.state === "uploading" && row.media_revision > 1
+          ? "reshooting"
+          : row.state,
     occurredAt: row.submitted_at ?? row.state_changed_at ?? row.created_at,
     ideaTitle: row.prompt?.title ?? "Prompt",
     oneLiner: row.capture_context?.one_liner ?? null,
@@ -132,7 +139,7 @@ export default async function Submissions({
       row.state === "changes_requested" && row.assignment_id
         ? { kind: "reshoot", href: `/capture/${row.assignment_id}?resubmit=${row.id}` }
         : row.state === "uploading" && row.assignment_id
-          ? { kind: "finish", href: `/capture/${row.assignment_id}` }
+          ? { kind: row.media_revision > 1 ? "finishReshoot" : "finish", href: `/capture/${row.assignment_id}` }
           : null,
     withdrawMode:
       row.state === "uploading" || row.state === "submitted"

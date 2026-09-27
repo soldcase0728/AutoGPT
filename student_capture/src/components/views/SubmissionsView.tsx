@@ -12,7 +12,8 @@ import { resolveShotsTab, splitShots, type ShotsTab } from "@/lib/my-shots";
 import type { StudentProgress } from "@/lib/student-progress";
 import type { CaptureState, Person } from "@/lib/types";
 
-type YoursState = CaptureState | "assigned" | "expired" | "taken_down";
+/** "reshooting": a shot sent back for changes that the student has started to redo. */
+type YoursState = CaptureState | "assigned" | "expired" | "taken_down" | "reshooting";
 type Tone = "muted" | "good" | "bad" | "accent";
 
 const TONE: Record<YoursState, Tone> = {
@@ -25,6 +26,7 @@ const TONE: Record<YoursState, Tone> = {
   withdrawn: "muted",
   approved: "good",
   changes_requested: "accent",
+  reshooting: "accent",
   rejected: "bad",
   published: "good",
   taken_down: "bad",
@@ -39,7 +41,8 @@ const SAID: Record<YoursState, string> = {
   withdrawal_requested: "Withdrawal requested",
   withdrawn: "Withdrawn",
   approved: "Accepted",
-  changes_requested: "Reshoot requested",
+  changes_requested: "Reshoot needed",
+  reshooting: "Reshoot not sent yet",
   rejected: "Not accepted",
   published: "Posted",
   taken_down: "Taken down",
@@ -48,8 +51,27 @@ const SAID: Record<YoursState, string> = {
 const ACTION_LABEL = {
   reshoot: "Reshoot this",
   finish: "Finish sending",
+  finishReshoot: "Finish reshoot",
   capture: "Capture this",
 } as const;
+
+/**
+ * States whose old picture would mislead: the shot was sent back, is being
+ * redone, or won't be used. They show a status tile instead of the media.
+ */
+const STATUS_TILE: Partial<Record<YoursState, { text: string; tone: "bad" | "accent" }>> = {
+  reshooting: { text: "Reshoot", tone: "accent" },
+  rejected: { text: "Not accepted", tone: "bad" },
+  taken_down: { text: "Taken down", tone: "bad" },
+};
+
+/** What the reviewer's message is, in this state. */
+function noteLabel(state: YoursState): string {
+  if (state === "changes_requested" || state === "reshooting") return "What to fix:";
+  if (state === "rejected") return "Why it wasn\u2019t used:";
+  if (state === "taken_down") return "Why it came down:";
+  return "Marketing desk:";
+}
 
 export interface SubmissionRow {
   id: string;
@@ -143,9 +165,10 @@ export function SubmissionsView({
         <li key={row.id} className="card p-4">
           <div className="flex gap-4">
             <Thumbnail
-              src={row.thumbnail?.src ?? null}
+              src={STATUS_TILE[row.state] ? null : (row.thumbnail?.src ?? null)}
               kind={row.thumbnail?.kind ?? "photo"}
               label={`${row.ideaTitle}${row.oneLiner ? `: ${row.oneLiner}` : ""}`}
+              placeholder={STATUS_TILE[row.state] ?? null}
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -194,12 +217,28 @@ export function SubmissionsView({
                   You started this but didn&rsquo;t tap Send it. Nobody can see it yet.
                 </p>
               )}
+              {row.state === "reshooting" && (
+                <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+                  You&rsquo;re redoing this one. Shoot it again, then tap Send it.
+                </p>
+              )}
+              {row.state === "changes_requested" && (
+                <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+                  The marketing desk sent this back. Fix what they asked and send it again.
+                </p>
+              )}
             </div>
           </div>
     
           {row.reviewNote && (
-            <p className="mt-3 rounded-sm border p-3 text-sm" style={{ borderColor: "var(--rule)", background: "var(--sunk)" }}>
-              <span className="font-semibold">Marketing desk:</span> {row.reviewNote}
+            <p
+              className="mt-3 rounded-sm border p-3 text-sm"
+              style={{
+                borderColor: row.state === "rejected" || row.state === "taken_down" ? "var(--clay)" : "var(--rule)",
+                background: "var(--sunk)",
+              }}
+            >
+              <span className="font-semibold">{noteLabel(row.state)}</span> {row.reviewNote}
             </p>
           )}
     

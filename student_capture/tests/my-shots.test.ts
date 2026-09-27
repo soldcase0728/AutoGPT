@@ -3,7 +3,7 @@ import { resolveShotsTab, shotBucket, splitShots } from "@/lib/my-shots";
 
 describe("shotBucket", () => {
   it("puts anything the student still has to do under open", () => {
-    expect(["assigned", "uploading", "changes_requested"].map(shotBucket)).toEqual(["open", "open", "open"]);
+    expect(["assigned", "uploading", "changes_requested", "reshooting"].map(shotBucket)).toEqual(["open", "open", "open", "open"]);
   });
 
   it("puts sent shots under done, whatever came of them", () => {
