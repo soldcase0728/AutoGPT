@@ -55,7 +55,7 @@ rollback;
 -- A leased job cannot be claimed twice.
 create temporary table safety_claim as
 select * from claim_safety_job(120);
-select t_assert((select count(*) = 1 and lease_token is not null from safety_claim),
+select t_assert((select count(*) = 1 and bool_and(lease_token is not null) from safety_claim),
   'worker should claim and lease a job');
 select t_assert((select id from claim_safety_job(120)) is null,
   'active lease should prevent a duplicate claim');

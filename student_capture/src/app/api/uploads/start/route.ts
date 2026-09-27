@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   const { data: assignment, error: assignmentError } = await supabase
     .from("assignments")
     .select(
-      "id, idea_id, person_id, completed_at, ideas!inner(media_type, min_media_count, max_media_count, orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height, min_duration_seconds, max_duration_seconds, caption_required)",
+      "id, idea_id, person_id, completed_at, ideas!inner(active, media_type, min_media_count, max_media_count, orientation, repeat_submission_policy, opens_at, closes_at, max_image_size, allowed_image_formats, min_image_width, min_image_height, min_duration_seconds, max_duration_seconds, caption_required)",
     )
     .eq("id", body.assignmentId)
     .maybeSingle();
@@ -70,7 +70,8 @@ export async function POST(request: Request) {
   if (assignment.person_id !== person.id) {
     return fail(403, "That prompt belongs to someone else.");
   }
-  const prompt = assignment.ideas as unknown as PromptSubmissionContract;
+  const prompt = assignment.ideas as unknown as PromptSubmissionContract & { active: boolean };
+  if (!prompt.active) return fail(409, "This task is on hold, so it can't take new uploads.");
   if (assignment.completed_at && prompt.repeat_submission_policy === "ONCE") {
     return fail(409, "You have already submitted for this prompt.");
   }

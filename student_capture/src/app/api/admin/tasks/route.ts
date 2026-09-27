@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { expandTaskDates, taskCreateSchema } from "@/lib/admin-task";
 import { fail, json, readJson } from "@/lib/http";
+import { schoolDays } from "@/lib/task-progress";
 
 export async function POST(request: Request) {
   const person = await currentPerson();
@@ -13,13 +14,15 @@ export async function POST(request: Request) {
     return fail(400, parsed.error.issues[0]?.message ?? "Check the task details and try again.");
   }
   const input = parsed.data;
-  const dates = expandTaskDates(input.startsOn, input.endsOn);
-  if (!dates) return fail(400, "Choose a valid date range of 31 days or fewer.");
+  const allDates = expandTaskDates(input.startsOn, input.endsOn);
+  if (!allDates) return fail(400, "Choose a valid date range of 31 days or fewer.");
+  const dates = schoolDays(allDates, input.weekdaysOnly);
+  if (!dates.length) return fail(400, "That range has no weekdays in it.");
 
   const admin = createAdminClient();
   const [{ data: campaign }, { data: students }, { data: guidelineSets }] = await Promise.all([
     admin.from("campaigns").select("id").eq("id", input.campaignId).eq("org_id", person.org_id).eq("active", true).maybeSingle(),
-    admin.from("people").select("id").eq("org_id", person.org_id).eq("role", "student").is("deactivated_at", null).in("id", input.studentIds),
+    admin.from("people").select("id, display_name").eq("org_id", person.org_id).eq("role", "student").eq("participation", "active").is("deactivated_at", null).in("id", input.studentIds),
     input.guidelineSetIds.length
       ? admin.from("guideline_sets").select("id").eq("org_id", person.org_id).in("id", input.guidelineSetIds)
       : Promise.resolve({ data: [] as Array<{ id: string }> }),
@@ -102,9 +105,15 @@ export async function POST(request: Request) {
     },
   });
 
+  const names = new Map((students ?? []).map((s) => [s.id, s.display_name as string]));
+  const skipped = requested
+    .filter((row) => occupied.has(`${row.person_id}:${row.due_on}`))
+    .map((row) => ({ name: names.get(row.person_id) ?? "A student", dueOn: row.due_on }));
+
   return json({
     id: idea.id,
     createdAssignments: available.length,
-    skippedExisting: requested.length - available.length,
+    skippedExisting: skipped.length,
+    skipped,
   }, 201);
 }

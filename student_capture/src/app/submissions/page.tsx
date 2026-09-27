@@ -1,6 +1,7 @@
 import { SubmissionsView, type SubmissionRow } from "@/components/views/SubmissionsView";
 import { createClient } from "@/lib/supabase/server";
 import { requirePerson } from "@/lib/session";
+import { loadStudentProgress } from "@/lib/student-progress";
 import type { CaptureState, PromptCaptureMode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +10,12 @@ export default async function Submissions() {
   const person = await requirePerson();
   const supabase = await createClient();
 
+  const progressPromise = person.role === "student" ? loadStudentProgress(supabase, person.id) : Promise.resolve(null);
   const [{ data: captures }, { data: assignments }] = await Promise.all([
     supabase
       .from("captures")
       .select(
-        "id, assignment_id, state, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
+        "id, assignment_id, state, kind, takedown_at, media_revision, created_at, submitted_at, state_changed_at, withdrawn_at, capture_context(one_liner), prompt:ideas!captures_prompt_id_fkey(title, capture_mode)",
       )
       .eq("person_id", person.id)
       .order("created_at", { ascending: false })
@@ -30,6 +32,9 @@ export default async function Submissions() {
     id: string;
     assignment_id: string | null;
     state: CaptureState;
+    kind: "photo" | "video" | null;
+    takedown_at: string | null;
+    media_revision: number;
     created_at: string;
     submitted_at: string | null;
     state_changed_at: string;
@@ -37,7 +42,42 @@ export default async function Submissions() {
     capture_context: { one_liner: string } | null;
     prompt: { title: string; capture_mode: PromptCaptureMode };
   }>;
-  const captureIds = captureRows.map((row) => row.id);
+  // An attempt withdrawn before it was ever sent was replaced by a retake; it
+  // is not something the student sent, so it does not belong in the list.
+  const visibleCaptures = captureRows.filter(
+    (row) => !(row.state === "withdrawn" && !row.submitted_at && row.media_revision <= 1),
+  );
+  const captureIds = visibleCaptures.map((row) => row.id);
+
+  // Read separately so the list still renders if the post-link migration has
+  // not been applied yet.
+  const publishedIds = visibleCaptures.filter((row) => row.state === "published").map((row) => row.id);
+  const postUrls = new Map<string, string>();
+  if (publishedIds.length) {
+    const { data: links, error: linkError } = await supabase
+      .from("captures")
+      .select("id, post_url")
+      .in("id", publishedIds);
+    if (!linkError) {
+      for (const link of (links ?? []) as Array<{ id: string; post_url: string | null }>) {
+        if (link.post_url) postUrls.set(link.id, link.post_url);
+      }
+    }
+  }
+  // Shot of the Day awards, read separately so the list still renders before
+  // that migration is applied.
+  const awardedOn = new Map<string, string>();
+  if (captureIds.length) {
+    const { data: awardRows, error: awardError } = await supabase
+      .from("shot_awards")
+      .select("capture_id, awarded_on")
+      .in("capture_id", captureIds);
+    if (!awardError) {
+      for (const a of (awardRows ?? []) as Array<{ capture_id: string; awarded_on: string }>) {
+        if ((awardedOn.get(a.capture_id) ?? "") < a.awarded_on) awardedOn.set(a.capture_id, a.awarded_on);
+      }
+    }
+  }
   const [{ data: reviews }, { data: withdrawalDecisions }] = captureIds.length
     ? await Promise.all([
         supabase
@@ -71,17 +111,24 @@ export default async function Submissions() {
     );
   }
 
-  const rows: SubmissionRow[] = captureRows.map((row) => ({
+  const rows: SubmissionRow[] = visibleCaptures.map((row) => ({
     id: `capture:${row.id}`,
     captureId: row.id,
-    state: row.state,
+    state: row.state === "rejected" && row.takedown_at ? "taken_down" : row.state,
     occurredAt: row.submitted_at ?? row.state_changed_at ?? row.created_at,
     ideaTitle: row.prompt?.title ?? "Prompt",
     oneLiner: row.capture_context?.one_liner ?? null,
     reviewNote: latestWithdrawalDecision.get(row.id) ?? latestNote.get(row.id) ?? null,
     source: row.prompt?.capture_mode === "OPEN_MOMENT" ? "Open Moment" : "Assigned",
-    actionHref: row.state === "changes_requested" && row.assignment_id
-      ? `/capture/${row.assignment_id}?resubmit=${row.id}` : null,
+    thumbnail: { src: `/api/captures/${row.id}/media`, kind: row.kind === "video" ? "video" : "photo" },
+    postUrl: row.state === "published" ? (postUrls.get(row.id) ?? null) : null,
+    awardedOn: row.state === "published" || row.state === "approved" ? (awardedOn.get(row.id) ?? null) : null,
+    action:
+      row.state === "changes_requested" && row.assignment_id
+        ? { kind: "reshoot", href: `/capture/${row.assignment_id}?resubmit=${row.id}` }
+        : row.state === "uploading" && row.assignment_id
+          ? { kind: "finish", href: `/capture/${row.assignment_id}` }
+          : null,
     withdrawMode:
       row.state === "uploading" || row.state === "submitted"
         ? "direct"
@@ -91,7 +138,7 @@ export default async function Submissions() {
   }));
 
   const representedAssignments = new Set(
-    captureRows.flatMap((row) => (row.assignment_id ? [row.assignment_id] : [])),
+    visibleCaptures.flatMap((row) => (row.assignment_id ? [row.assignment_id] : [])),
   );
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -114,11 +161,13 @@ export default async function Submissions() {
       oneLiner: null,
       reviewNote: null,
       source: "Assigned",
-      actionHref: expired ? null : `/capture/${assignment.id}`,
+      thumbnail: null,
+      postUrl: null,
+      action: expired ? null : { kind: "capture", href: `/capture/${assignment.id}` },
       withdrawMode: null,
     });
   }
 
   rows.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-  return <SubmissionsView person={person} rows={rows} />;
+  return <SubmissionsView person={person} rows={rows} progress={await progressPromise} />;
 }

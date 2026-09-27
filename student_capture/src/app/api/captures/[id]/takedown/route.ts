@@ -17,16 +17,21 @@ export async function POST(
   const person = await currentPerson();
   if (!person) return fail(401, "Sign in first.");
 
-  const body = await readJson<{ reason?: string }>(request);
+  const body = await readJson<{ reason?: string; message?: string }>(request);
   const reason = body?.reason?.trim();
+  const message = body?.message?.trim();
   if (!reason) {
-    return fail(400, "A takedown needs a reason — it goes in the permanent record.");
+    return fail(400, "Give the reason for the takedown. It stays in the staff record.");
+  }
+  if (!message) {
+    return fail(400, "Write a message to the student explaining that it was taken down.");
   }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("take_down_capture", {
     p_capture_id: id,
     p_reason: reason,
+    p_student_message: message,
   });
 
   if (error) {

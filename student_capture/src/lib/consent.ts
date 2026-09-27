@@ -30,3 +30,22 @@ export function describeBlocker(blocker: ConsentBlocker): string {
 export function publishable(blockers: ConsentBlocker[] | null | undefined): boolean {
   return (blockers?.length ?? 0) === 0;
 }
+
+/** A name reduced for comparison: case, spacing and punctuation don't count. */
+function normaliseName(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+/**
+ * Whether a typed signature is the roster name. "  ali   HADDAD " and
+ * "C Castiglione" match "Ali Haddad" and "C. Castiglione".
+ */
+export function signatureMatches(typed: string, rosterName: string): boolean {
+  const want = normaliseName(rosterName);
+  return want.length > 0 && normaliseName(typed) === want;
+}

@@ -56,6 +56,17 @@ begin;
     'an Open Moment submission should not require an assignment');
 rollback;
 
+-- Its own uploading envelope for Kit (from 30_kill_rules.sql), so this file does
+-- not depend on what that file did to its captures.
+insert into assignments (id, idea_id, person_id, due_on) values
+  ('b4000000-0000-0000-0000-000000000001', '51111111-1111-1111-1111-111111111111',
+   '71111111-1111-1111-1111-111111111111', current_date + 40);
+insert into captures (id, assignment_id, person_id, org_id, bucket, storage_key, state)
+values ('f4000000-0000-0000-0000-000000000001',
+        'b4000000-0000-0000-0000-000000000001',
+        '71111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
+        'captures', 'kit/f4/clip.mp4', 'uploading');
+
 -- An active owner may add and edit media only while the envelope is uploading.
 begin;
   set local role authenticated;
@@ -65,8 +76,8 @@ begin;
     id, submission_id, media_type, bucket, storage_key, sort_order, mime_type, file_size
   ) values (
     'f1000000-0000-0000-0000-000000000002',
-    'f0000000-0000-0000-0000-000000000001',
-    'video', 'captures', 'kit/f1/media-2/clip.mp4', 1, 'video/mp4', 1234
+    'f4000000-0000-0000-0000-000000000001',
+    'video', 'captures', 'kit/f4/media-2/clip.mp4', 1, 'video/mp4', 1234
   );
 
   update submission_media set width = 1080, height = 1920
@@ -88,7 +99,7 @@ begin
     insert into submission_media (
       submission_id, media_type, bucket, storage_key, sort_order
     ) values (
-      'f0000000-0000-0000-0000-000000000001',
+      'f4000000-0000-0000-0000-000000000001',
       'video', 'captures', 'jo/forged/clip.mp4', 1
     );
     raise exception 'ASSERT FAILED: student attached media to another submission';

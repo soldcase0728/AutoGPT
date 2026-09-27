@@ -49,7 +49,10 @@ run supabase/tests/99_grants.sql
 echo "==> seed"
 run supabase/seed.sql
 echo "==> tests"
-for f in supabase/tests/[1-8]*_*.sql; do run "$f"; done
+# Every numbered test file except 99_grants.sql, which ran as setup above.
+for f in supabase/tests/[1-9]*_*.sql; do
+  [ "$f" = supabase/tests/99_grants.sql ] || run "$f"
+done
 
 echo
 echo "database verified"

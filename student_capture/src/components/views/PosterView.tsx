@@ -1,3 +1,5 @@
+import { BRAND } from "@/lib/brand";
+
 /**
  * A printable poster for a locker room wall. Everything is sized for paper and
  * forced to a light palette — a poster printed from a dark-mode screen wastes
@@ -9,7 +11,7 @@ export function PosterView({
   url,
   qrSvg,
   callToAction = "Point your camera at this.",
-  note = "Sign in with your school email — no password. You get one prompt a morning, it takes under a minute, and you can stop any time.",
+  note = "Sign in with your school email and the password the school gives you. You get one prompt a morning, it takes under a minute, and you can stop any time.",
 }: {
   orgName: string;
   headline: string;
@@ -45,13 +47,15 @@ export function PosterView({
       `}</style>
 
       <div className="poster">
+        {/* eslint-disable-next-line @next/next/no-img-element -- printed, not optimised */}
+        <img src={BRAND.logo} alt={BRAND.schoolName} width={120} height={120} style={{ margin: "0 auto" }} />
         <p
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: 13,
             letterSpacing: "0.22em",
             textTransform: "uppercase",
-            color: "#8a6600",
+            color: BRAND.red,
             margin: 0,
           }}
         >

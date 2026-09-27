@@ -21,6 +21,7 @@ export const taskCreateSchema = z
     minDurationSeconds: z.number().min(0).max(600).nullable(),
     maxDurationSeconds: z.number().positive().max(600).nullable(),
     captionRequired: z.boolean().default(false),
+    weekdaysOnly: z.boolean().default(false),
   })
   .superRefine((value, context) => {
     const dates = expandTaskDates(value.startsOn, value.endsOn);

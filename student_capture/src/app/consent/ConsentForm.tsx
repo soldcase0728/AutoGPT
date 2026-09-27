@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { signatureMatches } from "@/lib/consent";
 import { RELEASE_VERSION } from "./version";
 
 export function ConsentForm({
@@ -17,10 +18,13 @@ export function ConsentForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const matches = typed.trim().toLowerCase() === displayName.trim().toLowerCase();
-
   async function sign(event: React.FormEvent) {
     event.preventDefault();
+    // Say what's wrong instead of leaving a grey button nobody can explain.
+    if (!signatureMatches(typed, displayName)) {
+      setError(`Type your name as the school has it: ${displayName}. If that's wrong, ask the marketing desk to fix it.`);
+      return;
+    }
     setSaving(true);
     setError("");
 
@@ -34,7 +38,7 @@ export function ConsentForm({
 
     if (insertError) {
       setSaving(false);
-      setError(insertError.message);
+      setError("That didn't save. Check your connection and tap I agree again.");
       return;
     }
     router.push("/");
@@ -46,20 +50,27 @@ export function ConsentForm({
       <label className="label" htmlFor="signature">
         Type your name to sign
       </label>
+      <p className="-mt-1 text-sm" style={{ color: "var(--muted)" }}>
+        As the school has it: <span className="font-semibold" style={{ color: "var(--ink)" }}>{displayName}</span>
+      </p>
       <input
         id="signature"
         value={typed}
-        onChange={(e) => setTyped(e.target.value)}
+        onChange={(e) => {
+          setTyped(e.target.value);
+          if (error) setError("");
+        }}
         className="card px-3 py-3"
         style={{ background: "var(--surface)" }}
-        placeholder={displayName}
-        autoComplete="off"
+        placeholder="Your full name"
+        autoComplete="name"
+        autoCapitalize="words"
       />
-      <button className="btn" disabled={!matches || saving}>
+      <button className="btn" disabled={!typed.trim() || saving}>
         {saving ? "Saving…" : "I agree"}
       </button>
       {error && (
-        <p className="text-sm" style={{ color: "var(--clay)" }}>
+        <p className="text-sm" style={{ color: "var(--clay)" }} role="alert">
           {error}
         </p>
       )}

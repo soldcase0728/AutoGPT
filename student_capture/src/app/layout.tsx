@@ -1,11 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Capture",
+  title: BRAND.appName,
   description: "Today's prompt, and somewhere to put what you shot.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Capture", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: BRAND.appName, statusBarStyle: "default" },
+  icons: {
+    icon: [{ url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export const viewport: Viewport = {

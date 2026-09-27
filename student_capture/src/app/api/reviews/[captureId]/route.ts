@@ -12,7 +12,10 @@ const DECISIONS: CaptureState[] = [
 
 interface Body {
   decision: CaptureState;
+  /** Shown to the student. */
   note?: string;
+  /** Staff only. */
+  internalNote?: string;
 }
 
 export async function POST(
@@ -31,7 +34,10 @@ export async function POST(
     return fail(400, `decision must be one of: ${DECISIONS.join(", ")}.`);
   }
   if (body.decision === "changes_requested" && !body.note?.trim()) {
-    return fail(400, "Say what needs changing — the student only sees the note.");
+    return fail(400, "Write a message to the student saying what to change.");
+  }
+  if (body.decision === "rejected" && !body.note?.trim()) {
+    return fail(400, "Write a message to the student saying why it wasn't accepted.");
   }
 
   const supabase = await createClient();
@@ -42,6 +48,7 @@ export async function POST(
     p_capture_id: captureId,
     p_decision: body.decision,
     p_note: body.note?.trim() || null,
+    p_internal_note: body.internalNote?.trim() || null,
   });
 
   if (stateError) {

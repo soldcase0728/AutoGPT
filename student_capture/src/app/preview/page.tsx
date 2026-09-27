@@ -6,10 +6,14 @@ const SCREENS = [
   ["today", "Student · today's prompt"],
   ["today-done", "Student · already sent"],
   ["capture", "Student · the capture flow"],
+  ["capture?media=photo", "Student · the capture flow, for photos"],
   ["consent", "Student · the release, as a minor sees it"],
   ["submissions", "Student · what they have sent"],
   ["review", "Marketing · the review queue"],
   ["poster", "Print · the QR poster for a locker room wall"],
+  ["dashboard", "Admin · the overview they land on"],
+  ["people", "Admin · people, access and releases"],
+  ["tasks", "Admin · creating and tracking tasks"],
 ];
 
 export default function PreviewIndex() {
