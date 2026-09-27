@@ -44,7 +44,7 @@ export const IDEA: Idea & { campaigns: { name: string } } = {
   format_spec: {
     kind: "video",
     orientation: "portrait",
-    min_seconds: 10,
+    min_seconds: 5,
     max_seconds: 30,
   },
   reference_urls: [],
@@ -60,7 +60,7 @@ export const IDEA: Idea & { campaigns: { name: string } } = {
   allowed_image_formats: null,
   min_image_width: null,
   min_image_height: null,
-  min_duration_seconds: 10,
+  min_duration_seconds: 5,
   max_duration_seconds: 30,
   caption_required: false,
   guideline_set_ids: [
@@ -79,7 +79,7 @@ const VERSIONS: GuidelineVersion[] = [
       summary: "Shoot it so it works on a phone, held upright.",
       items: [
         { id: "vertical", text: "Hold the phone upright. Vertical, 9:16.", required: true },
-        { id: "length", text: "Keep it between 10 and 30 seconds.", required: true },
+        { id: "length", text: "Keep it between 5 and 30 seconds.", required: true },
         { id: "light", text: "Face the light. Never shoot into it.", required: true },
         {
           id: "safety",
