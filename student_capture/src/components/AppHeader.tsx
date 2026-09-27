@@ -8,7 +8,7 @@ export function AppHeader({ person }: { person: Person }) {
 
   return (
     <header className="border-b" style={{ borderColor: "var(--rule)", borderTop: "4px solid var(--brand)" }}>
-      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-4">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
         <Link
           href={person.role === "admin" ? "/admin" : isStaff ? "/review" : "/"}
           className="flex items-center gap-2"
@@ -20,7 +20,7 @@ export function AppHeader({ person }: { person: Person }) {
             <span style={{ color: "var(--brand-ink)" }}>{BRAND.shortName}</span> Capture
           </span>
         </Link>
-        <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <nav className="order-3 flex basis-full flex-wrap items-center gap-x-4 gap-y-1 text-sm sm:order-2 sm:ml-auto sm:basis-auto">
           {!isStaff && (
             <Link href="/submissions" style={{ color: "var(--muted)" }}>
               My shots
@@ -46,9 +46,12 @@ export function AppHeader({ person }: { person: Person }) {
               </Link>
             </>
           )}
-          <span className="label" title={person.email}>{person.display_name}</span>
-          <SignOutButton />
         </nav>
+        {/* Always the top-right corner, on every screen size. */}
+        <div className="order-2 ml-auto flex items-center gap-3 sm:order-3 sm:ml-0">
+          <span className="label hidden sm:inline" title={person.email}>{person.display_name}</span>
+          <SignOutButton />
+        </div>
       </div>
     </header>
   );
