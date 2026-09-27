@@ -3,11 +3,13 @@ import { isoDate } from "./assign";
 import { assignmentStatuses, type TaskAssignment, type TaskCapture } from "./task-progress";
 import {
   parseCommunityStats,
+  parseTeamBoard,
   recentPost,
   studentRecord,
   type CommunityStats,
   type PostedCapture,
   type StudentRecord,
+  type TeamBoard,
 } from "./student-record";
 import type { CaptureState } from "./types";
 
@@ -15,6 +17,8 @@ export interface StudentProgress {
   record: StudentRecord;
   recent: PostedCapture | null;
   community: CommunityStats | null;
+  /** Null until the team-board migration is applied. */
+  board: TeamBoard | null;
 }
 
 /** Everything the student's record needs, read as the student through RLS. */
@@ -23,7 +27,7 @@ export async function loadStudentProgress(
   personId: string,
   now = new Date(),
 ): Promise<StudentProgress> {
-  const [{ data: assignmentRows }, { data: captureRows }, community] = await Promise.all([
+  const [{ data: assignmentRows }, { data: captureRows }, community, board] = await Promise.all([
     supabase
       .from("assignments")
       .select("id, due_on")
@@ -39,6 +43,10 @@ export async function loadStudentProgress(
     // Absent until the community-stats migration is applied; the record still shows.
     supabase.rpc("my_community_stats").then(
       ({ data, error }) => (error ? null : parseCommunityStats(data)),
+      () => null,
+    ),
+    supabase.rpc("my_team_board").then(
+      ({ data, error }) => (error ? null : parseTeamBoard(data)),
       () => null,
     ),
   ]);
@@ -80,5 +88,6 @@ export async function loadStudentProgress(
     record: studentRecord(assignments, statuses, isoDate(now), published.length),
     recent: newest,
     community,
+    board,
   };
 }

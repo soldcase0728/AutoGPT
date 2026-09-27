@@ -86,3 +86,44 @@ export function parseCommunityStats(raw: unknown): CommunityStats | null {
     }),
   };
 }
+
+export interface TeamBoard {
+  optedIn: boolean;
+  groups: Array<{
+    name: string;
+    kind: string;
+    entries: Array<{ firstName: string; weekSent: number; weekPosted: number; me: boolean }>;
+  }>;
+}
+
+/** The team-board RPC's JSON, checked field by field; null if missing or malformed. */
+export function parseTeamBoard(raw: unknown): TeamBoard | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0);
+  const groups = Array.isArray(r.groups) ? r.groups : [];
+  return {
+    optedIn: r.opted_in === true,
+    groups: groups.flatMap((g) => {
+      if (!g || typeof g !== "object") return [];
+      const row = g as Record<string, unknown>;
+      if (typeof row.name !== "string") return [];
+      const entries = Array.isArray(row.entries) ? row.entries : [];
+      return [{
+        name: row.name,
+        kind: typeof row.kind === "string" ? row.kind : "list",
+        entries: entries.flatMap((e) => {
+          if (!e || typeof e !== "object") return [];
+          const entry = e as Record<string, unknown>;
+          if (typeof entry.first_name !== "string" || !entry.first_name) return [];
+          return [{
+            firstName: entry.first_name,
+            weekSent: num(entry.week_sent),
+            weekPosted: num(entry.week_posted),
+            me: entry.me === true,
+          }];
+        }),
+      }];
+    }),
+  };
+}

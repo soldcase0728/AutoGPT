@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Chip } from "@/components/Chip";
 import { Thumbnail } from "@/components/Thumbnail";
 import { StudentProgressCard } from "@/components/StudentProgressCard";
+import { shotsHeading } from "@/lib/names";
 import type { StudentProgress } from "@/lib/student-progress";
 import type { CaptureState, Person } from "@/lib/types";
 
@@ -126,7 +127,7 @@ export function SubmissionsView({
     <>
       <AppHeader person={person} />
       <main className="mx-auto max-w-3xl px-5 py-8">
-        <h1 className="text-2xl font-bold tracking-tight">Yours</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{shotsHeading(person.display_name)}</h1>
         <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
           Assignments, uploads, and review outcomes in one place.
         </p>

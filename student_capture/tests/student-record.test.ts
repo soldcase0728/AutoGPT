@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCommunityStats, recentPost, studentRecord } from "@/lib/student-record";
+import { parseCommunityStats, parseTeamBoard, recentPost, studentRecord } from "@/lib/student-record";
 import type { AssignmentStatus, TaskAssignment } from "@/lib/task-progress";
 
 const a = (id: string, dueOn: string): TaskAssignment => ({ id, personId: "me", dueOn });
@@ -75,5 +75,34 @@ describe("parseCommunityStats", () => {
     expect(parseCommunityStats({ week_posted: "3", groups: [{ kind: "team" }, null] })).toEqual({
       weekPosted: 3, weekContributors: 0, groups: [],
     });
+  });
+});
+
+describe("parseTeamBoard", () => {
+  it("reads the RPC's shape", () => {
+    expect(parseTeamBoard({
+      opted_in: true,
+      groups: [{ name: "Varsity soccer", kind: "team", entries: [
+        { first_name: "Ali", week_sent: 4, week_posted: 2, me: true },
+        { first_name: "Jo", week_sent: "3", week_posted: 0, me: false },
+      ] }],
+    })).toEqual({
+      optedIn: true,
+      groups: [{ name: "Varsity soccer", kind: "team", entries: [
+        { firstName: "Ali", weekSent: 4, weekPosted: 2, me: true },
+        { firstName: "Jo", weekSent: 3, weekPosted: 0, me: false },
+      ] }],
+    });
+  });
+
+  it("treats anything but true as not opted in, and drops nameless entries", () => {
+    expect(parseTeamBoard({ opted_in: "yes", groups: [{ name: "G", entries: [{ week_sent: 1 }] }] })).toEqual({
+      optedIn: false,
+      groups: [{ name: "G", kind: "list", entries: [] }],
+    });
+  });
+
+  it("returns null when the function isn't there", () => {
+    expect(parseTeamBoard(undefined)).toBeNull();
   });
 });

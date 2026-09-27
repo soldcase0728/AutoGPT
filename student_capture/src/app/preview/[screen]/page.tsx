@@ -52,6 +52,18 @@ const PROGRESS = {
     weekContributors: 41,
     groups: [{ name: "Varsity soccer", kind: "team", members: 18, weekSent: 14 }],
   },
+  board: {
+    optedIn: true,
+    groups: [{
+      name: "Varsity soccer",
+      kind: "team",
+      entries: [
+        { firstName: "Jo", weekSent: 5, weekPosted: 2, me: false },
+        { firstName: "Ali", weekSent: 4, weekPosted: 1, me: true },
+        { firstName: "Sam", weekSent: 2, weekPosted: 0, me: false },
+      ],
+    }],
+  },
 };
 
 const SCREENS = [

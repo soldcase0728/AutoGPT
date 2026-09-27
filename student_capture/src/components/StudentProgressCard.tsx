@@ -1,4 +1,5 @@
 import { Chip } from "./Chip";
+import { TeamBoard } from "./TeamBoard";
 import type { StudentProgress } from "@/lib/student-progress";
 
 function Stat({ value, label }: { value: number; label: string }) {
@@ -16,7 +17,7 @@ function Stat({ value, label }: { value: number; label: string }) {
  * Team and school figures are counts only; nobody else is named.
  */
 export function StudentProgressCard({ progress }: { progress: StudentProgress }) {
-  const { record, recent, community } = progress;
+  const { record, recent, community, board } = progress;
   const showCommunity = community && (community.weekPosted > 0 || community.weekContributors > 0 || community.groups.length > 0);
 
   return (
@@ -76,6 +77,8 @@ export function StudentProgressCard({ progress }: { progress: StudentProgress })
             ))}
           </div>
         )}
+
+        {board && board.groups.length > 0 && <TeamBoard board={board} />}
       </section>
     </div>
   );

@@ -14,7 +14,7 @@ export function AppHeader({ person }: { person: Person }) {
         <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {!isStaff && (
             <Link href="/submissions" style={{ color: "var(--muted)" }}>
-              Yours
+              My shots
             </Link>
           )}
           {person.role === "admin" && (

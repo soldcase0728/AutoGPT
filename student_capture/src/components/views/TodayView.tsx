@@ -4,6 +4,8 @@ import { PromptCard } from "@/components/PromptCard";
 import { Chip } from "@/components/Chip";
 import { StudentProgressCard } from "@/components/StudentProgressCard";
 import type { StudentProgress } from "@/lib/student-progress";
+import { firstName } from "@/lib/names";
+import { Greeting } from "@/components/Greeting";
 import type { Idea, Person } from "@/lib/types";
 
 export interface TodayViewProps {
@@ -30,6 +32,9 @@ export function TodayView({
     <>
       <AppHeader person={person} />
       <main className="mx-auto max-w-3xl px-5 py-8">
+        {!isStaff && (
+          <Greeting name={firstName(person.display_name)} />
+        )}
         <p className="label">
           {today.toLocaleDateString(undefined, {
             weekday: "long",
@@ -74,7 +79,7 @@ export function TodayView({
                   </p>
                 </div>
                 <Link href="/submissions" className="btn btn-quiet whitespace-nowrap">
-                  Your clips
+                  My shots
                 </Link>
               </div>
             ) : (
