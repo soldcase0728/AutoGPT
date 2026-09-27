@@ -3,6 +3,7 @@ import { demoScreensEnabled } from "@/lib/demo";
 import { TodayView } from "@/components/views/TodayView";
 import { SubmissionsView } from "@/components/views/SubmissionsView";
 import { ConsentView } from "@/components/views/ConsentView";
+import { ConsentForm } from "@/app/consent/ConsentForm";
 import { CaptureFlow } from "@/app/capture/[assignmentId]/CaptureFlow";
 import { ReviewQueue } from "@/app/review/ReviewQueue";
 import { PosterView } from "@/components/views/PosterView";
@@ -136,10 +137,9 @@ export default async function PreviewScreen({
     case "consent":
       return (
         <ConsentView person={MINOR} minor ageUnknown={false} releaseVersion={RELEASE_VERSION}>
-          <p className="mt-6 text-sm" style={{ color: "var(--muted)" }}>
-            The signing form is omitted here — it writes a consent row, which needs a
-            database.
-          </p>
+          {/* A matching name would try to write a consent row, which needs a database;
+              a mismatch shows the guidance without one. */}
+          <ConsentForm personId={MINOR.id} displayName={MINOR.display_name} />
         </ConsentView>
       );
 

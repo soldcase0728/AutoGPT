@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeBlocker, publishable } from "@/lib/consent";
+import { describeBlocker, publishable, signatureMatches } from "@/lib/consent";
 
 describe("publishable", () => {
   it("is true only when the gate returned nothing", () => {
@@ -24,5 +24,19 @@ describe("describeBlocker", () => {
 
   it("degrades legibly on a reason it has never seen", () => {
     expect(describeBlocker({ reason: "future_rule" })).toBe("Unresolved: future_rule");
+  });
+});
+
+describe("signatureMatches", () => {
+  it("ignores case, spacing and punctuation", () => {
+    expect(signatureMatches("  ali   HADDAD ", "Ali Haddad")).toBe(true);
+    expect(signatureMatches("C Castiglione", "C. Castiglione")).toBe(true);
+    expect(signatureMatches("Zoe", "Zoë")).toBe(true);
+  });
+
+  it("still needs the actual name", () => {
+    expect(signatureMatches("Ali", "Ali Haddad")).toBe(false);
+    expect(signatureMatches("", "Ali Haddad")).toBe(false);
+    expect(signatureMatches("x", "")).toBe(false);
   });
 });
