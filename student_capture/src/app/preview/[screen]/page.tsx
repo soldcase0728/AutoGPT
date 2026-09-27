@@ -84,11 +84,11 @@ export default async function PreviewScreen({
   searchParams,
 }: {
   params: Promise<{ screen: string }>;
-  searchParams: Promise<{ url?: string; headline?: string; org?: string; note?: string }>;
+  searchParams: Promise<{ url?: string; headline?: string; org?: string; note?: string; media?: string }>;
 }) {
   if (!demoScreensEnabled()) notFound();
   const { screen } = await params;
-  const { url: urlParam, headline, org, note } = await searchParams;
+  const { url: urlParam, headline, org, note, media } = await searchParams;
 
   switch (screen) {
     case "today":
@@ -120,10 +120,10 @@ export default async function PreviewScreen({
             assignmentId="assignment-1"
             ideaId={IDEA.id}
             spec={IDEA.format_spec}
-            mediaType={IDEA.media_type}
+            mediaType={media === "photo" ? "photo_series" : IDEA.media_type}
             orientation={IDEA.orientation}
             minMediaCount={IDEA.min_media_count}
-            maxMediaCount={IDEA.max_media_count}
+            maxMediaCount={media === "photo" ? 3 : IDEA.max_media_count}
             captionRequired={IDEA.caption_required}
             checklist={CHECKLIST}
             people={PEOPLE}

@@ -487,19 +487,34 @@ export function CaptureFlow({
         {mediaType === "video" ? (
           <>
             {!file && !resumed && (
-              <label
-                className={`btn mt-3 block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
-              >
-                Open camera
-                <input
-                  type="file"
-                  className="sr-only"
-                  accept="video/*"
-                  capture="environment"
-                  disabled={!ready}
-                  onChange={onPick}
-                />
-              </label>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <label
+                  className={`btn block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
+                >
+                  Record now
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept="video/*"
+                    capture="environment"
+                    disabled={!ready}
+                    onChange={onPick}
+                  />
+                </label>
+                <label
+                  className={`btn btn-quiet block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
+                >
+                  Choose from camera roll
+                  {/* No capture attribute: the phone offers its library as well as the camera. */}
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept="video/*"
+                    disabled={!ready}
+                    onChange={onPick}
+                  />
+                </label>
+              </div>
             )}
             {file && previewUrl && (
               <video
@@ -524,7 +539,7 @@ export function CaptureFlow({
 
         {!ready && (
           <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
-            Tick &ldquo;I&rsquo;ll shoot this safely&rdquo; to open the camera.
+            Tick &ldquo;I&rsquo;ll shoot this safely&rdquo; to record or choose your shot.
           </p>
         )}
 
@@ -564,16 +579,22 @@ export function CaptureFlow({
                 : `Use ${photoFiles.length === 1 ? "this photo" : `these ${photoFiles.length} photos`}`}
             </button>
             {file && (
-              <label className="btn btn-quiet cursor-pointer">
-                Retake
-                <input
-                  type="file"
-                  className="sr-only"
-                  accept="video/*"
-                  capture="environment"
-                  onChange={onPick}
-                />
-              </label>
+              <>
+                <label className="btn btn-quiet cursor-pointer">
+                  Retake
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept="video/*"
+                    capture="environment"
+                    onChange={onPick}
+                  />
+                </label>
+                <label className="btn btn-quiet cursor-pointer">
+                  Choose another
+                  <input type="file" className="sr-only" accept="video/*" onChange={onPick} />
+                </label>
+              </>
             )}
           </div>
         )}
