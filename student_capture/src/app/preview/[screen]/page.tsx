@@ -241,7 +241,7 @@ export default async function PreviewScreen({
       const url = safeUrl(urlParam) ?? "https://capture.example.edu";
       return (
         <PosterView
-          orgName={org || "Northside Athletics"}
+          orgName={org || "Orchard Lake St. Mary's"}
           headline={headline || "One clip. Every day."}
           url={url}
           note={note}
