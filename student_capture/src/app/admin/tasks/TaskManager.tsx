@@ -164,7 +164,11 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks, 
       setError(body.error ?? "The task could not be created.");
       return;
     }
-    setMessage(`Task created: ${body.createdAssignments} assignment${body.createdAssignments === 1 ? "" : "s"}.`);
+    setMessage(
+      selectedStudents.length === 0
+        ? "Task created. Nobody has it yet; open it below to assign students."
+        : `Task created: ${body.createdAssignments} assignment${body.createdAssignments === 1 ? "" : "s"}.`,
+    );
     setSkipped(body.skipped ?? []);
     setTitle("");
     setBrief("");
@@ -267,7 +271,16 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks, 
             )}
           </div>
         )}
-        <button className="btn w-full sm:w-auto" disabled={busy || !campaignId || selectedCount === 0 || !days?.length}>{busy ? "Creating…" : days && days.length > 1 ? `Create ${days.length} days of tasks` : "Create task"}</button>
+        <div className="flex flex-col gap-2">
+          {selectedCount === 0 && (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              No students picked: the task is saved as &ldquo;Nobody assigned&rdquo;. Open it later to assign students and days.
+            </p>
+          )}
+          <button className="btn w-full sm:w-auto sm:self-start" disabled={busy || !campaignId || (selectedCount > 0 && !days?.length)}>
+            {busy ? "Creating…" : selectedCount === 0 ? "Create task, assign later" : days && days.length > 1 ? `Create ${days.length} days of tasks` : "Create task"}
+          </button>
+        </div>
       </form>
 
       <section>
@@ -299,7 +312,7 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks, 
                   <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>{task.assignmentCount} assignment{task.assignmentCount === 1 ? "" : "s"}{task.firstDueOn ? ` · ${task.firstDueOn}${task.lastDueOn !== task.firstDueOn ? ` to ${task.lastDueOn}` : ""}` : ""}</p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  <Link className="btn" href={`/admin/tasks/${task.id}`}>Open</Link>
+                  <Link className="btn" href={`/admin/tasks/${task.id}`}>{task.assignmentCount === 0 && !task.cancelled ? "Assign" : "Open"}</Link>
                   <button type="button" className="btn btn-quiet" onClick={() => applyTemplate(task)}>Use as template</button>
                 </div>
               </div>
