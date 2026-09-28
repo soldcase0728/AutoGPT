@@ -41,10 +41,10 @@ export function checkFormat(
   // A video whose length or size can't be read is usually a broken or
   // unsupported file; sending it only fails later, at review.
   if (facts.kind === "video" && spec.kind === "video") {
-    if (facts.bytes < MIN_VIDEO_BYTES) {
-      findings.push({ level: "block", message: "That video is too small to be a real clip. Try recording it again." });
-    } else if (!facts.durationSeconds || !facts.width || !facts.height) {
+    if (!facts.durationSeconds || !facts.width || !facts.height) {
       findings.push({ level: "block", message: "We couldn't read this video. Try recording it again." });
+    } else if (facts.bytes < MIN_VIDEO_BYTES) {
+      findings.push({ level: "block", message: "That video is too small to be a real clip. Try recording it again." });
     }
   }
 

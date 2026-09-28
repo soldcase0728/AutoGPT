@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandTaskDates, taskCreateSchema } from "@/lib/admin-task";
+import { cleanTaskTitle, expandTaskDates, taskCreateSchema } from "@/lib/admin-task";
 
 const valid = {
   campaignId: "41111111-1111-1111-1111-111111111111",
@@ -41,5 +41,18 @@ describe("taskCreateSchema", () => {
     expect(taskCreateSchema.safeParse({ ...valid, mediaType: "video" }).success).toBe(false);
     expect(taskCreateSchema.safeParse({ ...valid, maxMediaCount: 3 }).success).toBe(false);
     expect(taskCreateSchema.safeParse({ ...valid, mediaType: "photo_series", maxMediaCount: 3 }).success).toBe(true);
+  });
+});
+
+describe("cleanTaskTitle", () => {
+  it("strips every copy suffix a duplicate picked up", () => {
+    expect(cleanTaskTitle("Pre-game, ninety minutes out — copy — copy — copy")).toBe("Pre-game, ninety minutes out");
+    expect(cleanTaskTitle("Your view right now (copy)")).toBe("Your view right now");
+    expect(cleanTaskTitle("Test 1 - copy")).toBe("Test 1");
+  });
+
+  it("leaves a real title alone", () => {
+    expect(cleanTaskTitle("Copy the playbook")).toBe("Copy the playbook");
+    expect(cleanTaskTitle("Pre-game")).toBe("Pre-game");
   });
 });

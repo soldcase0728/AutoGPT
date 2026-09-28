@@ -27,6 +27,7 @@ const STATE_LABEL: Record<string, string> = {
   submitted: "new",
   in_review: "in review",
   changes_requested: "reshoot asked",
+  uploading: "reshooting now",
   approved: "approved",
   published: "posted",
   rejected: "rejected",
@@ -41,11 +42,18 @@ export interface CaptureExtras {
   scanTiming?: ScanTiming;
   /** Its Shot of the Day award, if it has one. */
   award?: ShotAward | null;
+  /** On a reshoot, the take the desk sent back. */
+  previousTake?: { mediaId: string; kind: "video" | "photo" } | null;
 }
 
 /** A shot that came back after the desk asked for changes. */
-function isReshoot(extras?: CaptureExtras) {
-  return Boolean(extras?.messages.some((message) => message.state === "changes_requested"));
+function isReshoot(row: QueueRow, extras?: CaptureExtras) {
+  return (row.media_revision ?? 1) > 1 || Boolean(extras?.messages.some((message) => message.state === "changes_requested"));
+}
+
+/** Sent back and not yet sent again: the desk is waiting on the student. */
+function isWaiting(row: QueueRow) {
+  return row.state === "changes_requested" || row.state === "uploading";
 }
 
 export interface WithdrawalRow {
@@ -391,10 +399,10 @@ export function ReviewQueue({
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Chip>{STATE_LABEL[row.state] ?? row.state}</Chip>
-              {isReshoot(extras[row.id]) && (row.state === "submitted" || row.state === "in_review") && (
+              {isReshoot(row, extras[row.id]) && (row.state === "submitted" || row.state === "in_review") && (
                 <Chip tone="accent">reshoot</Chip>
               )}
-              {row.consent_blockers?.length > 0 && <Chip tone="bad">consent missing</Chip>}
+              {row.consent_blockers?.length > 0 && !isWaiting(row) && <Chip tone="bad">consent missing</Chip>}
               {extras[row.id]?.award && <Chip tone="accent">★ shot of the day</Chip>}
               {row.student_participation !== "active" && <Chip tone="bad">account {row.student_participation}</Chip>}
               {rowSafety?.unresolved_finding_count ? (
@@ -465,9 +473,46 @@ export function ReviewQueue({
               {!current.exif_stripped && current.media_type === "video" && <Chip>location not stripped</Chip>}
             </div>
 
-            {isReshoot(extras[current.id]) && (current.state === "submitted" || current.state === "in_review") && (
+            {isReshoot(current, currentExtras) && (current.state === "submitted" || current.state === "in_review") && (
+              <div className="mt-3 flex items-start gap-3">
+                {currentExtras?.previousTake && (
+                  <a
+                    href={`/api/captures/${current.id}/media?mediaId=${currentExtras.previousTake.mediaId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-20 shrink-0 overflow-hidden rounded-sm bg-black opacity-70"
+                    title="The take you sent back"
+                  >
+                    {currentExtras.previousTake.kind === "video" ? (
+                      <video
+                        src={`/api/captures/${current.id}/media?mediaId=${currentExtras.previousTake.mediaId}`}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="aspect-[9/16] w-full object-cover"
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/captures/${current.id}/media?mediaId=${currentExtras.previousTake.mediaId}`}
+                        alt="The take you sent back"
+                        className="aspect-[9/16] w-full object-cover"
+                      />
+                    )}
+                  </a>
+                )}
+                <p className="text-sm font-semibold" style={{ color: "var(--accent)" }}>
+                  Reshoot of &ldquo;{current.idea_title}&rdquo;. This replaces the take you sent back
+                  {currentExtras?.previousTake ? " (left)" : ""}. What you asked for is in the thread below.
+                </p>
+              </div>
+            )}
+            {isWaiting(current) && (
               <p className="mt-3 text-sm font-semibold" style={{ color: "var(--accent)" }}>
-                Reshoot of &ldquo;{current.idea_title}&rdquo;. What you asked for is in the messages below.
+                {current.state === "uploading"
+                  ? `${current.student} has started the reshoot. It comes back to To review when they send it.`
+                  : `Waiting on ${current.student} to reshoot. It comes back to To review when they send it.`}
+                {" "}This is the take you sent back.
               </p>
             )}
             <p className="mt-3 text-lg font-semibold">
@@ -480,7 +525,7 @@ export function ReviewQueue({
               {currentExtras?.openedBy ? ` · opened by ${currentExtras.openedBy}` : ""}
             </p>
 
-            <AskedFor row={current} extras={currentExtras} />
+            {!isWaiting(current) && <AskedFor row={current} extras={currentExtras} />}
 
             <AutomatedSafetyReview captureId={current.id} review={currentSafety}
               timing={currentExtras?.scanTiming}
@@ -488,22 +533,26 @@ export function ReviewQueue({
               onSeek={(seconds) => { if (videoRef.current) { videoRef.current.currentTime = seconds; void videoRef.current.play(); } }} />
 
             {(currentExtras?.messages.length || currentExtras?.internalNotes.length) ? (
-              <details className="mt-4 text-sm">
+              <details
+                key={current.id}
+                className="mt-4 text-sm"
+                open={isWaiting(current) || isReshoot(current, currentExtras)}
+              >
                 <summary className="cursor-pointer" style={{ color: "var(--muted)" }}>
-                  History ({(currentExtras?.messages.length ?? 0) + (currentExtras?.internalNotes.length ?? 0)})
+                  Thread ({(currentExtras?.messages.length ?? 0) + (currentExtras?.internalNotes.length ?? 0)})
                 </summary>
                 <ul className="mt-2 flex flex-col gap-2">
                   {currentExtras?.messages.map((m, i) => (
-                    <li key={`m${i}`}><span className="font-semibold">To student</span> ({STATE_LABEL[m.state] ?? m.state}, {new Date(m.at).toLocaleDateString()}): {m.note}</li>
+                    <li key={`m${i}`}><span className="font-semibold">To student</span> ({STATE_LABEL[m.state] ?? m.state}, {dateTime(m.at)}): {m.note}</li>
                   ))}
                   {currentExtras?.internalNotes.map((n, i) => (
-                    <li key={`n${i}`}><span className="font-semibold">Staff note</span> ({n.author}, {new Date(n.at).toLocaleDateString()}): {n.note}</li>
+                    <li key={`n${i}`}><span className="font-semibold">Staff note</span> ({n.author}, {dateTime(n.at)}): {n.note}</li>
                   ))}
                 </ul>
               </details>
             ) : null}
 
-            {current.state !== "rejected" && (
+            {current.state !== "rejected" && current.state !== "uploading" && (
               <div className="mt-5 flex flex-col gap-3 border-t pt-4" style={{ borderColor: "var(--rule)" }}>
                 <div>
                   <label className="label" htmlFor="student-message">Message to student</label>
@@ -763,7 +812,7 @@ function SafetyReportsInbox({ rows, onSaved }: { rows: SafetyReportRow[]; onSave
             </p>
             <p className="mt-1 text-[15px]">{row.detail}</p>
             <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-              {row.reporter} · {new Date(row.createdAt).toLocaleString()}
+              {row.reporter} · {dateTime(row.createdAt)}
             </p>
             <button className="btn btn-quiet mt-2" disabled={busy === row.id} onClick={() => void handled(row)}>
               Mark handled
@@ -813,7 +862,7 @@ function WithdrawalInbox({ rows, onSaved }: { rows: WithdrawalRow[]; onSaved: ()
           <li key={row.id} className="border-t pt-3 first:border-t-0 first:pt-0" style={{ borderColor: "var(--rule)" }}>
             <p className="font-semibold">{row.student} · {row.ideaTitle}</p>
             <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-              {row.reason || "No reason given."} · {new Date(row.requestedAt).toLocaleString()}
+              {row.reason || "No reason given."} · {dateTime(row.requestedAt)}
             </p>
             {denying === row.id ? (
               <div className="mt-2 flex flex-col gap-2">

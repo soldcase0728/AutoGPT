@@ -1,3 +1,4 @@
+import { schoolToday } from "@/lib/dates";
 import { SubmissionsView, type SubmissionRow } from "@/components/views/SubmissionsView";
 import { createClient } from "@/lib/supabase/server";
 import { requirePerson } from "@/lib/session";
@@ -49,8 +50,17 @@ export default async function Submissions({
   }>;
   // An attempt withdrawn before it was ever sent was replaced by a retake; it
   // is not something the student sent, so it does not belong in the list.
+  // One live row per assignment: a draft left behind on an assignment that has
+  // since been sent is not a second task. (A reshoot reuses the same row.)
+  const sentAssignments = new Set(
+    captureRows
+      .filter((row) => row.assignment_id && row.state !== "uploading" && row.state !== "withdrawn")
+      .map((row) => row.assignment_id),
+  );
   const visibleCaptures = captureRows.filter(
-    (row) => !(row.state === "withdrawn" && !row.submitted_at && row.media_revision <= 1),
+    (row) =>
+      !(row.state === "withdrawn" && !row.submitted_at && row.media_revision <= 1) &&
+      !(row.state === "uploading" && row.media_revision <= 1 && sentAssignments.has(row.assignment_id)),
   );
   const captureIds = visibleCaptures.map((row) => row.id);
 
@@ -149,11 +159,12 @@ export default async function Submissions({
           : null,
   }));
 
+  // A withdrawn take stays in the history, but its task is open again.
   const representedAssignments = new Set(
-    visibleCaptures.flatMap((row) => (row.assignment_id ? [row.assignment_id] : [])),
+    visibleCaptures.flatMap((row) => (row.assignment_id && row.state !== "withdrawn" ? [row.assignment_id] : [])),
   );
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = schoolToday(now);
   for (const assignment of (assignments ?? []) as unknown as Array<{
     id: string;
     due_on: string;

@@ -28,7 +28,9 @@ export const QUEUE_TABS: QueueTab[] = [
   {
     id: "waiting",
     label: "Waiting on student",
-    states: ["changes_requested"],
+    // Sent back, and still sent back while the student reshoots (the capture is
+    // back in `uploading`; staff only see those that are reshoots).
+    states: ["changes_requested", "uploading"],
     newestFirst: false,
     empty: "No reshoots outstanding.",
   },

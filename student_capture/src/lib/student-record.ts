@@ -14,15 +14,24 @@ export interface StudentRecord {
   posted: number;
 }
 
+export interface StreakRules {
+  /** False once today's 9 pm cutoff has passed; an unsent prompt then breaks the streak. */
+  todayOpen?: boolean;
+  /** Per assignment, whether it was sent by 9 pm on its day. Missing means on time. */
+  onTime?: Map<string, boolean>;
+}
+
 /**
- * Today's prompt doesn't break a streak while it can still be sent: the streak
- * counts back from the last prompt that was actually missed.
+ * The streak counts prompts sent by 9 pm (school time) on their day, and ticks
+ * the moment one is sent. Today's prompt doesn't break it while it can still
+ * be sent in time: the streak counts back from the last prompt that was missed.
  */
 export function studentRecord(
   assignments: TaskAssignment[],
   statuses: Map<string, AssignmentStatus>,
   today: string,
   postedCount: number,
+  rules: StreakRules = {},
 ): StudentRecord {
   const due = assignments
     .filter((a) => a.dueOn <= today)
@@ -30,11 +39,11 @@ export function studentRecord(
   let streak = 0;
   for (const assignment of due) {
     const status = statuses.get(assignment.id) ?? "not_sent";
-    if (SENT.includes(status)) {
+    if (SENT.includes(status) && rules.onTime?.get(assignment.id) !== false) {
       streak += 1;
       continue;
     }
-    if (assignment.dueOn === today && status === "not_sent") continue;
+    if (assignment.dueOn === today && status === "not_sent" && rules.todayOpen !== false) continue;
     break;
   }
   const sent = assignments.filter((a) => SENT.includes(statuses.get(a.id) ?? "not_sent")).length;

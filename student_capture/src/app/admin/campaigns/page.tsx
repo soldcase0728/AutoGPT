@@ -1,3 +1,4 @@
+import { schoolToday } from "@/lib/dates";
 import { AppHeader } from "@/components/AppHeader";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -18,7 +19,7 @@ export default async function CampaignsPage() {
       <AppHeader person={me} />
       <main className="mx-auto max-w-3xl px-5 py-8">
         <CampaignManager
-          today={new Date().toISOString().slice(0, 10)}
+          today={schoolToday()}
           campaigns={(campaigns ?? []).map((c) => ({
             id: c.id, name: c.name, startsOn: c.starts_on, endsOn: c.ends_on, active: c.active,
             taskCount: ((c.ideas as unknown as Array<unknown>) ?? []).length,

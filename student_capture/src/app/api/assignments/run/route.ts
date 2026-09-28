@@ -1,3 +1,4 @@
+import { schoolToday } from "@/lib/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { fail, json, readJson } from "@/lib/http";
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await readJson<Body>(request)) ?? {};
-  const dueOn = body.dueOn ?? isoDate(new Date());
+  const dueOn = body.dueOn ?? schoolToday();
   const since = daysAgo(dueOn, RECENT_WINDOW_DAYS);
   const admin = createAdminClient();
 

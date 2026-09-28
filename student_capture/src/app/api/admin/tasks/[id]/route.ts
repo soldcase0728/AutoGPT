@@ -2,12 +2,13 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { fail, json, readJson } from "@/lib/http";
-import { isoDate } from "@/lib/assign";
+import { schoolToday } from "@/lib/dates";
+import { taskTitle } from "@/lib/admin-task";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("edit"),
-    title: z.string().trim().min(3).max(120),
+    title: taskTitle,
     brief: z.string().trim().min(10).max(2000),
     captionRequired: z.boolean(),
     guidelineSetIds: z.array(z.string().uuid()).max(20),
@@ -94,7 +95,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     case "cancel": {
       // Future and today's assignments that nobody has started are removed;
       // anything with a capture stays so its history is intact.
-      const today = isoDate(new Date());
+      const today = schoolToday();
       const { data: open } = await admin
         .from("assignments")
         .select("id, captures(id)")

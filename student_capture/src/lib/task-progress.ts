@@ -16,6 +16,8 @@ export interface TaskCapture {
   state: CaptureState;
   submittedAt: string | null;
   stateChangedAt: string;
+  /** Which take this is; above 1 means the desk sent it back once already. */
+  mediaRevision?: number;
 }
 
 export type AssignmentStatus =
@@ -41,6 +43,7 @@ export const STATUS_LABEL: Record<AssignmentStatus, string> = {
 
 const RANK: Record<CaptureState, number> = {
   uploading: 0,
+
   withdrawn: 0,
   submitted: 1,
   in_review: 1,
@@ -50,6 +53,11 @@ const RANK: Record<CaptureState, number> = {
   approved: 3,
   published: 4,
 };
+
+/** A reshoot in progress ranks as sent back, not as a fresh draft. */
+function rankOf(capture: TaskCapture): number {
+  return capture.state === "uploading" && (capture.mediaRevision ?? 1) > 1 ? RANK.changes_requested : RANK[capture.state];
+}
 
 function statusOf(capture: TaskCapture): AssignmentStatus {
   switch (capture.state) {
@@ -67,6 +75,9 @@ function statusOf(capture: TaskCapture): AssignmentStatus {
       return "rejected";
     case "withdrawn":
       return capture.submittedAt ? "withdrawn" : "not_sent";
+    case "uploading":
+      // A reshoot in progress is still sent back until the new take is sent.
+      return (capture.mediaRevision ?? 1) > 1 ? "reshoot" : "not_sent";
     default:
       return "not_sent";
   }
@@ -83,8 +94,8 @@ export function assignmentStatuses(
     const seen = best.get(capture.assignmentId);
     if (
       !seen ||
-      RANK[capture.state] > RANK[seen.state] ||
-      (RANK[capture.state] === RANK[seen.state] && capture.stateChangedAt > seen.stateChangedAt)
+      rankOf(capture) > rankOf(seen) ||
+      (rankOf(capture) === rankOf(seen) && capture.stateChangedAt > seen.stateChangedAt)
     ) {
       best.set(capture.assignmentId, capture);
     }

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { isoDate } from "@/lib/assign";
+import { schoolToday } from "@/lib/dates";
 import { assignmentStatuses, taskProgress, type TaskCapture } from "@/lib/task-progress";
 import type { CaptureState } from "@/lib/types";
 import { TaskDetail, type TaskStudentRow } from "./TaskDetail";
@@ -26,7 +26,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     supabase.from("assignments").select("id, person_id, due_on").eq("idea_id", id).order("due_on"),
     supabase
       .from("captures")
-      .select("assignment_id, state, submitted_at, state_changed_at")
+      .select("assignment_id, state, submitted_at, state_changed_at, media_revision")
       .eq("prompt_id", id),
     supabase.from("guideline_sets").select("id, name, kind").eq("org_id", me.org_id).order("kind"),
   ]);
@@ -37,12 +37,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     : { data: [] };
   const byId = new Map((people ?? []).map((p) => [p.id, p]));
 
-  const today = isoDate(new Date());
+  const today = schoolToday();
   const list = (assignments ?? []).map((a) => ({ id: a.id, personId: a.person_id, dueOn: a.due_on }));
   const statuses = assignmentStatuses(
     list,
-    ((captures ?? []) as Array<{ assignment_id: string | null; state: CaptureState; submitted_at: string | null; state_changed_at: string }>).map(
-      (c): TaskCapture => ({ assignmentId: c.assignment_id, state: c.state, submittedAt: c.submitted_at, stateChangedAt: c.state_changed_at }),
+    ((captures ?? []) as Array<{ assignment_id: string | null; state: CaptureState; submitted_at: string | null; state_changed_at: string; media_revision: number }>).map(
+      (c): TaskCapture => ({ assignmentId: c.assignment_id, state: c.state, submittedAt: c.submitted_at, stateChangedAt: c.state_changed_at, mediaRevision: c.media_revision }),
     ),
     today,
   );

@@ -2,7 +2,7 @@ import { Chip } from "./Chip";
 import { TeamBoard } from "./TeamBoard";
 import type { StudentProgress } from "@/lib/student-progress";
 import { awardDateLabel, recentAwards } from "@/lib/shot-of-the-day";
-import { isoDate } from "@/lib/assign";
+import { schoolToday } from "@/lib/dates";
 
 function Stat({ value, label }: { value: number; label: string }) {
   return (
@@ -20,7 +20,7 @@ function Stat({ value, label }: { value: number; label: string }) {
  */
 export function StudentProgressCard({ progress }: { progress: StudentProgress }) {
   const { record, recent, community, board, awards } = progress;
-  const [latestAward] = recentAwards(awards, isoDate(new Date()));
+  const [latestAward] = recentAwards(awards, schoolToday());
   const showCommunity = community && (community.weekPosted > 0 || community.weekContributors > 0 || community.groups.length > 0);
 
   return (

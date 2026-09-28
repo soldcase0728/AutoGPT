@@ -92,3 +92,8 @@ export function sendBlockers(input: {
   }
   return blockers;
 }
+
+/** Everything still in the way of Send, as one line: "To send: … …". */
+export function sendHint(blockers: string[]): string | null {
+  return blockers.length ? `To send: ${blockers.join(" ")}` : null;
+}

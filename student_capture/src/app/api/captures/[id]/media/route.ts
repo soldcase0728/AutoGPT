@@ -30,10 +30,14 @@ export async function GET(
     .maybeSingle();
 
   if (!capture) return fail(404, "That capture does not exist.");
-  // Drafts are the student's alone (RLS hides them from staff too).
-  if (capture.person_id !== person.id && capture.state === "uploading") {
+  // Drafts are the student's alone (RLS hides them from staff too). A shot being
+  // reshot is the exception: staff still see the take they sent back, never the
+  // new one before it is sent.
+  const reshootForStaff = capture.person_id !== person.id && capture.state === "uploading";
+  if (reshootForStaff && capture.media_revision <= 1) {
     return fail(404, "That capture does not exist.");
   }
+  const servedRevision = reshootForStaff ? capture.media_revision - 1 : capture.media_revision;
   if (
     capture.person_id !== person.id &&
     (capture.state === "withdrawal_requested" || capture.state === "withdrawn")
@@ -50,12 +54,14 @@ export async function GET(
   if (mediaId) {
     const { data: media } = await supabase
       .from("submission_media")
-      .select("id, submission_id, bucket, storage_key")
+      .select("id, submission_id, bucket, storage_key, media_revision")
       .eq("id", mediaId)
       .eq("submission_id", capture.id)
       // Any take of this capture: a reshoot shows its student the returned take.
       .maybeSingle();
-    if (!media) return fail(404, "That media item does not exist.");
+    if (!media || (reshootForStaff && media.media_revision > servedRevision)) {
+      return fail(404, "That media item does not exist.");
+    }
     bucket = media.bucket;
     storageKey = media.storage_key;
   } else {
@@ -63,9 +69,10 @@ export async function GET(
       .from("submission_media")
       .select("bucket, storage_key")
       .eq("submission_id", capture.id)
-      .eq("media_revision", capture.media_revision)
+      .eq("media_revision", servedRevision)
       .eq("sort_order", 0)
       .maybeSingle();
+    if (!primary && reshootForStaff) return fail(404, "That media item does not exist.");
     if (primary) {
       bucket = primary.bucket;
       storageKey = primary.storage_key;
@@ -73,7 +80,7 @@ export async function GET(
   }
 
   // Reviewing plays the proxy when one exists; downloading always takes the master.
-  const key = mediaId
+  const key = mediaId || reshootForStaff
     ? storageKey
     : wantsDownload
       ? storageKey
