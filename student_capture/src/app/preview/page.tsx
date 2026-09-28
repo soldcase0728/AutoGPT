@@ -7,6 +7,7 @@ const SCREENS = [
   ["today-done", "Student · already sent"],
   ["capture", "Student · the capture flow"],
   ["capture?media=photo", "Student · the capture flow, for photos"],
+  ["capture?reshoot=1", "Student · reshooting a shot the desk sent back"],
   ["consent", "Student · the release, as a minor sees it"],
   ["submissions", "Student · what they have sent"],
   ["review", "Marketing · the review queue"],

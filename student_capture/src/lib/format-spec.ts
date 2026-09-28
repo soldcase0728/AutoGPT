@@ -8,6 +8,9 @@ export interface MediaFacts {
   bytes: number;
 }
 
+/** Smaller than this is not a real clip. */
+export const MIN_VIDEO_BYTES = 50_000;
+
 export interface FormatFinding {
   /** `block` stops submission; `warn` is shown but does not. */
   level: "block" | "warn";
@@ -16,9 +19,8 @@ export interface FormatFinding {
 
 /**
  * Craft rules are soft by design: a student on a deadline should never be told
- * "no" by a linter. Only two things actually block — the wrong medium, and a
- * file too large to accept — because both make the capture unusable rather than
- * imperfect.
+ * "no" by a linter. Only what makes the capture unusable blocks: the wrong
+ * medium, a file too large to accept, and a video that can't be read.
  */
 export function checkFormat(
   spec: FormatSpec,
@@ -34,6 +36,16 @@ export function checkFormat(
         maxBytes,
       )} — try a shorter clip.`,
     });
+  }
+
+  // A video whose length or size can't be read is usually a broken or
+  // unsupported file; sending it only fails later, at review.
+  if (facts.kind === "video" && spec.kind === "video") {
+    if (facts.bytes < MIN_VIDEO_BYTES) {
+      findings.push({ level: "block", message: "That video is too small to be a real clip. Try recording it again." });
+    } else if (!facts.durationSeconds || !facts.width || !facts.height) {
+      findings.push({ level: "block", message: "We couldn't read this video. Try recording it again." });
+    }
   }
 
   if (facts.kind !== spec.kind) {

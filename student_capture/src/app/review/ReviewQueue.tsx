@@ -8,6 +8,7 @@ import { describeBlocker, publishable } from "@/lib/consent";
 import { formatBytes } from "@/lib/format-spec";
 import { AutomatedSafetyReview, type ScanTiming } from "@/components/AutomatedSafetyReview";
 import { reportKindLabel } from "@/lib/safety-report";
+import { dateTime } from "@/lib/dates";
 import { ShotOfTheDayControl } from "@/components/ShotOfTheDayControl";
 import type { ShotAward } from "@/lib/shot-of-the-day";
 import { MESSAGE_PRESETS, QUEUE_TABS, nextSelection, type QueueTabId } from "@/lib/queue";
@@ -40,6 +41,11 @@ export interface CaptureExtras {
   scanTiming?: ScanTiming;
   /** Its Shot of the Day award, if it has one. */
   award?: ShotAward | null;
+}
+
+/** A shot that came back after the desk asked for changes. */
+function isReshoot(extras?: CaptureExtras) {
+  return Boolean(extras?.messages.some((message) => message.state === "changes_requested"));
 }
 
 export interface WithdrawalRow {
@@ -385,6 +391,9 @@ export function ReviewQueue({
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Chip>{STATE_LABEL[row.state] ?? row.state}</Chip>
+              {isReshoot(extras[row.id]) && (row.state === "submitted" || row.state === "in_review") && (
+                <Chip tone="accent">reshoot</Chip>
+              )}
               {row.consent_blockers?.length > 0 && <Chip tone="bad">consent missing</Chip>}
               {extras[row.id]?.award && <Chip tone="accent">★ shot of the day</Chip>}
               {row.student_participation !== "active" && <Chip tone="bad">account {row.student_participation}</Chip>}
@@ -456,13 +465,18 @@ export function ReviewQueue({
               {!current.exif_stripped && current.media_type === "video" && <Chip>location not stripped</Chip>}
             </div>
 
+            {isReshoot(extras[current.id]) && (current.state === "submitted" || current.state === "in_review") && (
+              <p className="mt-3 text-sm font-semibold" style={{ color: "var(--accent)" }}>
+                Reshoot of &ldquo;{current.idea_title}&rdquo;. What you asked for is in the messages below.
+              </p>
+            )}
             <p className="mt-3 text-lg font-semibold">
               {current.one_liner ?? <span style={{ color: "var(--muted)" }}>No caption given</span>}
             </p>
             <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
               {current.student}
               {current.location_label ? ` · ${current.location_label}` : ""}
-              {current.submitted_at ? ` · sent ${new Date(current.submitted_at).toLocaleString()}` : ""}
+              {current.submitted_at ? ` · sent ${dateTime(current.submitted_at)}` : ""}
               {currentExtras?.openedBy ? ` · opened by ${currentExtras.openedBy}` : ""}
             </p>
 

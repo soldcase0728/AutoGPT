@@ -134,3 +134,31 @@ function mediaOrientationError(
   if (!actual) return "Media dimensions are required to verify orientation.";
   return actual === required ? null : `Media must use ${required} orientation.`;
 }
+
+export interface ReshootTake {
+  createdAt: string;
+  checksum: string | null;
+}
+
+/**
+ * A reshoot can only be sent with a new take: every file in the current media
+ * revision must have arrived after the desk sent the shot back, and none may be
+ * a byte-for-byte copy of a file the desk already saw. Null when it may be sent.
+ */
+export function reshootGateError(input: {
+  mediaRevision: number;
+  sentBackAt: string | null;
+  take: ReshootTake[];
+  earlierChecksums: string[];
+}): string | null {
+  if (input.mediaRevision < 2) return null;
+  const message = "Upload a new take first.";
+  if (!input.take.length) return message;
+  if (input.sentBackAt) {
+    const cutoff = new Date(input.sentBackAt).getTime();
+    if (input.take.some((item) => new Date(item.createdAt).getTime() <= cutoff)) return message;
+  }
+  const earlier = new Set(input.earlierChecksums);
+  if (input.take.some((item) => item.checksum && earlier.has(item.checksum))) return message;
+  return null;
+}

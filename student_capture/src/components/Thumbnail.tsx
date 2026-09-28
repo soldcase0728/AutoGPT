@@ -11,10 +11,16 @@ export function Thumbnail({
   src,
   kind,
   label,
+  placeholder = null,
 }: {
   src: string | null;
   kind: "photo" | "video";
   label: string;
+  /**
+   * A status tile to show instead of any media, e.g. "Reshoot" or "Not
+   * accepted", so a shot that was sent back never shows the old picture.
+   */
+  placeholder?: { text: string; tone?: "muted" | "bad" | "accent" } | null;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -71,10 +77,12 @@ export function Thumbnail({
       )}
       {(!src || failed) && (
         <span
-          className="absolute inset-0 flex items-center justify-center p-1 text-center font-mono text-[10px] uppercase tracking-[0.08em]"
-          style={{ color: "var(--muted)" }}
+          className="absolute inset-0 flex items-center justify-center p-1 text-center font-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
+          style={{
+            color: placeholder?.tone === "bad" ? "var(--clay)" : placeholder?.tone === "accent" ? "var(--accent)" : "var(--muted)",
+          }}
         >
-          {src ? "No preview" : "Not shot yet"}
+          {placeholder?.text ?? (src ? "No preview" : "Not shot yet")}
         </span>
       )}
       {showMedia && kind === "video" && (

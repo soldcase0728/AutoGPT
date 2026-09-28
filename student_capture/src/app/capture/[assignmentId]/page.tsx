@@ -9,7 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { objectLanded } from "@/lib/storage-landed";
 import type { GuidelineVersion, Idea } from "@/lib/types";
 import { RELEASE_VERSION } from "@/app/consent/version";
-import { CaptureFlow, type ResumeState } from "./CaptureFlow";
+import { CaptureFlow, type ResumeState, type SentBack } from "./CaptureFlow";
+import { SentBackCard } from "./SentBackCard";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,25 @@ export default async function CapturePage({
     .maybeSingle();
 
   if (!assignment || assignment.person_id !== person.id) notFound();
-  if (assignment.completed_at) redirect("/submissions");
+
+  // A shot the desk sent back: opening the task starts the reshoot, so the
+  // student lands on a new take of the same submission, never a duplicate.
+  const { data: returned } = await supabase
+    .from("captures")
+    .select("id")
+    .eq("assignment_id", assignment.id)
+    .eq("person_id", person.id)
+    .eq("state", "changes_requested")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (returned) {
+    const { error: reopenError } = await supabase.rpc("begin_capture_resubmission", { p_capture_id: returned.id });
+    if (reopenError) throw new Error(reopenError.message);
+  } else if (assignment.completed_at) {
+    redirect("/submissions");
+  }
+
 
   const idea = assignment.ideas as unknown as Idea & { active: boolean; campaigns?: { name: string } };
   if (!idea.active) {
@@ -100,6 +119,36 @@ export default async function CapturePage({
     };
   }
 
+  // What the desk asked for, and the take they returned, for a reshoot.
+  let sentBack: SentBack | undefined;
+  if (pending && pending.media_revision > 1) {
+    const [{ data: review }, { data: previous }] = await Promise.all([
+      supabase
+        .from("reviews")
+        .select("note, created_at")
+        .eq("capture_id", pending.id)
+        .eq("state", "changes_requested")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("submission_media")
+        .select("id, media_type")
+        .eq("submission_id", pending.id)
+        .eq("media_revision", pending.media_revision - 1)
+        .order("sort_order")
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    sentBack = {
+      note: (review as { note: string | null } | null)?.note ?? null,
+      at: (review as { created_at: string } | null)?.created_at ?? pending.created_at,
+      previous: previous
+        ? { captureId: pending.id, mediaId: previous.id, kind: previous.media_type === "video" ? "video" : "photo" }
+        : null,
+    };
+  }
+
   const { data: versionRows } = await supabase
     .from("guideline_versions")
     .select("id, set_id, version, body")
@@ -121,6 +170,7 @@ export default async function CapturePage({
     <>
       <AppHeader person={person} />
       <main className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-8">
+        {sentBack && <SentBackCard sentBack={sentBack} />}
         <PromptCard
           title={idea.title}
           brief={idea.brief}
@@ -135,6 +185,7 @@ export default async function CapturePage({
         <CaptureFlow
           initialCaptureId={resume?.isResubmission ? resume.captureId : resubmit}
           resume={resume}
+          sentBack={sentBack}
           assignmentId={assignment.id}
           ideaId={idea.id}
           spec={idea.format_spec}

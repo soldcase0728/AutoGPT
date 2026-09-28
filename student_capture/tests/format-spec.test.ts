@@ -55,22 +55,22 @@ describe("checkFormat", () => {
   });
 
   it("warns at both ends of the duration window", () => {
-    const short = checkFormat(VERTICAL, { kind: "video", durationSeconds: 4, bytes: 1000 }, MAX);
-    const long = checkFormat(VERTICAL, { kind: "video", durationSeconds: 90, bytes: 1000 }, MAX);
+    const short = checkFormat(VERTICAL, { kind: "video", durationSeconds: 4, width: 1080, height: 1920, bytes: 5_000_000 }, MAX);
+    const long = checkFormat(VERTICAL, { kind: "video", durationSeconds: 90, width: 1080, height: 1920, bytes: 5_000_000 }, MAX);
     expect(short[0]?.message).toMatch(/short/);
     expect(long[0]?.message).toMatch(/long/);
     expect(blocks([...short, ...long])).toBe(false);
   });
 
-  it("skips orientation checks when the browser could not read the file", () => {
-    const findings = checkFormat(VERTICAL, { kind: "video", bytes: 1000 }, MAX);
-    expect(findings).toEqual([]);
+  it("blocks, rather than guessing at orientation, when the browser could not read the file", () => {
+    const findings = checkFormat(VERTICAL, { kind: "video", bytes: 5_000_000 }, MAX);
+    expect(findings).toEqual([{ level: "block", message: "We couldn't read this video. Try recording it again." }]);
   });
 
   it("treats a square clip as portrait rather than nagging", () => {
     const findings = checkFormat(
       { kind: "video", orientation: "portrait" },
-      { kind: "video", width: 1080, height: 1080, bytes: 1000 },
+      { kind: "video", width: 1080, height: 1080, durationSeconds: 12, bytes: 5_000_000 },
       MAX,
     );
     expect(findings).toEqual([]);
@@ -90,5 +90,24 @@ describe("formatBytes", () => {
     expect(formatBytes(2048)).toBe("2.0 KB");
     expect(formatBytes(150 * 1024 * 1024)).toBe("150 MB");
     expect(formatBytes(3 * 1024 ** 3)).toBe("3.0 GB");
+  });
+});
+
+describe("unreadable videos", () => {
+  const spec = { kind: "video" as const, orientation: "portrait" as const, min_seconds: 5, max_seconds: 30 };
+
+  it("blocks a video whose length can't be read", () => {
+    const findings = checkFormat(spec, { kind: "video", bytes: 21_000_000 }, 500_000_000);
+    expect(findings).toContainEqual({ level: "block", message: "We couldn't read this video. Try recording it again." });
+  });
+
+  it("blocks a file too small to be a clip", () => {
+    const findings = checkFormat(spec, { kind: "video", bytes: 12_000, durationSeconds: 6, width: 1080, height: 1920 }, 500_000_000);
+    expect(findings[0]?.message).toBe("That video is too small to be a real clip. Try recording it again.");
+  });
+
+  it("lets a readable clip through", () => {
+    const findings = checkFormat(spec, { kind: "video", bytes: 6_000_000, durationSeconds: 12, width: 1080, height: 1920 }, 500_000_000);
+    expect(findings.filter((f) => f.level === "block")).toEqual([]);
   });
 });

@@ -5,7 +5,7 @@
 export type ShotsTab = "done" | "open";
 
 /** Row states that still need the student to do something. */
-const OPEN = new Set(["assigned", "uploading", "changes_requested"]);
+const OPEN = new Set(["assigned", "uploading", "changes_requested", "reshooting"]);
 
 /** Where a row belongs: to do, sent (whatever came of it), or missed. */
 export function shotBucket(state: string): "open" | "done" | "missed" {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  reshootGateError,
   detectedOrientation,
   promptAvailabilityError,
   reservationError,
@@ -118,5 +119,41 @@ describe("submissionError", () => {
       "portrait",
     );
     expect(submissionError(PHOTO, [valid])).toBeNull();
+  });
+});
+
+describe("reshootGateError", () => {
+  const sentBackAt = "2026-09-27T21:52:20Z";
+
+  it("lets a first submission through untouched", () => {
+    expect(reshootGateError({ mediaRevision: 1, sentBackAt: null, take: [], earlierChecksums: [] })).toBeNull();
+  });
+
+  it("needs a new take on a reshoot", () => {
+    expect(reshootGateError({ mediaRevision: 2, sentBackAt, take: [], earlierChecksums: [] })).toBe("Upload a new take first.");
+  });
+
+  it("refuses a take from before the shot was sent back", () => {
+    expect(reshootGateError({
+      mediaRevision: 2, sentBackAt,
+      take: [{ createdAt: "2026-09-27T21:07:00Z", checksum: null }],
+      earlierChecksums: [],
+    })).toBe("Upload a new take first.");
+  });
+
+  it("refuses the same file the desk already saw", () => {
+    expect(reshootGateError({
+      mediaRevision: 2, sentBackAt,
+      take: [{ createdAt: "2026-09-27T22:21:03Z", checksum: "abc" }],
+      earlierChecksums: ["abc"],
+    })).toBe("Upload a new take first.");
+  });
+
+  it("accepts a new take", () => {
+    expect(reshootGateError({
+      mediaRevision: 2, sentBackAt,
+      take: [{ createdAt: "2026-09-27T22:21:03Z", checksum: "def" }],
+      earlierChecksums: ["abc"],
+    })).toBeNull();
   });
 });

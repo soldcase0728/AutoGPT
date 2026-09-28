@@ -44,7 +44,7 @@ export const IDEA: Idea & { campaigns: { name: string } } = {
   format_spec: {
     kind: "video",
     orientation: "portrait",
-    min_seconds: 10,
+    min_seconds: 5,
     max_seconds: 30,
   },
   reference_urls: [],
@@ -60,7 +60,7 @@ export const IDEA: Idea & { campaigns: { name: string } } = {
   allowed_image_formats: null,
   min_image_width: null,
   min_image_height: null,
-  min_duration_seconds: 10,
+  min_duration_seconds: 5,
   max_duration_seconds: 30,
   caption_required: false,
   guideline_set_ids: [
@@ -79,7 +79,7 @@ const VERSIONS: GuidelineVersion[] = [
       summary: "Shoot it so it works on a phone, held upright.",
       items: [
         { id: "vertical", text: "Hold the phone upright. Vertical, 9:16.", required: true },
-        { id: "length", text: "Keep it between 10 and 30 seconds.", required: true },
+        { id: "length", text: "Keep it between 5 and 30 seconds.", required: true },
         { id: "light", text: "Face the light. Never shoot into it.", required: true },
         {
           id: "safety",
@@ -187,6 +187,34 @@ export const SUBMISSIONS: SubmissionRow[] = [
     postUrl: null,
     action: { kind: "finish", href: "/preview/capture" },
     withdrawMode: "direct",
+  },
+  {
+    id: "capture:c6",
+    captureId: "c6",
+    state: "reshooting",
+    occurredAt: "2026-09-01T12:00:00Z",
+    ideaTitle: "Pre-game, ninety minutes out",
+    oneLiner: null,
+    reviewNote: "An ID card, schedule or screen is readable. Please reshoot with it out of frame.",
+    source: "Assigned",
+    thumbnail: { src: "/preview-frame.svg", kind: "video" },
+    postUrl: null,
+    action: { kind: "finishReshoot", href: "/preview/capture" },
+    withdrawMode: "direct",
+  },
+  {
+    id: "capture:c7",
+    captureId: "c7",
+    state: "rejected",
+    occurredAt: "2026-08-27T15:00:00Z",
+    ideaTitle: "Your view right now",
+    oneLiner: "From the bleachers",
+    reviewNote: "It doesn't show what the prompt asked for.",
+    source: "Assigned",
+    thumbnail: { src: "/preview-frame.svg", kind: "photo" },
+    postUrl: null,
+    action: null,
+    withdrawMode: "request",
   },
 ];
 

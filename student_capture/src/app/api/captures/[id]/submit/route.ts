@@ -6,6 +6,7 @@ import {
   detectedOrientation,
   promptAvailabilityError,
   reservationError,
+  reshootGateError,
   submissionError,
   type PromptSubmissionContract,
   type SubmissionMediaFacts,
@@ -110,6 +111,43 @@ export async function POST(
     .order("sort_order");
   if (mediaReadError) return fail(500, mediaReadError.message);
   if (!mediaRows?.length) return fail(409, "This submission has no media.");
+
+  // A reshoot must go back with a new take, never the one the desk returned:
+  // not by the UI, and not by a hand-made request either.
+  if (capture.media_revision > 1) {
+    const gateReader = createAdminClient();
+    const [{ data: sentBack }, { data: take }, { data: earlier }] = await Promise.all([
+      gateReader
+        .from("reviews")
+        .select("created_at")
+        .eq("capture_id", capture.id)
+        .eq("state", "changes_requested")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      gateReader
+        .from("submission_media")
+        .select("created_at, checksum")
+        .eq("submission_id", capture.id)
+        .eq("media_revision", capture.media_revision),
+      gateReader
+        .from("submission_media")
+        .select("checksum")
+        .eq("submission_id", capture.id)
+        .lt("media_revision", capture.media_revision)
+        .not("checksum", "is", null),
+    ]);
+    const gate = reshootGateError({
+      mediaRevision: capture.media_revision,
+      sentBackAt: (sentBack as { created_at: string } | null)?.created_at ?? null,
+      take: ((take ?? []) as Array<{ created_at: string; checksum: string | null }>).map((row) => ({
+        createdAt: row.created_at,
+        checksum: row.checksum,
+      })),
+      earlierChecksums: ((earlier ?? []) as Array<{ checksum: string }>).map((row) => row.checksum),
+    });
+    if (gate) return fail(400, gate);
+  }
 
   const metadataById = new Map((body?.media ?? []).map((item) => [item.id, item]));
   if (body?.media && metadataById.size !== body.media.length) {
