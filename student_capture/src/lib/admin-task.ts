@@ -1,6 +1,18 @@
 import { z } from "zod";
 
 const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A task's title without the "— copy" / "(copy)" a duplicate used to pick up,
+ * however many times it was duplicated. Students and the Queue only ever see
+ * the real title.
+ */
+export function cleanTaskTitle(title: string): string {
+  return title.replace(/(?:\s*(?:[—–-]\s*copy|\(copy\)))+\s*$/i, "").trim();
+}
+
+/** A title field: trimmed, with any copy suffix removed. */
+export const taskTitle = z.string().trim().transform(cleanTaskTitle).pipe(z.string().min(3).max(120));
 // PostgreSQL accepts the fixed UUID-shaped identifiers used by the seed data,
 // even when their version/variant bits are not RFC-generated values.
 const databaseId = z.string().regex(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
@@ -8,7 +20,7 @@ const databaseId = z.string().regex(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12
 export const taskCreateSchema = z
   .object({
     campaignId: databaseId,
-    title: z.string().trim().min(3).max(120),
+    title: taskTitle,
     brief: z.string().trim().min(10).max(2000),
     mediaType: z.enum(["video", "photo", "photo_series"]),
     orientation: z.enum(["portrait", "landscape", "square", "any"]),

@@ -1,7 +1,7 @@
 import { DashboardView } from "@/components/views/DashboardView";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { isoDate } from "@/lib/assign";
+import { schoolToday } from "@/lib/dates";
 import { assignmentStatuses, type TaskAssignment, type TaskCapture } from "@/lib/task-progress";
 import {
   attentionItems,
@@ -32,7 +32,7 @@ export default async function AdminOverviewPage() {
   const person = await requireAdmin();
   const supabase = await createClient();
   const now = new Date();
-  const today = isoDate(now);
+  const today = schoolToday(now);
   const past = daysEnding(today, 14);
   const lastWeek = past.slice(-7);
   const ahead = daysAfter(today, 7);
@@ -75,14 +75,14 @@ export default async function AdminOverviewPage() {
     allRows((from, to) =>
       supabase
         .from("captures")
-        .select("assignment_id, state, submitted_at, state_changed_at")
+        .select("assignment_id, state, submitted_at, state_changed_at, media_revision")
         .not("assignment_id", "is", null)
         .gte("created_at", `${past[0]}T00:00:00Z`)
         .order("id")
         .range(from, to),
     ),
     count(supabase.from("review_queue").select("id", { count: "exact", head: true }).in("state", ["submitted", "in_review"])),
-    count(supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("state", "changes_requested")),
+    count(supabase.from("review_queue").select("id", { count: "exact", head: true }).in("state", ["changes_requested", "uploading"])),
     count(supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("state", "approved")),
     count(
       supabase
@@ -134,11 +134,13 @@ export default async function AdminOverviewPage() {
   );
   const captures: TaskCapture[] = (captureRows as Array<{
     assignment_id: string | null; state: CaptureState; submitted_at: string | null; state_changed_at: string;
+    media_revision: number | null;
   }>).map((c) => ({
     assignmentId: c.assignment_id,
     state: c.state,
     submittedAt: c.submitted_at,
     stateChangedAt: c.state_changed_at,
+    mediaRevision: c.media_revision ?? 1,
   }));
   const statuses = assignmentStatuses(assignments, captures, today);
 

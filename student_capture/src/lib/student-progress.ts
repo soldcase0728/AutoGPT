@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isoDate } from "./assign";
+import { beforeCutoff, cutoffFor, schoolToday } from "./dates";
 import { assignmentStatuses, type TaskAssignment, type TaskCapture } from "./task-progress";
 import {
   parseCommunityStats,
@@ -47,7 +47,7 @@ export async function loadStudentProgress(
       .limit(200),
     supabase
       .from("captures")
-      .select("id, assignment_id, state, submitted_at, state_changed_at, prompt:ideas!captures_prompt_id_fkey(title)")
+      .select("id, assignment_id, state, submitted_at, state_changed_at, media_revision, prompt:ideas!captures_prompt_id_fkey(title)")
       .eq("person_id", personId)
       .order("created_at", { ascending: false })
       .limit(300),
@@ -82,6 +82,7 @@ export async function loadStudentProgress(
     state: CaptureState;
     submitted_at: string | null;
     state_changed_at: string;
+    media_revision: number | null;
     prompt: { title: string } | null;
   }>;
   const statuses = assignmentStatuses(
@@ -91,9 +92,21 @@ export async function loadStudentProgress(
       state: c.state,
       submittedAt: c.submitted_at,
       stateChangedAt: c.state_changed_at,
+      mediaRevision: c.media_revision ?? 1,
     })),
-    isoDate(now),
+    schoolToday(now),
   );
+
+  // Sent by 9 pm on its day. A reshoot counts from the first send, which the
+  // desk already had on time or not; its new send time doesn't take it away.
+  const dueOn = new Map(assignments.map((a) => [a.id, a.dueOn]));
+  const onTime = new Map<string, boolean>();
+  for (const c of captures) {
+    const day = c.assignment_id ? dueOn.get(c.assignment_id) : undefined;
+    if (!day || !c.assignment_id) continue;
+    const inTime = (c.media_revision ?? 1) > 1 || (c.submitted_at !== null && new Date(c.submitted_at) <= cutoffFor(day));
+    onTime.set(c.assignment_id, (onTime.get(c.assignment_id) ?? false) || inTime);
+  }
 
   const published = captures.filter((c) => c.state === "published");
   const newest = recentPost(
@@ -128,7 +141,10 @@ export async function loadStudentProgress(
 
 
   return {
-    record: studentRecord(assignments, statuses, isoDate(now), published.length),
+    record: studentRecord(assignments, statuses, schoolToday(now), published.length, {
+      todayOpen: beforeCutoff(schoolToday(now), now),
+      onTime,
+    }),
     awards,
     recent: newest,
     community,

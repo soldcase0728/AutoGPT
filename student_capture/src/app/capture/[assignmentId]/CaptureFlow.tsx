@@ -11,6 +11,7 @@ import {
   UploadStepError,
   describeUploadFailure,
   sendBlockers,
+  sendHint,
   type UploadState,
 } from "@/lib/capture-status";
 import type { FormatSpec, PromptMediaType, PromptOrientation } from "@/lib/types";
@@ -148,12 +149,12 @@ export function CaptureFlow({
   // "Before you shoot" is read once per kind of prompt, then stays folded.
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(rulesKey)) setRulesOpen(false);
+      if (isReshoot || window.localStorage.getItem(rulesKey)) setRulesOpen(false);
       else window.localStorage.setItem(rulesKey, "1");
     } catch {
       // No storage: leave the rules open.
     }
-  }, [rulesKey]);
+  }, [isReshoot, rulesKey]);
 
   // Media resumed from an earlier visit still needs its facts read for "Send it".
   useEffect(() => {
@@ -341,11 +342,9 @@ export function CaptureFlow({
     if (!chosen) return;
 
     const facts = await probeMedia(chosen);
-    // A different clip needs its own answer to "who is in it?".
-    if (file) {
-      setTagged([]);
-      setNobody(false);
-    }
+    // A new clip needs its own answer to "who is in it?".
+    setTagged([]);
+    setNobody(false);
     setFile(chosen);
     setPreviewUrl(URL.createObjectURL(chosen));
     setProbe(facts);
@@ -437,7 +436,8 @@ export function CaptureFlow({
 
   return (
     <div className="flex flex-col gap-5">
-      {resume && !resume.complete && (
+      {/* Gone as soon as there's a new take in hand. */}
+      {resume && !resume.complete && upload === "idle" && !file && photoFiles.length === 0 && (
         <p className="card p-4 text-[15px]" style={{ borderColor: "var(--accent)" }}>
           Your last try at this, from {dateTime(resume.startedAt)}, didn&rsquo;t
           finish uploading. Choose the shot again to send it.
@@ -450,41 +450,36 @@ export function CaptureFlow({
         </p>
       )}
 
-      {/* 2 — the rest of the rules, to read; the format checks catch mistakes */}
-      {tips.length > 0 && (
-        <details
-          className="card p-5"
-          open={rulesOpen}
-          onToggle={(event) => setRulesOpen((event.target as HTMLDetailsElement).open)}
-        >
-          <summary className="label cursor-pointer">Before you shoot</summary>
-          <ul className="mt-3 flex flex-col gap-2 text-[15px]">
-            {tips.map((item) => (
-              <li key={item.id} className="flex gap-3">
-                <span aria-hidden style={{ color: "var(--accent)" }}>
-                  —
-                </span>
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
       {/* 3 — the shot: choose, look at it, then send it up */}
       <section className="card p-5">
         <p className="label">The shot</p>
 
+        {/* Before you shoot: three things to look for stay in view; the rest
+            of the tips fold away once they've been read for this kind of prompt. */}
+        {tips.length > 0 && !resumed && !file && upload === "idle" && photoFiles.length === 0 && (
+          <div className="mt-3">
+            <p className="text-sm font-semibold">Before you shoot, look for:</p>
+            <ul className="mt-1 flex flex-col gap-1 text-[15px]">
+              {tips.slice(0, 3).map((item) => (
+                <li key={item.id} className="flex gap-2">
+                  <span aria-hidden style={{ color: "var(--accent)" }}>—</span>
+                  <span>{item.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Safety sits right above the buttons it unlocks. */}
         {safety.length > 0 && !resumed && !file && upload === "idle" && photoFiles.length === 0 && (
-          <div className="mt-3 rounded-sm border-2 p-4" style={{ borderColor: "var(--clay)", background: "var(--sunk)" }}>
+          <div className="mt-3 rounded-sm border-2 p-3" style={{ borderColor: "var(--clay)", background: "var(--sunk)" }}>
             <p className="label" style={{ color: "var(--clay)" }}>Safety first</p>
-            <ul className="mt-2 flex flex-col gap-1 text-[15px] font-semibold">
+            <ul className="mt-1 flex flex-col gap-1 text-[15px] font-semibold">
               {safety.map((item) => (
                 <li key={item.id}>{item.text}</li>
               ))}
             </ul>
-            <label className="mt-3 flex cursor-pointer items-start gap-3 text-[16px]">
+            <label className="mt-2 flex cursor-pointer items-start gap-3 text-[16px]">
               <input
                 type="checkbox"
                 className="mt-1 h-5 w-5 shrink-0"
@@ -570,9 +565,39 @@ export function CaptureFlow({
               orientation={orientation}
               maxCount={maxMediaCount}
               disabled={!ready || shotLocked}
-              onChange={setPhotoFiles}
+              onChange={(photos) => {
+                // Different photos need their own answer to "who is in it?".
+                setPhotoFiles(photos);
+                setTagged([]);
+                setNobody(false);
+              }}
             />
           )
+        )}
+
+        {/* The rest of the tips, below the buttons so Record stays near the top. */}
+        {!resumed && !file && upload === "idle" && photoFiles.length === 0 && (
+          <>
+            {tips.length > 3 && (
+              <details
+                className="mt-3 text-[15px]"
+                open={rulesOpen}
+                onToggle={(event) => setRulesOpen((event.target as HTMLDetailsElement).open)}
+              >
+                <summary className="cursor-pointer text-sm" style={{ color: "var(--muted)" }}>
+                  {rulesOpen ? "Fewer tips" : `${tips.length - 3} more tips`}
+                </summary>
+                <ul className="mt-1 flex flex-col gap-1">
+                  {tips.slice(3).map((item) => (
+                    <li key={item.id} className="flex gap-2">
+                      <span aria-hidden style={{ color: "var(--accent)" }}>—</span>
+                      <span>{item.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
         )}
 
         {!ready && !file && !resumed && photoFiles.length === 0 && upload === "idle" && (
@@ -768,11 +793,9 @@ export function CaptureFlow({
           {submitting ? "Sending…" : "Send it"}
         </button>
         {blockers.length > 0 && (
-          <ul className="flex flex-col gap-1 text-sm" style={{ color: "var(--muted)" }} aria-live="polite">
-            {blockers.map((reason) => (
-              <li key={reason}>To send: {reason}</li>
-            ))}
-          </ul>
+          <p className="text-sm" style={{ color: "var(--muted)" }} aria-live="polite">
+            {sendHint(blockers)}
+          </p>
         )}
         {error && (
           <p className="text-sm" style={{ color: "var(--clay)" }} role="alert">

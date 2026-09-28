@@ -138,6 +138,8 @@ export interface QueueRow {
   person_id: string;
   student: string;
   student_participation: ParticipationState;
+  /** Which take this is; above 1 means a reshoot. */
+  media_revision?: number;
   state: CaptureState;
   kind: CaptureKind;
   mime: string | null;

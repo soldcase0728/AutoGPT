@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Chip } from "@/components/Chip";
-import { expandTaskDates } from "@/lib/admin-task";
+import { cleanTaskTitle, expandTaskDates } from "@/lib/admin-task";
 import { schoolDays } from "@/lib/task-progress";
 import type { PromptMediaType, PromptOrientation } from "@/lib/types";
 
@@ -123,7 +123,8 @@ export function TaskManager({ today, campaigns, students, guidelineSets, tasks, 
   }
 
   function applyTemplate(task: TaskSummary) {
-    setTitle(`${task.title} (copy)`);
+    // Same title: the dates and people are what make it a new task.
+    setTitle(cleanTaskTitle(task.title));
     setBrief(task.brief);
     setMediaType(task.mediaType);
     setOrientation(task.orientation);

@@ -66,18 +66,42 @@ export function TodayView({
         )}
 
         {todayIsSentBack ? null : !idea || !assignment ? (
-          <div className="card mt-4 p-5">
-            <h1 className="text-xl font-bold tracking-tight">Nothing to shoot today</h1>
-            <p className="mt-2 text-[15px]" style={{ color: "var(--muted)" }}>
-              Prompts land each morning. If you think one is missing, tell the marketing
-              desk.
+          // With a reshoot waiting, that is today's story; "nothing today" would contradict it.
+          sentBack ? null : (
+            <div className="card mt-4 p-5">
+              <h1 className="text-xl font-bold tracking-tight">Nothing to shoot today</h1>
+              <p className="mt-2 text-[15px]" style={{ color: "var(--muted)" }}>
+                Prompts land each morning. If you think one is missing, tell the marketing
+                desk.
+              </p>
+              {isStaff && (
+                <Link href="/review" className="btn mt-5 inline-block">
+                  Open the review queue
+                </Link>
+              )}
+            </div>
+          )
+        ) : assignment.completed_at ? (
+          // One card per assignment: a sent prompt is a single "done" card, not
+          // the prompt again with no button under it.
+          sentBack ? (
+            <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
+              Today&rsquo;s prompt, &ldquo;{idea.title}&rdquo;, is sent.
             </p>
-            {isStaff && (
-              <Link href="/review" className="btn mt-5 inline-block">
-                Open the review queue
+          ) : (
+            <section className="card mt-4 flex items-center justify-between gap-4 p-5" aria-label="Today is done">
+              <div>
+                <Chip tone="good">Sent</Chip>
+                <p className="mt-2 text-[17px] font-semibold leading-snug">{idea.title}</p>
+                <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
+                  That is today done. When it goes live, it shows up here.
+                </p>
+              </div>
+              <Link href="/submissions" className="btn btn-quiet whitespace-nowrap">
+                My shots
               </Link>
-            )}
-          </div>
+            </section>
+          )
         ) : (
           <div className="mt-4 flex flex-col gap-5">
             <PromptCard
@@ -91,24 +115,9 @@ export function TodayView({
               maxDurationSeconds={idea.max_duration_seconds}
               campaign={idea.campaigns?.name}
             />
-
-            {assignment.completed_at ? (
-              <div className="card flex items-center justify-between gap-4 p-5">
-                <div>
-                  <Chip tone="good">Sent</Chip>
-                  <p className="mt-2 text-[15px]">
-                    That is today done. When it goes live, it shows up here.
-                  </p>
-                </div>
-                <Link href="/submissions" className="btn btn-quiet whitespace-nowrap">
-                  My shots
-                </Link>
-              </div>
-            ) : (
-              <Link href={`/capture/${assignment.id}`} className="btn text-center">
-                Shoot it
-              </Link>
-            )}
+            <Link href={`/capture/${assignment.id}`} className="btn text-center">
+              Shoot it
+            </Link>
           </div>
         )}
 

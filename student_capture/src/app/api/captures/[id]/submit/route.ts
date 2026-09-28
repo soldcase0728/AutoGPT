@@ -146,7 +146,7 @@ export async function POST(
       })),
       earlierChecksums: ((earlier ?? []) as Array<{ checksum: string }>).map((row) => row.checksum),
     });
-    if (gate) return fail(400, gate);
+    if (gate) return fail(409, gate);
   }
 
   const metadataById = new Map((body?.media ?? []).map((item) => [item.id, item]));

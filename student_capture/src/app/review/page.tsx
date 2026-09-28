@@ -1,3 +1,4 @@
+import { schoolToday } from "@/lib/dates";
 import { AppHeader } from "@/components/AppHeader";
 import type { ScanTiming } from "@/components/AutomatedSafetyReview";
 import { createClient } from "@/lib/supabase/server";
@@ -159,7 +160,7 @@ export default async function ReviewPage({
   const awards = new Map<string, ShotAward>();
   let todaysPick: { captureId: string; student: string; title: string } | null = null;
   {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = schoolToday();
     const [{ data: awardRows, error: awardError }, { data: pickRow }] = await Promise.all([
       captureIds.length
         ? supabase.from("shot_awards").select("id, capture_id, awarded_on, note").in("capture_id", captureIds)
@@ -178,6 +179,23 @@ export default async function ReviewPage({
     if (pickId) {
       const { data: pick } = await supabase.from("review_queue").select("student, idea_title").eq("id", pickId).maybeSingle();
       if (pick) todaysPick = { captureId: pickId, student: pick.student, title: pick.idea_title };
+    }
+  }
+
+  // On a reshoot back in To review, the take the desk sent back, shown small
+  // next to the new one.
+  const reshootRows = rows.filter((row) => (row.media_revision ?? 1) > 1 && row.state !== "uploading");
+  const previousTakes = new Map<string, { mediaId: string; kind: "video" | "photo" }>();
+  if (reshootRows.length) {
+    const { data: earlier } = await supabase
+      .from("submission_media")
+      .select("id, submission_id, media_revision, media_type")
+      .in("submission_id", reshootRows.map((row) => row.id))
+      .eq("sort_order", 0);
+    for (const row of reshootRows) {
+      const take = ((earlier ?? []) as Array<{ id: string; submission_id: string; media_revision: number; media_type: string }>)
+        .find((m) => m.submission_id === row.id && m.media_revision === (row.media_revision ?? 1) - 1);
+      if (take) previousTakes.set(row.id, { mediaId: take.id, kind: take.media_type === "video" ? "video" : "photo" });
     }
   }
 
@@ -201,6 +219,7 @@ export default async function ReviewPage({
         : null,
       postUrl: postUrls.get(row.id) ?? null,
       award: awards.get(row.id) ?? null,
+      previousTake: previousTakes.get(row.id) ?? null,
       scanTiming: summary ? screenTiming.get(summary.safety_screen_id) as ScanTiming | undefined : undefined,
     };
   }

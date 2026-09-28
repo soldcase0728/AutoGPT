@@ -37,6 +37,29 @@ describe("studentRecord", () => {
     const statuses = new Map<string, AssignmentStatus>([["thu", "sent"], ["fri", "withdrawn"]]);
     expect(studentRecord(assignments, statuses, "2026-09-26", 0).streak).toBe(0);
   });
+
+  it("breaks the streak for today's prompt once 9 pm has passed unsent", () => {
+    const statuses = new Map<string, AssignmentStatus>([
+      ["wed", "sent"], ["thu", "sent"], ["fri", "not_sent"],
+    ]);
+    expect(studentRecord(assignments, statuses, "2026-09-25", 0, { todayOpen: false }).streak).toBe(0);
+  });
+
+  it("ticks the moment today's prompt is sent", () => {
+    const statuses = new Map<string, AssignmentStatus>([
+      ["wed", "sent"], ["thu", "sent"], ["fri", "sent"],
+    ]);
+    expect(studentRecord(assignments, statuses, "2026-09-25", 0, { todayOpen: true }).streak).toBe(3);
+  });
+
+  it("doesn't count one sent after 9 pm on its day, but still counts it as sent", () => {
+    const statuses = new Map<string, AssignmentStatus>([
+      ["wed", "sent"], ["thu", "sent"], ["fri", "sent"],
+    ]);
+    const record = studentRecord(assignments, statuses, "2026-09-26", 0, { onTime: new Map([["fri", false]]) });
+    expect(record.streak).toBe(0);
+    expect(record.sent).toBe(3);
+  });
 });
 
 describe("recentPost", () => {

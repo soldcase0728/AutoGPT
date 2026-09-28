@@ -1,3 +1,4 @@
+import { schoolToday } from "@/lib/dates";
 import { AppHeader } from "@/components/AppHeader";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -62,7 +63,7 @@ export default async function PeoplePage({
     <>
       <AppHeader person={me} />
       <main className="mx-auto max-w-5xl px-5 py-8">
-        <PeopleManager rows={rows} releaseVersion={RELEASE_VERSION} today={new Date().toISOString().slice(0, 10)} initialFilter={resolvePeopleFilter(filter)} />
+        <PeopleManager rows={rows} releaseVersion={RELEASE_VERSION} today={schoolToday()} initialFilter={resolvePeopleFilter(filter)} />
       </main>
     </>
   );

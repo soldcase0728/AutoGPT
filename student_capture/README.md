@@ -208,6 +208,8 @@ original migrations, which are not.)
 | `20260927140000_report_not_permitted.sql` | The "A teacher or coach won't allow it" report reason |
 | `20260927150000_shot_of_the_day.sql` | Shot of the Day, awarded by an admin and shown to the student |
 | `20260928120000_hide_drafts_from_staff.sql` | Staff can't read a shot until the student sends it |
+| `20260928130000_reshoot_waiting_on_student.sql` | A shot being reshot stays on the desk under "Waiting on student", showing only the take the desk sent back |
+| `20260928140000_strip_copy_titles.sql` | Removes the " — copy" a duplicated task picked up from stored titles |
 
 Apply them before deploying this version. The review queue's decisions,
 takedowns, post links, task pages and groups call what they add; until they are

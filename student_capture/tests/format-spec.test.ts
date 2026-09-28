@@ -101,6 +101,13 @@ describe("unreadable videos", () => {
     expect(findings).toContainEqual({ level: "block", message: "We couldn't read this video. Try recording it again." });
   });
 
+  it("blocks a 200-byte .mp4 as unreadable", () => {
+    const findings = checkFormat(spec, { kind: "video", bytes: 200 }, 500_000_000);
+    expect(findings.filter((f) => f.level === "block").map((f) => f.message)).toEqual([
+      "We couldn't read this video. Try recording it again.",
+    ]);
+  });
+
   it("blocks a file too small to be a clip", () => {
     const findings = checkFormat(spec, { kind: "video", bytes: 12_000, durationSeconds: 6, width: 1080, height: 1920 }, 500_000_000);
     expect(findings[0]?.message).toBe("That video is too small to be a real clip. Try recording it again.");

@@ -1,7 +1,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { requireAdmin } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { isoDate } from "@/lib/assign";
+import { schoolToday } from "@/lib/dates";
 import { TaskManager, type TaskSummary, type StudentGroup } from "./TaskManager";
 import type { GuidelineVersion } from "@/lib/types";
 
@@ -23,7 +23,7 @@ export default async function AdminTasksPage() {
       .limit(30),
   ]);
 
-  const today = isoDate(new Date());
+  const today = schoolToday();
   const ideaIds = (ideas ?? []).map((idea) => idea.id);
   const setIds = (guidelineSets ?? []).map((set) => set.id);
   const [{ data: groups }, { data: members }, { data: versions }, { data: cancelled }] = await Promise.all([
@@ -86,7 +86,7 @@ export default async function AdminTasksPage() {
       <AppHeader person={person} />
       <main className="mx-auto max-w-5xl px-5 py-8">
         <TaskManager
-          today={isoDate(new Date())}
+          today={schoolToday()}
           campaigns={campaigns ?? []}
           students={students ?? []}
           guidelineSets={guidelineSets ?? []}

@@ -29,6 +29,15 @@ describe("assignmentStatuses", () => {
     expect(statuses.get("a2")).toBe("not_sent");
   });
 
+  it("keeps a reshoot in progress as sent back until the new take is sent", () => {
+    const reshooting = assignmentStatuses(
+      [{ id: "r", personId: "ali", dueOn: "2026-09-21" }],
+      [{ assignmentId: "r", state: "uploading", submittedAt: null, stateChangedAt: at, mediaRevision: 2 }],
+      "2026-09-23",
+    );
+    expect(reshooting.get("r")).toBe("reshoot");
+  });
+
   it("separates future assignments from missing ones", () => {
     expect(statuses.get("a4")).toBe("upcoming");
     expect(statuses.get("a5")).toBe("not_sent");

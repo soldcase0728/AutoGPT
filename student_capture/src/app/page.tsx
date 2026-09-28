@@ -3,7 +3,7 @@ import { TodayView, type TodaySentBack } from "@/components/views/TodayView";
 import { createClient } from "@/lib/supabase/server";
 import { hasSignedRelease, requirePerson } from "@/lib/session";
 import type { Idea } from "@/lib/types";
-import { isoDate } from "@/lib/assign";
+import { schoolToday } from "@/lib/dates";
 import { loadStudentProgress } from "@/lib/student-progress";
 import { RELEASE_VERSION } from "@/app/consent/version";
 
@@ -20,7 +20,7 @@ export default async function Today() {
   }
 
   const supabase = await createClient();
-  const today = isoDate(new Date());
+  const today = schoolToday();
 
   const progressPromise = person.role === "student" ? loadStudentProgress(supabase, person.id) : Promise.resolve(null);
   const { data: assignment } = await supabase
