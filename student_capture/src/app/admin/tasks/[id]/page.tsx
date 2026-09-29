@@ -22,13 +22,23 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     .maybeSingle();
   if (!idea) notFound();
 
-  const [{ data: assignments }, { data: captures }, { data: guidelineSets }] = await Promise.all([
+  const [{ data: assignments }, { data: captures }, { data: guidelineSets }, { data: roster }, { data: groups }, { data: members }] = await Promise.all([
     supabase.from("assignments").select("id, person_id, due_on").eq("idea_id", id).order("due_on"),
     supabase
       .from("captures")
       .select("assignment_id, state, submitted_at, state_changed_at, media_revision")
       .eq("prompt_id", id),
     supabase.from("guideline_sets").select("id, name, kind").eq("org_id", me.org_id).order("kind"),
+    supabase
+      .from("people")
+      .select("id, display_name, email")
+      .eq("org_id", me.org_id)
+      .eq("role", "student")
+      .eq("participation", "active")
+      .is("deactivated_at", null)
+      .order("display_name"),
+    supabase.from("student_groups").select("id, name").eq("org_id", me.org_id).order("name"),
+    supabase.from("student_group_members").select("group_id, person_id"),
   ]);
 
   const personIds = [...new Set((assignments ?? []).map((a) => a.person_id))];
@@ -82,6 +92,15 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           progress={progress}
           rows={rows}
           guidelineSets={guidelineSets ?? []}
+          today={today}
+          students={(roster ?? []) as Array<{ id: string; display_name: string; email: string }>}
+          groups={((groups ?? []) as Array<{ id: string; name: string }>).map((g) => ({
+            id: g.id,
+            name: g.name,
+            memberIds: ((members ?? []) as Array<{ group_id: string; person_id: string }>)
+              .filter((m) => m.group_id === g.id)
+              .map((m) => m.person_id),
+          }))}
         />
       </main>
     </>

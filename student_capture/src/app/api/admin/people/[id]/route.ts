@@ -24,6 +24,12 @@ const actionSchema = z.discriminatedUnion("action", [
     reason: z.string().trim().min(3).max(500),
   }),
   z.object({ action: z.literal("reset_password") }),
+  z.object({
+    action: z.literal("delete"),
+    /** Also delete what they sent. Needs `confirmName` to match their name. */
+    withShots: z.boolean().default(false),
+    confirmName: z.string().trim().max(120).optional(),
+  }),
 ]);
 
 /** One administrator action on one person. */
@@ -49,6 +55,47 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const now = new Date().toISOString();
 
   switch (body.action) {
+    case "delete": {
+      if (body.withShots && body.confirmName?.toLowerCase() !== String(target.display_name).trim().toLowerCase()) {
+        return fail(400, `Type their name, ${target.display_name}, to confirm deleting their shots too.`);
+      }
+      // One transaction in the database decides and deletes (see
+      // 20260929120000_delete_person.sql); files and the login follow.
+      const { data, error } = await supabase.rpc("delete_person", {
+        p_person_id: id,
+        p_with_shots: body.withShots,
+      });
+      if (error) {
+        if (error.code === "42501") return fail(403, "Only an administrator can delete people.");
+        if (error.code === "P0002") return fail(404, "That person is not on your roster.");
+        if (error.code === "23503") {
+          return fail(409, "They have a record on the desk (reviews, notes, awards or decisions), so they can't be deleted. Revoke their access instead.");
+        }
+        if (error.code === "23514") {
+          return fail(409, error.message, error.hint === "needs_with_shots" ? { needsShots: true } : undefined);
+        }
+        return fail(500, error.message);
+      }
+      const result = data as { auth_user_id: string | null; files: Array<{ bucket: string; key: string }>; shots_deleted: number };
+      const admin = createAdminClient();
+      const warnings: string[] = [];
+      const byBucket = new Map<string, string[]>();
+      for (const file of result.files ?? []) {
+        byBucket.set(file.bucket, [...(byBucket.get(file.bucket) ?? []), file.key]);
+      }
+      for (const [bucket, keys] of byBucket) {
+        for (let i = 0; i < keys.length; i += 100) {
+          const { error: removeError } = await admin.storage.from(bucket).remove(keys.slice(i, i + 100));
+          if (removeError) warnings.push(`Some files couldn't be removed from storage: ${removeError.message}`);
+        }
+      }
+      if (result.auth_user_id) {
+        const { error: authError } = await admin.auth.admin.deleteUser(result.auth_user_id);
+        if (authError) warnings.push(`Their login couldn't be deleted: ${authError.message}. Remove it in Supabase → Authentication.`);
+      }
+      return json({ ok: true, deleted: true, shotsDeleted: result.shots_deleted, warnings });
+    }
+
     case "activate":
     case "restore_access":
     case "revoke_access": {

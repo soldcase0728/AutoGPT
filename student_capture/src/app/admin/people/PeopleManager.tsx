@@ -289,6 +289,35 @@ function ManagePerson({ row, today }: {
   const [withdrawing, setWithdrawing] = useState<"media_release" | "parental" | null>(null);
   const [withdrawReason, setWithdrawReason] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [deleting, setDeleting] = useState<"ask" | "shots" | null>(null);
+  const [deleteNote, setDeleteNote] = useState("");
+  const [typedName, setTypedName] = useState("");
+
+  async function remove(withShots: boolean) {
+    setBusy(true);
+    setError("");
+    setDone("");
+    const response = await fetch(`/api/admin/people/${row.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "delete", withShots, confirmName: withShots ? typedName : undefined }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setBusy(false);
+    if (!response.ok) {
+      if (payload.needsShots) {
+        setDeleting("shots");
+        setDeleteNote(payload.error ?? "");
+        return;
+      }
+      setError(payload.error || "That didn't delete.");
+      setDeleting(null);
+      return;
+    }
+    const warnings = (payload.warnings ?? []) as string[];
+    if (warnings.length) window.alert(`${row.name} was deleted. ${warnings.join(" ")}`);
+    router.refresh();
+  }
 
   async function run(body: object, success: string) {
     setBusy(true);
@@ -435,6 +464,50 @@ function ManagePerson({ row, today }: {
           )
         )}
       </section>
+
+      {!row.isMe && (
+        <section className="flex flex-col gap-2 border-t pt-4 md:col-span-2" style={{ borderColor: "var(--rule)" }} aria-label="Delete">
+          <p className="label">Delete</p>
+          {deleting === null && (
+            <button className="btn btn-quiet self-start" style={{ color: "var(--clay)" }} onClick={() => setDeleting("ask")}>Delete {row.name}…</button>
+          )}
+          {deleting === "ask" && (
+            <div className="flex flex-col gap-2 rounded-sm border p-3" style={{ borderColor: "var(--clay)" }}>
+              <p className="text-sm">
+                Removes them from the roster, their tasks, releases and login, for good. If they&rsquo;ve sent
+                shots, you&rsquo;ll be asked about those next. To keep their history instead, revoke their access.
+              </p>
+              <div className="flex gap-2">
+                <button className="btn" style={{ background: "var(--clay)", borderColor: "var(--clay)" }} disabled={busy} onClick={() => void remove(false)}>Delete</button>
+                <button className="btn btn-quiet" onClick={() => setDeleting(null)}>Keep them</button>
+              </div>
+            </div>
+          )}
+          {deleting === "shots" && (
+            <form
+              className="flex flex-col gap-2 rounded-sm border p-3"
+              style={{ borderColor: "var(--clay)" }}
+              onSubmit={(event) => { event.preventDefault(); void remove(true); }}
+            >
+              <p className="text-sm font-semibold" style={{ color: "var(--clay)" }}>{deleteNote}</p>
+              <p className="text-sm">
+                Deleting them also deletes those shots and their files, for everyone, and can&rsquo;t be undone.
+                To keep the shots, revoke their access instead.
+              </p>
+              <label className="label" htmlFor={`del-${row.id}`}>Type {row.name} to confirm</label>
+              <input id={`del-${row.id}`} value={typedName} onChange={(e) => setTypedName(e.target.value)} autoComplete="off"
+                className="rounded border bg-transparent px-3 py-2" style={{ borderColor: "var(--rule)" }} />
+              <div className="flex gap-2">
+                <button className="btn" style={{ background: "var(--clay)", borderColor: "var(--clay)" }}
+                  disabled={busy || typedName.trim().toLowerCase() !== row.name.trim().toLowerCase()}>
+                  Delete them and their shots
+                </button>
+                <button type="button" className="btn btn-quiet" onClick={() => { setDeleting(null); setTypedName(""); }}>Keep them</button>
+              </div>
+            </form>
+          )}
+        </section>
+      )}
 
       {(error || done) && (
         <p className="text-sm md:col-span-2" style={{ color: error ? "var(--clay)" : "var(--moss)" }} role={error ? "alert" : "status"}>

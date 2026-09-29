@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Chip } from "@/components/Chip";
-import { STATUS_LABEL, type AssignmentStatus, type TaskProgress } from "@/lib/task-progress";
+import { STATUS_LABEL, schoolDays, type AssignmentStatus, type TaskProgress } from "@/lib/task-progress";
+import { expandTaskDates } from "@/lib/admin-task";
 
 export interface TaskStudentRow {
   assignmentId: string;
@@ -65,11 +66,18 @@ export function TaskDetail({
   progress,
   rows,
   guidelineSets,
+  today,
+  students = [],
+  groups = [],
 }: {
   task: Task;
   progress: TaskProgress;
   rows: TaskStudentRow[];
   guidelineSets: Array<{ id: string; name: string; kind: string }>;
+  today: string;
+  /** Active students who can be given this task. */
+  students?: Array<{ id: string; display_name: string; email: string }>;
+  groups?: Array<{ id: string; name: string; memberIds: string[] }>;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -83,6 +91,51 @@ export function TaskDetail({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState(false);
+  const [assigning, setAssigning] = useState(rows.length === 0);
+  const [pick, setPick] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [startsOn, setStartsOn] = useState(today);
+  const [endsOn, setEndsOn] = useState(today);
+  const [weekdaysOnly, setWeekdaysOnly] = useState(true);
+  const [assignNotice, setAssignNotice] = useState("");
+  const [assignError, setAssignError] = useState("");
+
+  const days = useMemo(() => {
+    const all = expandTaskDates(startsOn, endsOn);
+    return all ? schoolDays(all, weekdaysOnly) : null;
+  }, [endsOn, startsOn, weekdaysOnly]);
+  const needle = search.trim().toLowerCase();
+  const shown = needle
+    ? students.filter((s) => `${s.display_name} ${s.email}`.toLowerCase().includes(needle))
+    : students;
+  const activeIds = new Set(students.map((s) => s.id));
+
+  async function assign(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setAssignError("");
+    setAssignNotice("");
+    const response = await fetch(`/api/admin/tasks/${task.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "assign", studentIds: pick, startsOn, endsOn, weekdaysOnly }),
+    });
+    setBusy(false);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setAssignError(payload.error || "That didn't save.");
+      return;
+    }
+    const skipped = (payload.skipped ?? []) as Array<{ name: string; dueOn: string }>;
+    setAssignNotice(
+      `Assigned: ${payload.createdAssignments} assignment${payload.createdAssignments === 1 ? "" : "s"}.` +
+        (skipped.length
+          ? ` Skipped because they already have a task that day: ${skipped.slice(0, 8).map((x) => `${x.name} (${x.dueOn})`).join(", ")}${skipped.length > 8 ? `, and ${skipped.length - 8} more` : ""}.`
+          : ""),
+    );
+    setPick([]);
+    router.refresh();
+  }
 
   const missing = useMemo(() => {
     const seen = new Map<string, TaskStudentRow>();
@@ -217,6 +270,69 @@ export function TaskDetail({
           {rows.length === 0 && <p className="text-sm" style={{ color: "var(--muted)" }}>No assignments.</p>}
         </div>
       </section>
+
+      {!task.cancelled && (
+        <section className="card flex flex-col gap-4 p-5" aria-label="Assign students">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="label">{rows.length === 0 ? "Nobody assigned yet" : "Assign more students"}</p>
+            {!assigning && (
+              <button type="button" className="btn btn-quiet" onClick={() => setAssigning(true)}>Assign students…</button>
+            )}
+          </div>
+          {assigning && (
+            <form onSubmit={assign} className="flex flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1"><span className="label">First day</span>
+                  <input type="date" required value={startsOn} onChange={(e) => { setStartsOn(e.target.value); if (endsOn < e.target.value) setEndsOn(e.target.value); }} className="rounded border bg-transparent px-3 py-2" style={{ borderColor: "var(--rule)" }} />
+                </label>
+                <label className="flex flex-col gap-1"><span className="label">Last day</span>
+                  <input type="date" required min={startsOn} value={endsOn} onChange={(e) => setEndsOn(e.target.value)} className="rounded border bg-transparent px-3 py-2" style={{ borderColor: "var(--rule)" }} />
+                </label>
+                <label className="flex items-center gap-2 self-end pb-2 text-sm">
+                  <input type="checkbox" checked={weekdaysOnly} onChange={(e) => setWeekdaysOnly(e.target.checked)} />
+                  School days only
+                </label>
+              </div>
+              {groups.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {groups.map((g) => (
+                    <button key={g.id} type="button" className="rounded-sm border px-2 py-1 text-sm" style={{ borderColor: "var(--rule)" }}
+                      onClick={() => setPick((p) => [...new Set([...p, ...g.memberIds.filter((id) => activeIds.has(id))])])}>
+                      + {g.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a student" className="rounded border bg-transparent px-3 py-2" style={{ borderColor: "var(--rule)" }} />
+              <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">
+                {shown.map((s) => (
+                  <label key={s.id} className="flex items-start gap-3 rounded border p-2 text-sm" style={{ borderColor: "var(--rule)" }}>
+                    <input type="checkbox" className="mt-1" checked={pick.includes(s.id)}
+                      onChange={(e) => setPick((p) => (e.target.checked ? [...new Set([...p, s.id])] : p.filter((x) => x !== s.id)))} />
+                    <span><span className="block font-medium">{s.display_name}</span><span className="block text-xs" style={{ color: "var(--muted)" }}>{s.email}</span></span>
+                  </label>
+                ))}
+                {students.length === 0 && <p className="text-sm" style={{ color: "var(--muted)" }}>No active students. Activate them in People first.</p>}
+              </div>
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                A student gets at most one task a day; days they already have one are skipped.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button className="btn" disabled={busy || pick.length === 0 || !days?.length}>
+                  {pick.length === 0
+                    ? "Pick students"
+                    : `Assign to ${pick.length} student${pick.length === 1 ? "" : "s"}${days && days.length > 1 ? ` on ${days.length} days` : ""}`}
+                </button>
+                {rows.length > 0 && (
+                  <button type="button" className="btn btn-quiet" onClick={() => setAssigning(false)}>Close</button>
+                )}
+              </div>
+            </form>
+          )}
+          {assignError && <p className="text-sm" style={{ color: "var(--clay)" }} role="alert">{assignError}</p>}
+          {assignNotice && <p className="text-sm" style={{ color: "var(--moss)" }} role="status">{assignNotice}</p>}
+        </section>
+      )}
 
       {!task.cancelled && (
         <section className="card flex flex-col gap-4 p-5">

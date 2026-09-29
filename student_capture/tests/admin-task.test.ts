@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanTaskTitle, expandTaskDates, taskCreateSchema } from "@/lib/admin-task";
+import { cleanTaskTitle, expandTaskDates, taskAssignSchema, taskCreateSchema } from "@/lib/admin-task";
 
 const valid = {
   campaignId: "41111111-1111-1111-1111-111111111111",
@@ -37,6 +37,14 @@ describe("taskCreateSchema", () => {
     expect(taskCreateSchema.safeParse(valid).success).toBe(true);
   });
 
+  it("accepts a task with nobody assigned yet", () => {
+    const parsed = taskCreateSchema.safeParse({ ...valid, studentIds: [] });
+    expect(parsed.success).toBe(true);
+    const { studentIds: _omit, ...withoutStudents } = valid;
+    void _omit;
+    expect(taskCreateSchema.safeParse(withoutStudents).data?.studentIds).toEqual([]);
+  });
+
   it("requires video durations and reserves multi-item counts for photo series", () => {
     expect(taskCreateSchema.safeParse({ ...valid, mediaType: "video" }).success).toBe(false);
     expect(taskCreateSchema.safeParse({ ...valid, maxMediaCount: 3 }).success).toBe(false);
@@ -54,5 +62,18 @@ describe("cleanTaskTitle", () => {
   it("leaves a real title alone", () => {
     expect(cleanTaskTitle("Copy the playbook")).toBe("Copy the playbook");
     expect(cleanTaskTitle("Pre-game")).toBe("Pre-game");
+  });
+});
+
+describe("taskAssignSchema", () => {
+  const assign = { action: "assign", studentIds: ["63333333-3333-3333-3333-333333333333"], startsOn: "2026-10-05", endsOn: "2026-10-09", weekdaysOnly: true };
+
+  it("assigns an existing task to students over a range", () => {
+    expect(taskAssignSchema.safeParse(assign).success).toBe(true);
+  });
+
+  it("needs at least one student and a sane range", () => {
+    expect(taskAssignSchema.safeParse({ ...assign, studentIds: [] }).success).toBe(false);
+    expect(taskAssignSchema.safeParse({ ...assign, endsOn: "2026-10-01" }).success).toBe(false);
   });
 });
