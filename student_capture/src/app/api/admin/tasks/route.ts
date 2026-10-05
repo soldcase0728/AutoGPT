@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { expandTaskDates, taskCreateSchema } from "@/lib/admin-task";
+import { assignTask } from "@/lib/assign-task";
 import { fail, json, readJson } from "@/lib/http";
 import { schoolDays } from "@/lib/task-progress";
 
@@ -22,7 +23,9 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const [{ data: campaign }, { data: students }, { data: guidelineSets }] = await Promise.all([
     admin.from("campaigns").select("id").eq("id", input.campaignId).eq("org_id", person.org_id).eq("active", true).maybeSingle(),
-    admin.from("people").select("id, display_name").eq("org_id", person.org_id).eq("role", "student").eq("participation", "active").is("deactivated_at", null).in("id", input.studentIds),
+    input.studentIds.length
+      ? admin.from("people").select("id").eq("org_id", person.org_id).eq("role", "student").eq("participation", "active").is("deactivated_at", null).in("id", input.studentIds)
+      : Promise.resolve({ data: [] as Array<{ id: string }> }),
     input.guidelineSetIds.length
       ? admin.from("guideline_sets").select("id").eq("org_id", person.org_id).in("id", input.guidelineSetIds)
       : Promise.resolve({ data: [] as Array<{ id: string }> }),
@@ -70,25 +73,15 @@ export async function POST(request: Request) {
 
   if (ideaError || !idea) return fail(500, ideaError?.message ?? "The prompt could not be created.");
 
-  const requested = dates.flatMap((due_on) => input.studentIds.map((person_id) => ({
-    idea_id: idea.id,
-    person_id,
-    due_on,
-  })));
-  const { data: existing, error: existingError } = await admin
-    .from("assignments")
-    .select("person_id, due_on")
-    .in("person_id", input.studentIds)
-    .gte("due_on", input.startsOn)
-    .lte("due_on", input.endsOn);
-  if (existingError) return fail(500, existingError.message);
-
-  const occupied = new Set((existing ?? []).map((row) => `${row.person_id}:${row.due_on}`));
-  const available = requested.filter((row) => !occupied.has(`${row.person_id}:${row.due_on}`));
-  if (available.length) {
-    const { error: assignmentError } = await admin.from("assignments").insert(available);
-    if (assignmentError) return fail(500, assignmentError.message);
-  }
+  // No students is fine: the task waits, marked "Nobody assigned", until it's
+  // assigned from its page.
+  const assigned = await assignTask(admin, {
+    orgId: person.org_id,
+    ideaId: idea.id,
+    studentIds: input.studentIds,
+    dates: input.studentIds.length ? dates : [],
+  });
+  if ("error" in assigned) return fail(assigned.status, assigned.error);
 
   await admin.from("audit_log").insert({
     org_id: person.org_id,
@@ -99,21 +92,15 @@ export async function POST(request: Request) {
     detail: {
       starts_on: input.startsOn,
       ends_on: input.endsOn,
-      requested_assignments: requested.length,
-      created_assignments: available.length,
-      skipped_existing: requested.length - available.length,
+      created_assignments: assigned.created,
+      skipped_existing: assigned.skipped.length,
     },
   });
 
-  const names = new Map((students ?? []).map((s) => [s.id, s.display_name as string]));
-  const skipped = requested
-    .filter((row) => occupied.has(`${row.person_id}:${row.due_on}`))
-    .map((row) => ({ name: names.get(row.person_id) ?? "A student", dueOn: row.due_on }));
-
   return json({
     id: idea.id,
-    createdAssignments: available.length,
-    skippedExisting: skipped.length,
-    skipped,
+    createdAssignments: assigned.created,
+    skippedExisting: assigned.skipped.length,
+    skipped: assigned.skipped,
   }, 201);
 }

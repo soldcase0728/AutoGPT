@@ -3,7 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { currentPerson } from "@/lib/session";
 import { fail, json, readJson } from "@/lib/http";
 import { schoolToday } from "@/lib/dates";
-import { taskTitle } from "@/lib/admin-task";
+import { expandTaskDates, taskAssignSchema, taskTitle } from "@/lib/admin-task";
+import { assignTask } from "@/lib/assign-task";
+import { schoolDays } from "@/lib/task-progress";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -17,6 +19,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("resume") }),
   z.object({ action: z.literal("cancel") }),
   z.object({ action: z.literal("delete") }),
+  taskAssignSchema,
 ]);
 
 /**
@@ -65,6 +68,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return json({ ok: true, deleted: true });
   }
   if (idea.cancelled_at && body.action !== "edit") return fail(409, "That task was cancelled.");
+
+  if (body.action === "assign") {
+    const dates = schoolDays(expandTaskDates(body.startsOn, body.endsOn) ?? [], body.weekdaysOnly);
+    if (!dates.length) return fail(400, "That range has no weekdays in it.");
+    const assigned = await assignTask(admin, { orgId: person.org_id, ideaId: id, studentIds: body.studentIds, dates });
+    if ("error" in assigned) return fail(assigned.status, assigned.error);
+    await admin.from("audit_log").insert({
+      org_id: person.org_id,
+      actor_id: person.id,
+      action: "content_task.assigned",
+      subject_type: "idea",
+      subject_id: id,
+      detail: { starts_on: body.startsOn, ends_on: body.endsOn, created_assignments: assigned.created, skipped_existing: assigned.skipped.length },
+    });
+    return json({ ok: true, createdAssignments: assigned.created, skipped: assigned.skipped });
+  }
 
   let detail: Record<string, unknown> = {};
   switch (body.action) {

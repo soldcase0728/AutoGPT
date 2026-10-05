@@ -26,7 +26,8 @@ export const taskCreateSchema = z
     orientation: z.enum(["portrait", "landscape", "square", "any"]),
     startsOn: z.string().regex(isoDate),
     endsOn: z.string().regex(isoDate),
-    studentIds: z.array(databaseId).min(1).max(250),
+    // Empty is allowed: the task is saved and assigned later from its page.
+    studentIds: z.array(databaseId).max(250).default([]),
     guidelineSetIds: z.array(databaseId).max(20).default([]),
     minMediaCount: z.number().int().min(1).max(4),
     maxMediaCount: z.number().int().min(1).max(4),
@@ -56,6 +57,20 @@ export const taskCreateSchema = z
   });
 
 export type TaskCreateInput = z.infer<typeof taskCreateSchema>;
+
+/** Assigning an existing task: who, and which days. */
+export const taskAssignSchema = z
+  .object({
+    action: z.literal("assign"),
+    studentIds: z.array(databaseId).min(1, "Choose at least one student.").max(250),
+    startsOn: z.string().regex(isoDate),
+    endsOn: z.string().regex(isoDate),
+    weekdaysOnly: z.boolean().default(false),
+  })
+  .refine((value) => expandTaskDates(value.startsOn, value.endsOn) !== null, {
+    path: ["endsOn"],
+    message: "Choose a range of 31 days or fewer.",
+  });
 
 /** Inclusive UTC date expansion. Returns null for invalid, reversed, or overly broad ranges. */
 export function expandTaskDates(start: string, end: string, maxDays = 31): string[] | null {
