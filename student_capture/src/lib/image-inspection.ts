@@ -102,3 +102,35 @@ function containsAscii(bytes: Uint8Array, value: string): boolean {
   }
   return false;
 }
+
+/**
+ * A JPEG with its metadata segments removed: APP1 (EXIF and XMP, which is
+ * where GPS, camera and time live), APP13 (IPTC) and comments. The pixels are
+ * untouched; JFIF (APP0) and the colour profile (APP2) stay so the picture
+ * looks the same. Anything that isn't a well-formed JPEG comes back as-is.
+ *
+ * Canvas output has no GPS, but Safari still writes a small EXIF block into
+ * every JPEG it encodes, which the submit check (rightly) refuses.
+ */
+export function stripJpegMetadata(bytes: Uint8Array): Uint8Array {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return bytes;
+  const kept: Uint8Array[] = [bytes.subarray(0, 2)];
+  let offset = 2;
+  while (offset + 4 <= bytes.length) {
+    if (bytes[offset] !== 0xff) return bytes;
+    const marker = bytes[offset + 1]!;
+    if (marker === 0xff) { offset += 1; continue; }
+    // Start of scan: the rest is image data.
+    if (marker === 0xda) { kept.push(bytes.subarray(offset)); break; }
+    if (marker === 0xd9) { kept.push(bytes.subarray(offset)); break; }
+    const length = (bytes[offset + 2]! << 8) | bytes[offset + 3]!;
+    if (length < 2 || offset + 2 + length > bytes.length) return bytes;
+    const drop = marker === 0xe1 || marker === 0xed || marker === 0xfe;
+    if (!drop) kept.push(bytes.subarray(offset, offset + 2 + length));
+    offset += 2 + length;
+  }
+  const out = new Uint8Array(kept.reduce((n, part) => n + part.length, 0));
+  let at = 0;
+  for (const part of kept) { out.set(part, at); at += part.length; }
+  return out;
+}
