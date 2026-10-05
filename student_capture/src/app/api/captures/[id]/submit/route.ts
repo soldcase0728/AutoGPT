@@ -183,7 +183,7 @@ export async function POST(
       const bytes = new Uint8Array(await object.arrayBuffer());
       const image = inspectImage(bytes);
       if (!image) return fail(400, "An uploaded image has an invalid or unsupported signature.");
-      if (image.hasExif) return fail(400, "An uploaded image still contains EXIF or location metadata.");
+      if (image.hasExif) return fail(400, "This photo still has location or camera details in it. Tap Retake and take it again.");
       item.width = image.width;
       item.height = image.height;
       item.mimeType = image.mimeType;

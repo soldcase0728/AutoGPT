@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PromptOrientation } from "@/lib/types";
+import { stripJpegMetadata } from "@/lib/image-inspection";
 
 interface CapturedPhoto {
   file: File;
@@ -91,16 +92,23 @@ export function PhotoCamera({
       canvas.toBlob(
         (blob) => {
           if (!blob) return resolve(false);
-          const file = new File([blob], `capture-${Date.now()}.jpg`, {
-            type: "image/jpeg",
-            lastModified: Date.now(),
-          });
-          setPhotos((previous) => {
-            if (previous.length >= maxCount) return previous;
-            const next = [...previous, { file, url: URL.createObjectURL(file) }];
-            return next;
-          });
-          resolve(true);
+          // Safari writes its own small EXIF block into canvas JPEGs; take
+          // every metadata segment out before the photo leaves the phone.
+          void blob.arrayBuffer().then(
+            (buffer) => {
+              const clean = stripJpegMetadata(new Uint8Array(buffer));
+              const file = new File([clean as BlobPart], `capture-${Date.now()}.jpg`, {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              setPhotos((previous) => {
+                if (previous.length >= maxCount) return previous;
+                return [...previous, { file, url: URL.createObjectURL(file) }];
+              });
+              resolve(true);
+            },
+            () => resolve(false),
+          );
         },
         "image/jpeg",
         0.9,
