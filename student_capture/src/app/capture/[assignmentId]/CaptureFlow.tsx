@@ -689,7 +689,7 @@ export function CaptureFlow({
             <p className="mt-2 text-sm" style={{ color: "var(--muted)" }} role="status">
               {upload === "uploading" &&
                 `Uploading ${Math.round(progress * 100)}%. Keep this screen open.`}
-              {upload === "done" && "Uploaded. Now tell us what it is."}
+              {upload === "done" && "Uploaded."}
             </p>
             {upload === "failed" && (
               <>
