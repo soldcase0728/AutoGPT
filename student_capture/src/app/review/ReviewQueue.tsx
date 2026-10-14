@@ -759,6 +759,8 @@ function AskedFor({ row, extras }: { row: QueueRow; extras?: CaptureExtras }) {
       <p className="label mt-3">Who&rsquo;s in it</p>
       {row.no_people_in_frame ? (
         <p className="mt-1 text-sm">Student says nobody is recognisable.</p>
+      ) : !(extras?.tagged ?? []).length ? (
+        <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>Covered by the school-wide release.</p>
       ) : (
         <ul className="mt-1 flex flex-col gap-1 text-sm">
           {(extras?.tagged ?? []).map((person) => {

@@ -80,16 +80,12 @@ export function sendBlockers(input: {
   upload: UploadState;
   captionRequired: boolean;
   oneLiner: string;
-  peopleDecided: boolean;
 }): string[] {
   const blockers: string[] = [];
   if (input.upload === "idle") blockers.push("Choose your shot and tap Use this.");
   if (input.upload === "uploading") blockers.push("Wait for the upload to finish.");
   if (input.upload === "failed") blockers.push("The upload didn't finish. Tap Try again above.");
   if (input.captionRequired && !input.oneLiner.trim()) blockers.push("Add a one-line caption.");
-  if (!input.peopleDecided) {
-    blockers.push("Tag who's in it, or tick “Nobody is recognisable”.");
-  }
   return blockers;
 }
 

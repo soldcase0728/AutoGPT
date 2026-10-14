@@ -50,14 +50,10 @@ export async function POST(
   const body = await readJson<Body>(request);
   const oneLiner = body?.oneLiner?.trim() ?? "";
 
+  // Tagging is optional: the school-wide release covers everyone in a shot.
+  // Tags, when sent, still have their releases checked before posting.
   const peopleIds = [...new Set(body?.peopleIds ?? [])];
-  const noPeopleInFrame = Boolean(body?.noPeopleInFrame);
-  if (peopleIds.length === 0 && !noPeopleInFrame) {
-    return fail(400, "Tag everyone in frame, or confirm nobody is identifiable.");
-  }
-  if (peopleIds.length > 0 && noPeopleInFrame) {
-    return fail(400, "Either nobody is in frame, or someone is. Not both.");
-  }
+  const noPeopleInFrame = peopleIds.length === 0 && Boolean(body?.noPeopleInFrame);
 
   const supabase = await createClient();
 
