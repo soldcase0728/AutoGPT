@@ -2,13 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { PromptCard } from "@/components/PromptCard";
 import { createClient } from "@/lib/supabase/server";
-import { hasSignedRelease, requirePerson } from "@/lib/session";
+import { requirePerson } from "@/lib/session";
 import { buildChecklist } from "@/lib/guidelines";
 import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { objectLanded } from "@/lib/storage-landed";
 import type { GuidelineVersion, Idea } from "@/lib/types";
-import { RELEASE_VERSION } from "@/app/consent/version";
 import { CaptureFlow, type ResumeState, type SentBack } from "./CaptureFlow";
 import { SentBackCard } from "./SentBackCard";
 
@@ -24,9 +23,6 @@ export default async function CapturePage({
   const { assignmentId } = await params;
   const { resubmit } = await searchParams;
   const person = await requirePerson();
-  if (person.role === "student" && !(await hasSignedRelease(person.id, RELEASE_VERSION))) {
-    redirect("/consent");
-  }
 
   const supabase = await createClient();
 

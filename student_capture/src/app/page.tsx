@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import { TodayView, type TodaySentBack } from "@/components/views/TodayView";
 import { createClient } from "@/lib/supabase/server";
-import { hasSignedRelease, requirePerson } from "@/lib/session";
+import { requirePerson } from "@/lib/session";
 import type { Idea } from "@/lib/types";
 import { schoolToday } from "@/lib/dates";
 import { loadStudentProgress } from "@/lib/student-progress";
-import { RELEASE_VERSION } from "@/app/consent/version";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +14,7 @@ export default async function Today() {
   if (person.role === "admin") redirect("/admin");
   if (person.role === "reviewer") redirect("/review");
 
-  if (person.role === "student" && !(await hasSignedRelease(person.id, RELEASE_VERSION))) {
-    redirect("/consent");
-  }
+  // Media consent is collected by the school before a student is given access.
 
   const supabase = await createClient();
   const today = schoolToday();

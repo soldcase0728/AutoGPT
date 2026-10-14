@@ -11,7 +11,6 @@ import {
   quietStudents,
   upcomingDays,
 } from "@/lib/dashboard";
-import { needsParentalRelease, releaseStatus, type ConsentRecord } from "@/lib/people";
 import type { CaptureState } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -121,13 +120,6 @@ export default async function AdminOverviewPage() {
   const roster = (students ?? []) as Array<{
     id: string; display_name: string; email: string; birth_year: number | null; participation: string;
   }>;
-  const studentIds = roster.map((s) => s.id);
-  const { data: consents } = studentIds.length
-    ? await supabase
-        .from("consents")
-        .select("person_id, type, document_version, signed_at, signed_by, expires_at, revoked_at")
-        .in("person_id", studentIds)
-    : { data: [] };
 
   const assignments: TaskAssignment[] = (assignmentRows as Array<{ id: string; person_id: string; due_on: string }>).map(
     (a) => ({ id: a.id, personId: a.person_id, dueOn: a.due_on }),
@@ -165,12 +157,6 @@ export default async function AdminOverviewPage() {
     lastWeek,
   ).map((q) => ({ ...q, email: byId.get(q.personId)?.email ?? "" }));
 
-  const consentRows = (consents ?? []) as Array<ConsentRecord & { person_id: string }>;
-  const needingParent = roster.filter(
-    (s) =>
-      needsParentalRelease(s.birth_year, now) &&
-      releaseStatus(consentRows.filter((c) => c.person_id === s.id), "parental", { now }) !== "valid",
-  ).length;
 
   const readyBlocked = ((approved ?? []) as Array<{ consent_blockers: unknown[] | null }>).filter(
     (row) => (row.consent_blockers ?? []).length > 0,
@@ -188,7 +174,8 @@ export default async function AdminOverviewPage() {
     withdrawalRequests,
     approvedBlockedByRelease: readyBlocked,
     studentsAwaitingActivation: roster.filter((s) => s.participation === "pending").length,
-    studentsNeedingParentRelease: needingParent,
+    // Consent is collected outside the app before access.
+    studentsNeedingParentRelease: 0,
     tasksWithNobodyAssigned: unassigned,
     nextGap: upcoming.find((d) => d.gap)?.date ?? null,
   });
