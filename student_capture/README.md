@@ -211,6 +211,7 @@ original migrations, which are not.)
 | `20260928130000_reshoot_waiting_on_student.sql` | A shot being reshot stays on the desk under "Waiting on student", showing only the take the desk sent back |
 | `20260928140000_strip_copy_titles.sql` | Removes the " — copy" a duplicated task picked up from stored titles |
 | `20260929120000_delete_person.sql` | An admin can delete someone from the roster (and, if confirmed, their shots); refused for posted shots or anyone with a record on the desk |
+| `20261014120000_school_wide_release.sql` | Untagged shots are covered by the school-wide release; students no longer say who is in a shot |
 
 Apply them before deploying this version. The review queue's decisions,
 takedowns, post links, task pages and groups call what they add; until they are

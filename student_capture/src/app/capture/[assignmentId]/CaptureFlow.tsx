@@ -92,8 +92,6 @@ export function CaptureFlow({
   maxMediaCount,
   captionRequired,
   checklist,
-  people,
-  self,
   maxBytes,
   supabaseUrl,
 }: Props) {
@@ -127,8 +125,6 @@ export function CaptureFlow({
   const [progress, setProgress] = useState(resumedComplete ? 1 : 0);
   const [uploadError, setUploadError] = useState("");
   const [oneLiner, setOneLiner] = useState("");
-  const [tagged, setTagged] = useState<string[]>([]);
-  const [nobody, setNobody] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [resumedUnreadable, setResumedUnreadable] = useState(false);
@@ -138,8 +134,7 @@ export function CaptureFlow({
   const tips = useMemo(() => checklist.items.filter((i) => !i.safety), [checklist]);
   // One acknowledgement covers every safety rule; the tips are for reading.
   const ready = safety.length === 0 || safetyAck;
-  const peopleDecided = nobody ? tagged.length === 0 : tagged.length > 0;
-  const blockers = sendBlockers({ upload, captionRequired, oneLiner, peopleDecided });
+  const blockers = sendBlockers({ upload, captionRequired, oneLiner });
   const canSubmit = blockers.length === 0 && !submitting && !resumedUnreadable;
   // A reshoot keeps its submission; retaking one throws away only the new take.
   const isReshoot = Boolean(sentBack || resume?.isResubmission);
@@ -342,9 +337,6 @@ export function CaptureFlow({
     if (!chosen) return;
 
     const facts = await probeMedia(chosen);
-    // A new clip needs its own answer to "who is in it?".
-    setTagged([]);
-    setNobody(false);
     setFile(chosen);
     setPreviewUrl(URL.createObjectURL(chosen));
     setProbe(facts);
@@ -366,9 +358,6 @@ export function CaptureFlow({
         setCaptureId(null);
       }
     }
-    // Consent belongs to a clip: a new one is asked again.
-    setTagged([]);
-    setNobody(false);
     setResumedUnreadable(false);
     staleRef.current = null;
     setResumed(false);
@@ -394,8 +383,9 @@ export function CaptureFlow({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         oneLiner,
-        peopleIds: tagged,
-        noPeopleInFrame: nobody,
+        // The school-wide release covers everyone in a shot; students don't tag.
+        peopleIds: [],
+        noPeopleInFrame: false,
         durationSeconds: probe.durationSeconds,
         width: probe.width,
         height: probe.height,
@@ -424,11 +414,6 @@ export function CaptureFlow({
     }
     router.push("/submissions");
     router.refresh();
-  }
-
-  function toggle(id: string) {
-    setTagged((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
-    setNobody(false);
   }
 
   const blocking = blocks(findings);
@@ -565,12 +550,7 @@ export function CaptureFlow({
               orientation={orientation}
               maxCount={maxMediaCount}
               disabled={!ready || shotLocked}
-              onChange={(photos) => {
-                // Different photos need their own answer to "who is in it?".
-                setPhotoFiles(photos);
-                setTagged([]);
-                setNobody(false);
-              }}
+              onChange={setPhotoFiles}
             />
           )
         )}
@@ -689,7 +669,7 @@ export function CaptureFlow({
             <p className="mt-2 text-sm" style={{ color: "var(--muted)" }} role="status">
               {upload === "uploading" &&
                 `Uploading ${Math.round(progress * 100)}%. Keep this screen open.`}
-              {upload === "done" && "Uploaded. Now tell us what it is."}
+              {upload === "done" && "Uploaded."}
             </p>
             {upload === "failed" && (
               <>
@@ -733,60 +713,20 @@ export function CaptureFlow({
       </div>
 
       {/* 4 — the context marketing needs, and nothing more */}
-      <section className="card p-5">
-        {captionRequired && (
-          <>
-            <label className="label" htmlFor="one-liner">What is happening? One line.</label>
-            <input
-              id="one-liner"
-              value={oneLiner}
-              onChange={(e) => setOneLiner(e.target.value)}
-              maxLength={140}
-              className="card mt-2 w-full px-3 py-3"
-              style={{ background: "var(--bg)" }}
-              placeholder="Last five minutes before the bus leaves"
-            />
-          </>
-        )}
-
-        <p className={`label ${captionRequired ? "mt-5" : ""}`}>Who is in it?</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {[{ id: self.id, display_name: `${self.display_name} (you)` }, ...people.filter((p) => p.id !== self.id)].map(
-            (p) => {
-              const on = tagged.includes(p.id);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => toggle(p.id)}
-                  className="rounded-sm border px-3 py-1.5 text-sm"
-                  style={{
-                    borderColor: on ? "var(--ink)" : "var(--rule)",
-                    background: on ? "var(--ink)" : "transparent",
-                    color: on ? "var(--bg)" : "var(--ink)",
-                  }}
-                  aria-pressed={on}
-                >
-                  {p.display_name}
-                </button>
-              );
-            },
-          )}
-        </div>
-
-        <label className="mt-4 flex cursor-pointer items-start gap-3 text-[15px]">
+      {captionRequired && (
+        <section className="card p-5">
+          <label className="label" htmlFor="one-liner">What is happening? One line.</label>
           <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 shrink-0"
-            checked={nobody}
-            onChange={(e) => {
-              setNobody(e.target.checked);
-              if (e.target.checked) setTagged([]);
-            }}
+            id="one-liner"
+            value={oneLiner}
+            onChange={(e) => setOneLiner(e.target.value)}
+            maxLength={140}
+            className="card mt-2 w-full px-3 py-3"
+            style={{ background: "var(--bg)" }}
+            placeholder="Last five minutes before the bus leaves"
           />
-          <span>Nobody is recognisable in this one.</span>
-        </label>
-      </section>
+        </section>
+      )}
 
       <div className="flex flex-col gap-2">
         <button className="btn" disabled={!canSubmit} onClick={submit} type="button">

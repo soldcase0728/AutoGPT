@@ -51,9 +51,10 @@ insert into capture_people (capture_id, person_id) values
 select t_assert(capture_consent_ok('c0000000-0000-0000-0000-000000000001'),
                 'adult with a live media release should pass');
 
--- 2. Nobody tagged and nothing affirmed is a blocker, not a silent pass.
-select t_assert(t_has_blocker('c0000000-0000-0000-0000-000000000002', 'no_people_declared'),
-                'untagged capture without an affirmation should be blocked');
+-- 2. Nobody tagged is covered by the school-wide release
+--    (20261014120000_school_wide_release.sql).
+select t_assert(capture_consent_ok('c0000000-0000-0000-0000-000000000002'),
+                'untagged capture should be covered by the school-wide release');
 
 -- 3. Affirming that nobody is identifiable clears it.
 select t_assert(capture_consent_ok('c0000000-0000-0000-0000-000000000003'),

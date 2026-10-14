@@ -45,7 +45,7 @@ describe("describeUploadFailure", () => {
 });
 
 describe("sendBlockers", () => {
-  const ready = { upload: "done" as const, captionRequired: true, oneLiner: "Bus", peopleDecided: true };
+  const ready = { upload: "done" as const, captionRequired: true, oneLiner: "Bus" };
 
   it("is empty when everything is in place", () => {
     expect(sendBlockers(ready)).toEqual([]);
@@ -57,8 +57,8 @@ describe("sendBlockers", () => {
   });
 
   it("lists every missing piece in order", () => {
-    expect(sendBlockers({ upload: "idle", captionRequired: true, oneLiner: "", peopleDecided: false }))
-      .toHaveLength(3);
+    expect(sendBlockers({ upload: "idle", captionRequired: true, oneLiner: "" }))
+      .toHaveLength(2);
     expect(sendBlockers({ ...ready, upload: "failed" })[0]).toContain("Try again");
   });
 });
