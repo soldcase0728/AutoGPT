@@ -208,18 +208,18 @@ export default async function PreviewScreen({
             oldestToReviewSince: "2026-09-01T15:10:00Z",
             waitingOnStudent: 2,
             readyToPost: 4,
-            readyBlocked: 1,
+            readyBlocked: 0,
             postedThisWeek: 23,
           }}
           attention={attentionItems({
             now,
-            oldestScanQueuedAt: "2026-09-01T17:05:00Z",
-            queuedScans: 3,
+            oldestScanQueuedAt: null,
+            queuedScans: 0,
             safetyReports: 1,
             withdrawalRequests: 1,
-            approvedBlockedByRelease: 1,
+            approvedBlockedByRelease: 0,
             studentsAwaitingActivation: 2,
-            studentsNeedingParentRelease: 4,
+            studentsNeedingParentRelease: 0,
             tasksWithNobodyAssigned: 1,
             nextGap: upcoming.find((d) => d.gap)?.date ?? null,
           })}

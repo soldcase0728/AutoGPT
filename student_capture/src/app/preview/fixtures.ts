@@ -277,9 +277,8 @@ export const QUEUE: QueueRow[] = [
     one_liner: "Sprint repeats, and the face you make on the last one",
     idea_title: "The unglamorous part",
     idea_brief: "The part nobody posts.",
-    consent_blockers: [
-      { person_id: MINOR.id, person: "Jo Mercer", reason: "parental_missing" },
-    ],
+    // Covered by the school-wide release: nothing blocks posting.
+    consent_blockers: [],
   },
   {
     ...baseRow,
@@ -294,13 +293,7 @@ export const QUEUE: QueueRow[] = [
     one_liner: "Empty gym at six, before anyone else turns up",
     idea_title: "Your view right now",
     idea_brief: "One photo of whatever is in front of you.",
-    consent_blockers: [
-      {
-        person_id: "65555555-5555-5555-5555-555555555555",
-        person: "Sam Okafor",
-        reason: "age_unknown",
-      },
-    ],
+    consent_blockers: [],
   },
 ];
 
