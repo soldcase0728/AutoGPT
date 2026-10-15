@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as tus from "tus-js-client";
@@ -10,8 +11,12 @@ import { mediaKind, probeMedia, probeUrl, type Probe } from "@/lib/probe";
 import {
   UploadStepError,
   describeUploadFailure,
+  safetyAckText,
   sendBlockers,
   sendHint,
+  shotStageText,
+  sourceButtonText,
+  type ShotSource,
   type UploadState,
 } from "@/lib/capture-status";
 import type { FormatSpec, PromptMediaType, PromptOrientation } from "@/lib/types";
@@ -107,6 +112,10 @@ export function CaptureFlow({
 
   const [resumed, setResumed] = useState(resumedComplete);
   const [safetyAck, setSafetyAck] = useState(false);
+  // Shooting now or using one already on the phone: the safety wording follows it.
+  const [source, setSource] = useState<ShotSource>("camera");
+  // Set only once the server has confirmed the marketing desk has the shot.
+  const [receivedAt, setReceivedAt] = useState<Date | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
@@ -412,12 +421,33 @@ export function CaptureFlow({
     } catch {
       // Nothing stored.
     }
-    router.push("/submissions");
+    // The submit route answered OK: the shot is recorded as sent. Only now say so.
+    setSubmitting(false);
+    setReceivedAt(new Date());
     router.refresh();
   }
 
   const blocking = blocks(findings);
   const shotLocked = upload === "uploading" || upload === "done";
+
+  const ackKind = mediaType === "video" ? "video" : "photo";
+  const ackText = safetyAckText(source, ackKind);
+
+  if (receivedAt) {
+    return (
+      <section className="card p-5" role="status" aria-live="polite" style={{ borderColor: "var(--moss)", borderWidth: 2 }}>
+        <p className="label" style={{ color: "var(--moss)" }}>Received</p>
+        <p className="mt-2 text-[20px] font-semibold leading-snug">{shotStageText("received")}</p>
+        <p className="mt-1 text-[15px]" style={{ color: "var(--muted)" }}>
+          Sent at {dateTime(receivedAt)}. It&rsquo;s waiting for review, and you&rsquo;ll see what happens to it in My shots.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/submissions" className="btn">My shots</Link>
+          <Link href="/" className="btn btn-quiet">Back to Today</Link>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -430,8 +460,8 @@ export function CaptureFlow({
       )}
       {resumed && (
         <p className="card p-4 text-[15px]" style={{ borderColor: "var(--moss)" }}>
-          {isReshoot ? "Your new take" : `Your shot from ${dateTime(resume!.startedAt)}`} is uploaded. Add the
-          details below and tap Send it, or retake it.
+          {isReshoot ? "Your new take" : `Your shot from ${dateTime(resume!.startedAt)}`} is uploaded but not
+          sent yet. Tap Send it to give it to the marketing desk, or retake it.
         </p>
       )}
 
@@ -455,6 +485,33 @@ export function CaptureFlow({
           </div>
         )}
 
+        {/* Shooting now, or using one already on the phone. */}
+        {!resumed && !file && upload === "idle" && photoFiles.length === 0 && (
+          <div className="mt-3 grid grid-cols-2 gap-1 rounded-sm border p-1" role="radiogroup" aria-label="Where the shot comes from" style={{ borderColor: "var(--rule)" }}>
+            {(["camera", "roll"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={source === option}
+                onClick={() => {
+                  if (source !== option) {
+                    setSource(option);
+                    setSafetyAck(false);
+                  }
+                }}
+                className="rounded-sm px-3 py-2 text-[15px] font-semibold"
+                style={{
+                  background: source === option ? "var(--ink)" : "transparent",
+                  color: source === option ? "var(--bg)" : "var(--ink)",
+                }}
+              >
+                {option === "camera" ? "Shoot it now" : "Already on my phone"}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Safety sits right above the buttons it unlocks. */}
         {safety.length > 0 && !resumed && !file && upload === "idle" && photoFiles.length === 0 && (
           <div className="mt-3 rounded-sm border-2 p-3" style={{ borderColor: "var(--clay)", background: "var(--sunk)" }}>
@@ -471,7 +528,7 @@ export function CaptureFlow({
                 checked={safetyAck}
                 onChange={(e) => setSafetyAck(e.target.checked)}
               />
-              <span>I&rsquo;ll shoot this safely.</span>
+              <span>{ackText}</span>
             </label>
           </div>
         )}
@@ -505,32 +562,24 @@ export function CaptureFlow({
         {mediaType === "video" ? (
           <>
             {!file && !resumed && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2">
                 <label
                   className={`btn block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
                 >
-                  Record now
-                  <input
-                    type="file"
-                    className="sr-only"
-                    accept="video/*"
-                    capture="environment"
-                    disabled={!ready}
-                    onChange={onPick}
-                  />
-                </label>
-                <label
-                  className={`btn btn-quiet block cursor-pointer text-center ${ready ? "" : "pointer-events-none opacity-40"}`}
-                >
-                  Choose from camera roll
-                  {/* No capture attribute: the phone offers its library as well as the camera. */}
-                  <input
-                    type="file"
-                    className="sr-only"
-                    accept="video/*"
-                    disabled={!ready}
-                    onChange={onPick}
-                  />
+                  {sourceButtonText(source, "video")}
+                  {source === "camera" ? (
+                    <input
+                      type="file"
+                      className="sr-only"
+                      accept="video/*"
+                      capture="environment"
+                      disabled={!ready}
+                      onChange={onPick}
+                    />
+                  ) : (
+                    // No capture attribute: the phone offers its library.
+                    <input type="file" className="sr-only" accept="video/*" disabled={!ready} onChange={onPick} />
+                  )}
                 </label>
               </div>
             )}
@@ -550,6 +599,7 @@ export function CaptureFlow({
               orientation={orientation}
               maxCount={maxMediaCount}
               disabled={!ready || shotLocked}
+              source={source}
               onChange={setPhotoFiles}
             />
           )
@@ -582,7 +632,7 @@ export function CaptureFlow({
 
         {!ready && !file && !resumed && photoFiles.length === 0 && upload === "idle" && (
           <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
-            Tick &ldquo;I&rsquo;ll shoot this safely&rdquo; to record or choose your shot.
+            Tick &ldquo;{ackText.replace(/\.$/, "")}&rdquo; to {source === "camera" ? "start" : "choose your shot"}.
           </p>
         )}
         {resumedUnreadable && (
@@ -614,6 +664,9 @@ export function CaptureFlow({
         )}
 
         {/* Review before upload */}
+        {upload === "idle" && (file || photoFiles.length > 0) && (
+          <p className="mt-3 text-sm font-semibold" role="status">{shotStageText("on_phone")}</p>
+        )}
         {upload === "idle" && (file || photoFiles.length >= minMediaCount) && (
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -623,8 +676,8 @@ export function CaptureFlow({
               onClick={() => void startUpload(file ? [file] : photoFiles)}
             >
               {file
-                ? "Use this"
-                : `Use ${photoFiles.length === 1 ? "this photo" : `these ${photoFiles.length} photos`}`}
+                ? "Upload this"
+                : `Upload ${photoFiles.length === 1 ? "this photo" : `these ${photoFiles.length} photos`}`}
             </button>
             {file && (
               <>
@@ -667,9 +720,10 @@ export function CaptureFlow({
               />
             </div>
             <p className="mt-2 text-sm" style={{ color: "var(--muted)" }} role="status">
-              {upload === "uploading" &&
-                `Uploading ${Math.round(progress * 100)}%. Keep this screen open.`}
-              {upload === "done" && "Uploaded."}
+              {upload === "uploading" && shotStageText("uploading", progress)}
+              {upload === "done" && !submitting && shotStageText("uploaded")}
+              {upload === "done" && submitting && shotStageText("sending")}
+              {upload === "failed" && shotStageText("failed")}
             </p>
             {upload === "failed" && (
               <>

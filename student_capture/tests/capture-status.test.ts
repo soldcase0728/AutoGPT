@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UploadStepError, describeUploadFailure, sendBlockers } from "@/lib/capture-status";
+import { UploadStepError, describeUploadFailure, safetyAckText, sendBlockers, shotStageText, sourceButtonText } from "@/lib/capture-status";
 
 const online = { online: true, fileBytes: 700 * 1024 * 1024, maxBytes: 512 * 1024 * 1024 };
 
@@ -60,5 +60,29 @@ describe("sendBlockers", () => {
     expect(sendBlockers({ upload: "idle", captionRequired: true, oneLiner: "" }))
       .toHaveLength(2);
     expect(sendBlockers({ ...ready, upload: "failed" })[0]).toContain("Try again");
+  });
+});
+
+describe("safety wording follows the source", () => {
+  it("is a promise before shooting and a statement about an existing shot", () => {
+    expect(safetyAckText("camera", "video")).toBe("I’ll shoot this safely.");
+    expect(safetyAckText("roll", "video")).toBe("This was filmed safely.");
+    expect(safetyAckText("roll", "photo")).toBe("This was taken safely.");
+    expect(sourceButtonText("camera", "video")).toBe("Record now");
+    expect(sourceButtonText("roll", "photo")).toBe("Choose from camera roll");
+  });
+});
+
+describe("shot stages never overstate", () => {
+  it("only the received stage says the desk has it", () => {
+    const stages = ["on_phone", "uploading", "uploaded", "sending", "failed"] as const;
+    for (const stage of stages) expect(shotStageText(stage, 0.5)).not.toMatch(/received/i);
+    expect(shotStageText("received")).toBe("Received by the marketing desk.");
+  });
+
+  it("says plainly that an upload alone is not a send", () => {
+    expect(shotStageText("uploading", 0.42)).toContain("Not sent to marketing yet");
+    expect(shotStageText("uploaded")).toContain("not sent yet");
+    expect(shotStageText("on_phone")).toContain("Nothing has been sent");
   });
 });

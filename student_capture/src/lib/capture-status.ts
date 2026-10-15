@@ -82,7 +82,7 @@ export function sendBlockers(input: {
   oneLiner: string;
 }): string[] {
   const blockers: string[] = [];
-  if (input.upload === "idle") blockers.push("Choose your shot and tap Use this.");
+  if (input.upload === "idle") blockers.push("Choose your shot and tap Upload this.");
   if (input.upload === "uploading") blockers.push("Wait for the upload to finish.");
   if (input.upload === "failed") blockers.push("The upload didn't finish. Tap Try again above.");
   if (input.captionRequired && !input.oneLiner.trim()) blockers.push("Add a one-line caption.");
@@ -92,4 +92,46 @@ export function sendBlockers(input: {
 /** Everything still in the way of Send, as one line: "To send: … …". */
 export function sendHint(blockers: string[]): string | null {
   return blockers.length ? `To send: ${blockers.join(" ")}` : null;
+}
+
+/** Where the student is getting the shot from. */
+export type ShotSource = "camera" | "roll";
+
+/**
+ * The safety confirmation, worded for what the student is actually doing:
+ * a promise before shooting, a statement about a clip or photo that already exists.
+ */
+export function safetyAckText(source: ShotSource, kind: "video" | "photo"): string {
+  if (source === "camera") return "I’ll shoot this safely.";
+  return kind === "video" ? "This was filmed safely." : "This was taken safely.";
+}
+
+/** The button that opens the chosen source. */
+export function sourceButtonText(source: ShotSource, kind: "video" | "photo"): string {
+  if (source === "camera") return kind === "video" ? "Record now" : "Take a photo now";
+  return "Choose from camera roll";
+}
+
+/**
+ * Where the shot is, in the student's terms. Each stage says only what is
+ * true at that moment: nothing reads as sent until the marketing desk's side
+ * has confirmed it.
+ */
+export type ShotStage = "on_phone" | "uploading" | "uploaded" | "sending" | "received" | "failed";
+
+export function shotStageText(stage: ShotStage, progress = 0): string {
+  switch (stage) {
+    case "on_phone":
+      return "On your phone only. Nothing has been sent yet.";
+    case "uploading":
+      return `Uploading ${Math.round(progress * 100)}%. Keep this screen open. Not sent to marketing yet.`;
+    case "uploaded":
+      return "Uploaded, but not sent yet. Tap Send it to give it to the marketing desk.";
+    case "sending":
+      return "Sending to the marketing desk…";
+    case "received":
+      return "Received by the marketing desk.";
+    case "failed":
+      return "The upload didn’t finish. Nothing has been sent.";
+  }
 }
