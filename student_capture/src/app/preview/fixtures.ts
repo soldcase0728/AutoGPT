@@ -1,5 +1,5 @@
 import { buildChecklist } from "@/lib/guidelines";
-import type { GuidelineVersion, Idea, Person, QueueRow } from "@/lib/types";
+import type { CaptureSafetyReview, GuidelineVersion, Idea, Person, QueueRow } from "@/lib/types";
 import type { SubmissionRow } from "@/components/views/SubmissionsView";
 
 /**
@@ -358,5 +358,51 @@ export const PEOPLE_ROWS = [
     id: "66666666-6666-6666-6666-666666666666", role: "student" as const, name: "Lia Novak",
     email: "lia@example.edu", birthYear: null, participation: "pending" as const,
     hasLogin: false, isMe: false, postedCount: 0, consents: [],
+  },
+];
+
+/** The automated safety scan on the first queue item: two moments to look at. */
+export const SAFETY_REVIEWS: CaptureSafetyReview[] = [
+  {
+    capture_id: "a1b2c3d4-0000-0000-0000-000000000001",
+    safety_screen_id: "5afe0000-0000-0000-0000-000000000001",
+    safety_status: "flags_detected",
+    overall_risk_level: "high",
+    error_code: null,
+    finding_count: 2,
+    unresolved_finding_count: 2,
+    failed_scan_overridden: false,
+    findings: [
+      {
+        id: "5afe0000-0000-0000-0000-0000000000f1",
+        safety_screen_id: "5afe0000-0000-0000-0000-000000000001",
+        submission_media_id: "primary",
+        category: "student_id_badge",
+        severity: "high",
+        confidence: 0.91,
+        description: "A student ID card with a readable name hangs from a backpack in the lower left.",
+        start_ms: 4000,
+        end_ms: 6000,
+        bounding_box: null,
+        detector: "vision",
+        resolution_status: "unreviewed",
+        resolution_reason: null,
+      },
+      {
+        id: "5afe0000-0000-0000-0000-0000000000f2",
+        safety_screen_id: "5afe0000-0000-0000-0000-000000000001",
+        submission_media_id: "primary",
+        category: "profanity_speech",
+        severity: "medium",
+        confidence: 0.78,
+        description: "Someone off camera swears as the bus pulls away.",
+        start_ms: 11000,
+        end_ms: 12500,
+        bounding_box: null,
+        detector: "transcript",
+        resolution_status: "unreviewed",
+        resolution_reason: null,
+      },
+    ],
   },
 ];
