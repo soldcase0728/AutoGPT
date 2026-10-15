@@ -23,6 +23,7 @@ import {
   QUEUE_EXTRAS,
   PEOPLE_ROWS,
   SAFETY_REPORTS,
+  SAFETY_REVIEWS,
   REVIEWER,
   STUDENT,
   SUBMISSIONS,
@@ -176,6 +177,7 @@ export default async function PreviewScreen({
             search=""
             extras={QUEUE_EXTRAS}
             safetyReports={SAFETY_REPORTS}
+            safetyReviews={SAFETY_REVIEWS}
             mediaSrc="/preview-frame.svg"
           />
         </main>

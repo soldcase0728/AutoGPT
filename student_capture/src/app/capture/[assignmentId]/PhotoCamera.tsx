@@ -13,11 +13,14 @@ export function PhotoCamera({
   orientation,
   maxCount,
   disabled,
+  source = "camera",
   onChange,
 }: {
   orientation: PromptOrientation;
   maxCount: number;
   disabled: boolean;
+  /** Which way the student chose to get the photo: only that button shows. */
+  source?: "camera" | "roll";
   onChange: (files: File[]) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -166,14 +169,16 @@ export function PhotoCamera({
   return (
     <div className="mt-3 flex flex-col gap-3">
       {!active && photos.length < maxCount && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2">
+          {source === "camera" ? (
           <button className="btn" type="button" disabled={disabled} onClick={() => void start()}>
             {photos.length ? "Take another" : "Take a photo now"}
           </button>
+          ) : (
           <label
-            className={`btn btn-quiet block cursor-pointer text-center ${disabled ? "pointer-events-none opacity-40" : ""}`}
+            className={`btn block cursor-pointer text-center ${disabled ? "pointer-events-none opacity-40" : ""}`}
           >
-            Choose from camera roll
+            {photos.length ? "Choose another" : "Choose from camera roll"}
             <input
               type="file"
               className="sr-only"
@@ -183,6 +188,7 @@ export function PhotoCamera({
               onChange={(event) => void pick(event)}
             />
           </label>
+          )}
         </div>
       )}
       <div className={active ? "relative overflow-hidden rounded-sm bg-black" : "hidden"}>
